@@ -16,10 +16,11 @@ $user = $user_stmt->fetch(PDO::FETCH_ASSOC);
 
 // Fetch courses taught by instructor
 $courses_stmt = $pdo->prepare("
-    SELECT DISTINCT c.course_id, c.course_name
+    SELECT DISTINCT c.course_id, c.course_name, c.course_code
     FROM schedule s
     JOIN courses c ON s.course_id = c.course_id
     WHERE s.instructor_id = ?
+    ORDER BY c.course_name
 ");
 $courses_stmt->execute([$instructor_id]);
 $courses = $courses_stmt->fetchAll();
@@ -68,15 +69,25 @@ button.view-students-btn:hover{background:#1254c1;}
 
 /* Modal styles */
 .modal{display:none;position:fixed;z-index:2000;left:0;top:0;width:100%;height:100%;overflow:auto;background-color:rgba(0,0,0,0.6);}
-.modal-content{background:#fff;margin:10% auto;padding:20px;border-radius:12px;width:90%;max-width:600px;position:relative;}
-.close{position:absolute;top:10px;right:15px;font-size:28px;font-weight:bold;color:#333;cursor:pointer;transition:0.3s;}
+.modal-content{background:#fff;margin:5% auto;padding:25px;border-radius:12px;width:90%;max-width:800px;position:relative;max-height:80vh;overflow-y:auto;}
+.close{position:absolute;top:15px;right:20px;font-size:28px;font-weight:bold;color:#333;cursor:pointer;transition:0.3s;}
 .close:hover{color:#000;}
-.modal table{width:100%;border-collapse:collapse;margin-top:10px;}
-.modal table th, .modal table td{padding:10px;border:1px solid #ccc;}
+.modal table{width:100%;border-collapse:collapse;margin-top:15px;}
+.modal table th, .modal table td{padding:12px;border:1px solid #ddd;}
 .modal table th{background:#2575fc;color:#fff;}
+.modal table tr:nth-child(even){background:#f9f9f9;}
+
+.loading{text-align:center;padding:40px;color:#666;font-style:italic;}
+.error{text-align:center;padding:20px;color:#e74c3c;background:#fdf2f2;border-radius:6px;margin:10px 0;}
 
 /* Responsive */
-@media screen and (max-width:768px){body{flex-direction:column;}.sidebar{width:100%;padding:15px;box-shadow:none;}.main-content{margin:0;padding:20px;border-radius:0;}table th,table td{padding:10px;font-size:12px;}}
+@media screen and (max-width:768px){
+    body{flex-direction:column;}
+    .sidebar{width:100%;padding:15px;box-shadow:none;}
+    .main-content{margin:0;padding:20px;border-radius:0;}
+    table th,table td{padding:10px;font-size:12px;}
+    .modal-content{margin:10% auto;padding:15px;}
+}
 </style>
 </head>
 <body>
@@ -84,31 +95,41 @@ button.view-students-btn:hover{background:#1254c1;}
 <div class="sidebar">
     <h2>Instructor Panel</h2>
     <a href="instructor_dashboard.php" class="<?= $current_page=='instructor_dashboard.php'?'active':'' ?>">Dashboard</a>
-    <a href="my_courses.php" class="<?= $current_page=='my_courses.php'?'active':'' ?>">My Courses</a>
+    <a href="my_courses.php" class="active">My Courses</a>
     <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">Edit Profile</a>
     <a href="../logout.php">Logout</a>
 </div>
 
 <div class="main-content">
     <h1>My Courses</h1>
-    <table>
-        <thead>
-            <tr>
-                <th>Course Name</th>
-                <th>Action</th>
-            </tr>
-        </thead>
-        <tbody>
-        <?php foreach($courses as $c): ?>
-            <tr>
-                <td><?= htmlspecialchars($c['course_name']) ?></td>
-                <td>
-                    <button class="view-students-btn" onclick="openModal(<?= $c['course_id'] ?>)">View Students</button>
-                </td>
-            </tr>
-        <?php endforeach; ?>
-        </tbody>
-    </table>
+    <?php if(empty($courses)): ?>
+        <p style="text-align:center; padding:40px; color:#666; font-style:italic;">
+            You are not currently assigned to any courses.
+        </p>
+    <?php else: ?>
+        <table>
+            <thead>
+                <tr>
+                    <th>Course Name</th>
+                    <th>Course Code</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php foreach($courses as $c): ?>
+                <tr>
+                    <td><?= htmlspecialchars($c['course_name']) ?></td>
+                    <td><?= htmlspecialchars($c['course_code'] ?? 'N/A') ?></td>
+                    <td>
+                        <button class="view-students-btn" onclick="openModal(<?= $c['course_id'] ?>)">
+                            View Students
+                        </button>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    <?php endif; ?>
 </div>
 
 <!-- Modal Structure -->
@@ -116,8 +137,8 @@ button.view-students-btn:hover{background:#1254c1;}
     <div class="modal-content">
         <span class="close" onclick="closeModal()">&times;</span>
         <h2>Enrolled Students</h2>
-        <div id="modalBody">
-            <!-- Student table will be inserted here dynamically -->
+        <div id="modalBody" class="loading">
+            Loading students...
         </div>
     </div>
 </div>
@@ -125,11 +146,24 @@ button.view-students-btn:hover{background:#1254c1;}
 <script>
 // Open modal & fetch students
 function openModal(courseId){
+    // Show loading state
+    document.getElementById('modalBody').innerHTML = '<div class="loading">Loading students...</div>';
+    document.getElementById('studentsModal').style.display = 'block';
+    
     fetch(`view_students_ajax.php?course_id=${courseId}`)
-    .then(response=>response.text())
-    .then(data=>{
+    .then(response => {
+        if(!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        return response.text();
+    })
+    .then(data => {
         document.getElementById('modalBody').innerHTML = data;
-        document.getElementById('studentsModal').style.display = 'block';
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        document.getElementById('modalBody').innerHTML = 
+            '<div class="error">Error loading students. Please try again.</div>';
     });
 }
 
@@ -140,10 +174,17 @@ function closeModal(){
 
 // Close modal if click outside
 window.onclick = function(event){
-    if(event.target==document.getElementById('studentsModal')){
+    if(event.target == document.getElementById('studentsModal')){
         closeModal();
     }
 }
+
+// Close modal with Escape key
+document.addEventListener('keydown', function(event){
+    if(event.key === 'Escape'){
+        closeModal();
+    }
+});
 </script>
 
 </body>

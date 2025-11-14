@@ -41,7 +41,7 @@ $total_enrollments = $total_enrollments_stmt->fetchColumn();
 $enrollments_stmt = $pdo->prepare("
     SELECT u.username AS student_name, 
            c.course_name, 
-           GROUP_CONCAT(DISTINCT s.day_of_week ORDER BY FIELD(s.day_of_week, 'Monday','Tuesday','Wednesday','Thursday','Friday') SEPARATOR ', ') AS days,
+           GROUP_CONCAT(DISTINCT s.day ORDER BY FIELD(s.day, 'Monday','Tuesday','Wednesday','Thursday','Friday') SEPARATOR ', ') AS days,
            MIN(s.start_time) AS start_time,
            MAX(s.end_time) AS end_time
     FROM enrollments e
@@ -50,7 +50,7 @@ $enrollments_stmt = $pdo->prepare("
     JOIN courses c ON s.course_id = c.course_id
     WHERE c.department_id = ?
     GROUP BY u.username, c.course_name
-    ORDER BY u.username, FIELD(s.day_of_week, 'Monday','Tuesday','Wednesday','Thursday','Friday')
+    ORDER BY u.username, FIELD(s.day, 'Monday','Tuesday','Wednesday','Thursday','Friday')
 ");
 $enrollments_stmt->execute([$dept_id]);
 $enrollments = $enrollments_stmt->fetchAll();

@@ -28,33 +28,53 @@ $courses_stmt->execute([$instructor_id]);
 $courses = $courses_stmt->fetchAll();
 $total_courses = count($courses);
 
-// Fetch today's classes and number of enrolled students
-$today = date('l'); // Day name
-$today_classes_stmt = $pdo->prepare("
-    SELECT s.schedule_id, c.course_name, r.room_name, s.start_time, s.end_time,
+// Fetch complete weekly schedule
+$weekly_schedule_stmt = $pdo->prepare("
+    SELECT s.schedule_id, c.course_name, c.course_code, r.room_name, 
+           s.day, s.start_time, s.end_time,
            (SELECT COUNT(*) FROM enrollments e WHERE e.schedule_id = s.schedule_id) AS student_count
     FROM schedule s
     JOIN courses c ON s.course_id = c.course_id
     JOIN rooms r ON s.room_id = r.room_id
-    WHERE s.instructor_id = ? AND s.day_of_week = ?
-    ORDER BY s.start_time
+    WHERE s.instructor_id = ?
+    ORDER BY FIELD(s.day, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'), s.start_time
 ");
-$today_classes_stmt->execute([$instructor_id, $today]);
-$today_classes = $today_classes_stmt->fetchAll();
-$total_students_today = array_sum(array_column($today_classes, 'student_count'));
+$weekly_schedule_stmt->execute([$instructor_id]);
+$weekly_schedule = $weekly_schedule_stmt->fetchAll();
 
-// Next class
+// Group schedule by day for better display
+$schedule_by_day = [
+    'Monday' => [],
+    'Tuesday' => [],
+    'Wednesday' => [],
+    'Thursday' => [],
+    'Friday' => []
+];
+
+foreach($weekly_schedule as $class) {
+    $schedule_by_day[$class['day']][] = $class;
+}
+
+// Calculate total students across all classes
+$total_students = array_sum(array_column($weekly_schedule, 'student_count'));
+
+// Next class (from current time)
+$today = date('l');
+$current_time = date('H:i:s');
 $next_class_stmt = $pdo->prepare("
-    SELECT c.course_name, s.start_time
+    SELECT c.course_name, s.day, s.start_time, s.end_time, r.room_name
     FROM schedule s
     JOIN courses c ON s.course_id = c.course_id
+    JOIN rooms r ON s.room_id = r.room_id
     WHERE s.instructor_id = ?
-      AND s.day_of_week = ?
-      AND s.start_time >= CURTIME()
-    ORDER BY s.start_time ASC
+      AND (
+        (s.day = ? AND s.start_time >= ?) OR 
+        (s.day > ?)
+      )
+    ORDER BY FIELD(s.day, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'), s.start_time
     LIMIT 1
 ");
-$next_class_stmt->execute([$instructor_id, $today]);
+$next_class_stmt->execute([$instructor_id, $today, $current_time, $today]);
 $next_class = $next_class_stmt->fetch(PDO::FETCH_ASSOC);
 
 // Sidebar active page
@@ -186,37 +206,91 @@ body {
     right:15px;
 }
 
-/* ========== Schedule Table ========== */
-.schedule-table {
-    width:100%;
-    border-collapse:collapse;
-    margin-top:15px;
-    background-color:#fff;
-    border-radius:12px;
-    overflow:hidden;
-    box-shadow:0 6px 20px rgba(0,0,0,0.1);
+/* ========== Weekly Schedule Grid ========== */
+.weekly-schedule {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 15px;
+    margin-top: 20px;
 }
-.schedule-table th,.schedule-table td {
-    border:none;
-    padding:14px;
-    text-align:left;
+.day-column {
+    background: white;
+    border-radius: 12px;
+    padding: 15px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
-.schedule-table th {
-    background-color:#2575fc;
-    color:#fff;
-    font-weight:600;
+.day-header {
+    background: #2575fc;
+    color: white;
+    padding: 12px;
+    border-radius: 8px;
+    text-align: center;
+    margin-bottom: 15px;
+    font-weight: bold;
 }
-.schedule-table tr:nth-child(even) {background-color:#f7f9fc;}
-.schedule-table tr:hover {background-color:#d0e7ff;}
-.schedule-table .next-class {background-color:#ffeaa7 !important;font-weight:bold;}
+.class-slot {
+    background: #f8f9fa;
+    border-left: 4px solid #6a11cb;
+    padding: 12px;
+    margin-bottom: 10px;
+    border-radius: 6px;
+    transition: transform 0.2s;
+}
+.class-slot:hover {
+    transform: translateX(5px);
+    background: #e3f2fd;
+}
+.class-slot.next-class {
+    background: #fff3cd;
+    border-left-color: #ffc107;
+    font-weight: bold;
+}
+.course-name {
+    font-weight: bold;
+    color: #2c3e50;
+    margin-bottom: 5px;
+}
+.class-details {
+    font-size: 12px;
+    color: #666;
+    line-height: 1.4;
+}
+.class-time {
+    font-weight: bold;
+    color: #2575fc;
+}
+.student-count {
+    background: #e9ecef;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 11px;
+    margin-top: 5px;
+    display: inline-block;
+}
+
+/* ========== No Classes Message ========== */
+.no-classes {
+    text-align: center;
+    padding: 20px;
+    color: #666;
+    font-style: italic;
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin: 10px 0;
+}
 
 /* ========== Responsive ========== */
+@media screen and (max-width:1200px){
+    .weekly-schedule {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
 @media screen and (max-width:768px){
     body{flex-direction:column;}
     .sidebar{width:100%;padding:15px;box-shadow:none;}
     .main-content{margin:0;padding:20px;border-radius:0;}
     .stats-cards{flex-direction:column;}
-    .schedule-table th,.schedule-table td{padding:10px;font-size:12px;}
+    .weekly-schedule{grid-template-columns: 1fr;}
 }
 </style>
 </head>
@@ -239,7 +313,7 @@ body {
     </div>
 
     <h1>Welcome, <?= htmlspecialchars($user['username']); ?> 👋</h1>
-    <p>Instructor dashboard overview</p>
+    <p>Your weekly teaching schedule overview</p>
 
     <div class="stats-cards">
         <div class="card">
@@ -247,59 +321,62 @@ body {
             <p><?= $total_courses ?></p>
         </div>
         <div class="card">
-            <h3>Students Today</h3>
-            <p><?= $total_students_today ?></p>
+            <h3>Weekly Classes</h3>
+            <p><?= count($weekly_schedule) ?></p>
+        </div>
+        <div class="card">
+            <h3>Total Students</h3>
+            <p><?= $total_students ?></p>
         </div>
         <div class="card">
             <h3>Next Class</h3>
             <?php if($next_class): ?>
-                <p><?= htmlspecialchars($next_class['course_name']) ?> at <?= date('H:i', strtotime($next_class['start_time'])) ?></p>
-                <p id="countdown"></p>
-                <script>
-                    const startTime = "<?= date('H:i:s', strtotime($next_class['start_time'])) ?>";
-                    let todayDate = new Date().toISOString().split('T')[0];
-                    const classDateTime = new Date(todayDate + "T" + startTime);
-                    function updateCountdown(){
-                        const now = new Date();
-                        const diff = classDateTime - now;
-                        if(diff <= 0){document.getElementById('countdown').innerText = "Class is starting now!";clearInterval(timerInterval);return;}
-                        const hours=Math.floor(diff/(1000*60*60));
-                        const minutes=Math.floor((diff % (1000*60*60))/(1000*60));
-                        const seconds=Math.floor((diff % (1000*60))/1000);
-                        document.getElementById('countdown').innerText = `Starts in: ${hours}h ${minutes}m ${seconds}s`;
-                    }
-                    updateCountdown();
-                    const timerInterval = setInterval(updateCountdown,1000);
-                </script>
+                <p><?= htmlspecialchars($next_class['course_name']) ?></p>
+                <p style="font-size:14px;margin-top:5px;">
+                    <?= $next_class['day'] ?> at <?= date('g:i A', strtotime($next_class['start_time'])) ?>
+                </p>
             <?php else: ?>
-                <p>No more classes today</p>
+                <p>No upcoming classes</p>
             <?php endif; ?>
         </div>
     </div>
 
-    <h2>Today's Classes</h2>
-    <table class="schedule-table">
-        <thead>
-            <tr>
-                <th>Course</th>
-                <th>Room</th>
-                <th>Start</th>
-                <th>End</th>
-                <th>Students</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php foreach($today_classes as $c): ?>
-            <tr class="<?= ($next_class && $next_class['course_name']==$c['course_name'])?'next-class':'' ?>">
-                <td><?= htmlspecialchars($c['course_name']) ?></td>
-                <td><?= htmlspecialchars($c['room_name']) ?></td>
-                <td><?= htmlspecialchars($c['start_time']) ?></td>
-                <td><?= htmlspecialchars($c['end_time']) ?></td>
-                <td><?= htmlspecialchars($c['student_count']) ?></td>
-            </tr>
-            <?php endforeach; ?>
-        </tbody>
-    </table>
+    <h2>Weekly Schedule</h2>
+    <div class="weekly-schedule">
+        <?php 
+        $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+        foreach($days as $day): 
+            $day_classes = $schedule_by_day[$day];
+        ?>
+            <div class="day-column">
+                <div class="day-header"><?= $day ?></div>
+                <?php if(!empty($day_classes)): ?>
+                    <?php foreach($day_classes as $class): 
+                        $is_next_class = ($next_class && 
+                                         $next_class['course_name'] == $class['course_name'] && 
+                                         $next_class['day'] == $class['day'] && 
+                                         $next_class['start_time'] == $class['start_time']);
+                    ?>
+                        <div class="class-slot <?= $is_next_class ? 'next-class' : '' ?>">
+                            <div class="course-name"><?= htmlspecialchars($class['course_name']) ?></div>
+                            <div class="class-details">
+                                <div class="class-time">
+                                    <?= date('g:i A', strtotime($class['start_time'])) ?> - <?= date('g:i A', strtotime($class['end_time'])) ?>
+                                </div>
+                                <div>Room: <?= htmlspecialchars($class['room_name']) ?></div>
+                                <?php if(!empty($class['course_code'])): ?>
+                                    <div>Code: <?= htmlspecialchars($class['course_code']) ?></div>
+                                <?php endif; ?>
+                                <div class="student-count"><?= $class['student_count'] ?> students</div>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <div class="no-classes">No classes scheduled</div>
+                <?php endif; ?>
+            </div>
+        <?php endforeach; ?>
+    </div>
 </div>
 </body>
 </html>

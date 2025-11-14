@@ -3,12 +3,39 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
 session_start();
-require __DIR__ . '/../../includes/db.php';
 
+// Enhanced Session Security
+// Regenerate session ID to prevent session fixation
+session_regenerate_id(true);
+
+// Check if user is logged in
 if(!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'student'){
     header("Location: ../index.php");
     exit;
 }
+
+// Validate user agent to prevent session hijacking
+if(!isset($_SESSION['user_agent'])) {
+    $_SESSION['user_agent'] = $_SERVER['HTTP_USER_AGENT'];
+} else {
+    if($_SESSION['user_agent'] !== $_SERVER['HTTP_USER_AGENT']) {
+        // User agent changed - possible session hijacking
+        session_destroy();
+        header("Location: ../index.php");
+        exit;
+    }
+}
+
+// Session expiration (30 minutes)
+if(isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity'] > 1800)) {
+    // Session expired
+    session_destroy();
+    header("Location: ../index.php?expired=1");
+    exit;
+}
+$_SESSION['last_activity'] = time();
+
+require __DIR__ . '/../../includes/db.php';
 
 $student_id = $_SESSION['user_id'];
 
@@ -20,14 +47,14 @@ $user = $user_stmt->fetch(PDO::FETCH_ASSOC);
 // Fetch student's schedule
 $schedules = $pdo->prepare("
     SELECT s.schedule_id, c.course_name, u.username AS instructor_name, r.room_name, 
-           s.academic_year, s.semester, s.day_of_week, s.start_time, s.end_time
+           s.academic_year, s.semester, s.day, s.start_time, s.end_time
     FROM schedule s
     JOIN courses c ON s.course_id = c.course_id
     JOIN users u ON s.instructor_id = u.user_id
     JOIN rooms r ON s.room_id = r.room_id
     JOIN enrollments e ON s.schedule_id = e.schedule_id
     WHERE e.student_id = ?
-    ORDER BY s.day_of_week, s.start_time
+    ORDER BY s.day, s.start_time
 ");
 $schedules->execute([$student_id]);
 $my_schedule = $schedules->fetchAll();
@@ -48,7 +75,7 @@ $upcoming_classes_stmt = $pdo->prepare("
     FROM schedule s
     JOIN enrollments e ON s.schedule_id = e.schedule_id
     WHERE e.student_id = ?
-      AND s.day_of_week = DAYNAME(CURDATE())
+      AND s.day = DAYNAME(CURDATE())
       AND s.start_time >= CURTIME()
 ");
 $upcoming_classes_stmt->execute([$student_id]);
@@ -61,7 +88,7 @@ $next_class_stmt = $pdo->prepare("
     JOIN courses c ON s.course_id = c.course_id
     JOIN enrollments e ON s.schedule_id = e.schedule_id
     WHERE e.student_id = ?
-      AND s.day_of_week = DAYNAME(CURDATE())
+      AND s.day = DAYNAME(CURDATE())
       AND s.start_time >= CURTIME()
     ORDER BY s.start_time ASC
     LIMIT 1
@@ -222,6 +249,35 @@ body {
 .schedule-table tr:hover {background-color: #d0e7ff;}
 .schedule-table .today-row {background-color: #ffeaa7 !important;font-weight:bold;}
 
+/* ================= Security Notice ================= */
+.security-notice {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    color: #856404;
+    padding: 12px 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.security-notice i {
+    font-size: 16px;
+}
+
+/* ================= Session Timer ================= */
+.session-timer {
+    background: #d1ecf1;
+    border: 1px solid #bee5eb;
+    color: #0c5460;
+    padding: 8px 12px;
+    border-radius: 5px;
+    font-size: 12px;
+    margin-top: 10px;
+    display: inline-block;
+}
+
 /* ================= Responsive ================= */
 @media screen and (max-width:768px){
     body{flex-direction:column;}
@@ -231,6 +287,7 @@ body {
     .schedule-table th,.schedule-table td{padding:10px;font-size:12px;}
 }
 </style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
 <!-- Sidebar -->
@@ -240,11 +297,25 @@ body {
     <a href="my_schedule.php" class="<?= $current_page=='my_schedule.php'?'active':'' ?>">My Schedule</a>
     <a href="view_announcements.php" class="<?= $current_page=='view_announcements.php'?'active':'' ?>">Announcements</a>
     <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">Edit Profile</a>
-    <a href="../logout.php">Logout</a>
+    <a href="../logout.php" onclick="return confirm('Are you sure you want to logout?')">Logout</a>
 </div>
 
 <!-- Main Content -->
 <div class="main-content">
+    <!-- Security Notice -->
+    <div class="security-notice">
+        <i class="fas fa-shield-alt"></i>
+        <div>
+            <strong>Security Notice:</strong> This session will automatically expire after 30 minutes of inactivity. 
+            For your security, please logout when finished.
+        </div>
+    </div>
+
+    <!-- Session Timer -->
+    <div class="session-timer" id="sessionTimer">
+        <i class="fas fa-clock"></i> Session expires in: <span id="timer">30:00</span>
+    </div>
+
     <!-- Profile Picture -->
     <div class="profile-picture">
         <?php if($user['profile_picture'] && file_exists(__DIR__.'/uploads/'.$user['profile_picture'])): ?>
@@ -311,13 +382,13 @@ body {
         <?php 
         $today = date('l'); // Current day name
         foreach($my_schedule as $s): 
-            $todayClass = ($s['day_of_week'] === $today) ? 'today-row' : '';
+            $todayClass = ($s['day'] === $today) ? 'today-row' : '';
         ?>
             <tr class="<?= $todayClass ?>">
                 <td><?= htmlspecialchars($s['course_name']) ?></td>
                 <td><?= htmlspecialchars($s['instructor_name']) ?></td>
                 <td><?= htmlspecialchars($s['room_name']) ?></td>
-                <td><?= htmlspecialchars($s['day_of_week']) ?></td>
+                <td><?= htmlspecialchars($s['day']) ?></td>
                 <td><?= htmlspecialchars($s['start_time']) ?></td>
                 <td><?= htmlspecialchars($s['end_time']) ?></td>
             </tr>
@@ -325,5 +396,49 @@ body {
         </tbody>
     </table>
 </div>
+
+<script>
+// Session timer countdown (30 minutes = 1800 seconds)
+let sessionTime = 1800; // 30 minutes in seconds
+
+function updateSessionTimer() {
+    const minutes = Math.floor(sessionTime / 60);
+    const seconds = sessionTime % 60;
+    
+    document.getElementById('timer').textContent = 
+        `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    
+    if (sessionTime <= 0) {
+        // Session expired, redirect to logout
+        window.location.href = '../logout.php?expired=1';
+    } else {
+        sessionTime--;
+    }
+}
+
+// Update timer every second
+setInterval(updateSessionTimer, 1000);
+
+// Reset timer on user activity
+function resetSessionTimer() {
+    sessionTime = 1800; // Reset to 30 minutes
+}
+
+// Add event listeners for user activity
+document.addEventListener('mousemove', resetSessionTimer);
+document.addEventListener('keypress', resetSessionTimer);
+document.addEventListener('click', resetSessionTimer);
+document.addEventListener('scroll', resetSessionTimer);
+
+// Initial timer update
+updateSessionTimer();
+
+// Confirm logout
+document.querySelector('a[href="../logout.php"]').addEventListener('click', function(e) {
+    if(!confirm('Are you sure you want to logout?')) {
+        e.preventDefault();
+    }
+});
+</script>
 </body>
 </html>

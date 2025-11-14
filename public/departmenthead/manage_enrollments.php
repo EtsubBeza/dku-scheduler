@@ -83,13 +83,13 @@ $courses = $courses_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Fetch enrollments
 $enrollments_stmt = $pdo->prepare("
-    SELECT e.enrollment_id, u.username AS student_name, c.course_name, s.day_of_week, s.start_time, s.end_time
+    SELECT e.enrollment_id, u.username AS student_name, c.course_name, s.day, s.start_time, s.end_time
     FROM enrollments e
     JOIN users u ON e.student_id = u.user_id
     JOIN schedule s ON e.schedule_id = s.schedule_id
     JOIN courses c ON s.course_id = c.course_id
     WHERE c.department_id = ?
-    ORDER BY u.username, s.day_of_week, s.start_time
+    ORDER BY u.username, s.day, s.start_time
 ");
 $enrollments_stmt->execute([$dept_id]);
 $enrollments = $enrollments_stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -202,7 +202,7 @@ body {font-family: Arial, sans-serif; margin:0; background:#f3f4f6;}
                             <td><input type="checkbox" name="unenroll_ids[]" value="<?= (int)$e['enrollment_id'] ?>"></td>
                             <td><?= htmlspecialchars($e['student_name']) ?></td>
                             <td><?= htmlspecialchars($e['course_name']) ?></td>
-                            <td><?= htmlspecialchars($e['day_of_week']) ?></td>
+                            <td><?= htmlspecialchars($e['day']) ?></td>
                             <td><?= htmlspecialchars($e['start_time']) ?> - <?= htmlspecialchars($e['end_time']) ?></td>
                         </tr>
                     <?php endforeach; ?>
