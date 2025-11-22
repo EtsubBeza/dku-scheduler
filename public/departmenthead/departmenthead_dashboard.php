@@ -82,143 +82,563 @@ $announcements = $announcements_stmt->fetchAll();
 <head>
 <meta charset="UTF-8">
 <title>Department Head Dashboard</title>
-<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
-/* ================= Dashboard Main Content ================= */
+:root {
+    --primary: #4361ee;
+    --primary-dark: #3a56d4;
+    --secondary: #7209b7;
+    --success: #4cc9f0;
+    --danger: #f72585;
+    --warning: #f8961e;
+    --light: #f8f9fa;
+    --dark: #212529;
+    --gray: #6c757d;
+    --gray-light: #e9ecef;
+    --border-radius: 8px;
+    --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --transition: all 0.3s ease;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+    background-color: #f5f7fb;
+    color: var(--dark);
+    line-height: 1.6;
+}
+
+.container {
+    display: flex;
+    min-height: 100vh;
+}
+
+/* Sidebar Styles */
+.sidebar {
+    width: 250px;
+    background: linear-gradient(180deg, var(--primary), var(--secondary));
+    color: white;
+    padding: 20px 0;
+    box-shadow: var(--box-shadow);
+    z-index: 100;
+    position: fixed;
+    height: 100vh;
+    overflow-y: auto;
+}
+
+.logo {
+    text-align: center;
+    padding: 0 20px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 20px;
+}
+
+.logo h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.logo p {
+    font-size: 0.8rem;
+    opacity: 0.8;
+}
+
+.nav-links {
+    list-style: none;
+}
+
+.nav-links li {
+    padding: 12px 20px;
+    transition: var(--transition);
+}
+
+.nav-links li:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.nav-links li.active {
+    background-color: rgba(255, 255, 255, 0.2);
+    border-left: 4px solid white;
+}
+
+.nav-links a {
+    color: white;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.nav-links i {
+    font-size: 1.2rem;
+}
+
+/* Main Content Styles */
 .main-content {
-    margin-left: 250px; /* Sidebar width */
+    flex: 1;
+    margin-left: 250px;
     padding: 30px;
+    overflow-y: auto;
     background-color: #f9fafb;
     min-height: 100vh;
-    transition: all 0.3s ease;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+.header h1 {
+    font-size: 2rem;
+    color: var(--primary);
+    font-weight: 700;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: white;
+    padding: 10px 15px;
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+}
+
+.user-info img {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+/* Card Styles */
+.card {
+    background: white;
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+    margin-bottom: 25px;
+    overflow: hidden;
+}
+
+.card-header {
+    padding: 20px;
+    background: var(--primary);
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.card-header h3 {
+    font-size: 1.3rem;
+    font-weight: 600;
+}
+
+.badge {
+    background: var(--success);
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.card-body {
+    padding: 20px;
 }
 
 /* Welcome Section */
 .welcome-section {
-    background: linear-gradient(135deg, #4f46e5, #3b82f6);
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
     color: white;
     padding: 30px 20px;
-    border-radius: 12px;
+    border-radius: var(--border-radius);
     margin-bottom: 30px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    box-shadow: var(--box-shadow);
 }
 
-.welcome-section h1 { font-size: 28px; margin-bottom: 10px; }
-.welcome-section p { font-size: 16px; opacity: 0.9; }
+.welcome-section h1 { 
+    font-size: 28px; 
+    margin-bottom: 10px; 
+}
+
+.welcome-section p { 
+    font-size: 16px; 
+    opacity: 0.9; 
+}
 
 /* Stats Cards */
-.stats-cards { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 30px; }
+.stats-cards { 
+    display: flex; 
+    gap: 20px; 
+    flex-wrap: wrap; 
+    margin-bottom: 30px; 
+}
+
 .stats-cards .card {
     flex: 1 1 200px;
     background-color: white;
-    border-radius: 12px;
+    border-radius: var(--border-radius);
     padding: 20px;
     text-align: center;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: var(--box-shadow);
+    transition: var(--transition);
+    border: none;
 }
-.stats-cards .card:hover { transform: translateY(-5px); box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
-.stats-cards .card h3 { font-size: 18px; margin-bottom: 10px; color: #374151; }
-.stats-cards .card p { font-size: 24px; font-weight: bold; color: #111827; }
+
+.stats-cards .card:hover { 
+    transform: translateY(-5px); 
+    box-shadow: 0 8px 20px rgba(0,0,0,0.1); 
+}
+
+.stats-cards .card h3 { 
+    font-size: 18px; 
+    margin-bottom: 10px; 
+    color: var(--dark);
+}
+
+.stats-cards .card p { 
+    font-size: 24px; 
+    font-weight: bold; 
+    color: var(--primary);
+}
 
 /* Table Section */
-.table-section, .announcement-section { background-color: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 30px; }
-.table-section h2, .announcement-section h2 { margin-bottom: 20px; color: #111827; }
+.table-section, .announcement-section { 
+    background-color: white; 
+    padding: 20px; 
+    border-radius: var(--border-radius); 
+    box-shadow: var(--box-shadow); 
+    margin-bottom: 30px; 
+}
 
-.enrollments-table, .announcements-table { width: 100%; border-collapse: collapse; }
+.table-section h2, .announcement-section h2 { 
+    margin-bottom: 20px; 
+    color: var(--dark); 
+}
+
+.enrollments-table, .announcements-table { 
+    width: 100%; 
+    border-collapse: collapse; 
+}
+
 .enrollments-table th, .enrollments-table td,
 .announcements-table th, .announcements-table td {
-    padding: 12px 15px; text-align: left; border-bottom: 1px solid #e5e7eb;
+    padding: 12px 15px; 
+    text-align: left; 
+    border-bottom: 1px solid var(--gray-light);
 }
-.enrollments-table th, .announcements-table th { background-color: #f3f4f6; color: #374151; font-weight: 600; }
-.enrollments-table tr:hover, .announcements-table tr:hover { background-color: #f9fafb; transition: background-color 0.2s; }
+
+.enrollments-table th, .announcements-table th { 
+    background-color: var(--gray-light); 
+    color: var(--dark); 
+    font-weight: 600; 
+}
+
+.enrollments-table tr:hover, .announcements-table tr:hover { 
+    background-color: #f9fafb; 
+    transition: background-color 0.2s; 
+}
 
 /* Announcement Form */
-.announcement-form { margin-bottom: 20px; }
-.announcement-form input, .announcement-form textarea { width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 6px; border: 1px solid #ccc; }
-.announcement-form button { padding: 10px 20px; background-color: #4f46e5; color: white; border: none; border-radius: 6px; cursor: pointer; }
-.announcement-form button:hover { background-color: #3b36c4; }
+.announcement-form { 
+    margin-bottom: 20px; 
+}
+
+.announcement-form input, .announcement-form textarea { 
+    width: 100%; 
+    padding: 12px 15px;
+    margin-bottom: 15px; 
+    border-radius: var(--border-radius); 
+    border: 1px solid var(--gray-light); 
+    font-size: 1rem;
+    transition: var(--transition);
+}
+
+.announcement-form input:focus, .announcement-form textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.2);
+}
+
+.announcement-form button { 
+    padding: 12px 20px; 
+    background-color: var(--primary); 
+    color: white; 
+    border: none; 
+    border-radius: var(--border-radius); 
+    cursor: pointer; 
+    font-weight: 600;
+    transition: var(--transition);
+}
+
+.announcement-form button:hover { 
+    background-color: var(--primary-dark); 
+}
+
+/* Button Styles */
+.btn {
+    padding: 12px 20px;
+    border: none;
+    border-radius: var(--border-radius);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-primary {
+    background: var(--primary);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: var(--primary-dark);
+}
+
+.btn-danger {
+    background: var(--danger);
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #e1156f;
+}
+
+.btn-success {
+    background: var(--success);
+    color: white;
+}
+
+.btn-success:hover {
+    background: #3ab3d6;
+}
+
+/* Message Styles */
+.message {
+    padding: 15px;
+    border-radius: var(--border-radius);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.message.success {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.message.error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.message.warning {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+}
 
 /* Responsive */
-@media (max-width: 768px) { .stats-cards { flex-direction: column; } }
+@media (max-width: 768px) { 
+    .container {
+        flex-direction: column;
+    }
+    
+    .sidebar {
+        width: 100%;
+        position: relative;
+        height: auto;
+    }
+    
+    .main-content {
+        margin-left: 0;
+    }
+    
+    .stats-cards { 
+        flex-direction: column; 
+    }
+    
+    .form-row {
+        flex-direction: column;
+    }
+}
 </style>
 </head>
 <body>
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="logo">
+                <h2><i class="fas fa-university"></i> DKU Scheduler</h2>
+                <p>Department Head Portal</p>
+            </div>
+            <ul class="nav-links">
+                <li class="active"><a href="dashboard.php"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
+                <li><a href="manage_students.php"><i class="fas fa-users"></i> Manage Students</a></li>
+                <li><a href="manage_courses.php"><i class="fas fa-book"></i> Manage Courses</a></li>
+                <li><a href="manage_schedules.php"><i class="fas fa-calendar-plus"></i> Manage Schedules</a></li>
+                <li><a href="assign_courses.php"><i class="fas fa-tasks"></i> Assign Courses</a></li>
+                <li><a href="announcements.php"><i class="fas fa-bullhorn"></i> Announcements</a></li>
+                <li><a href="../logout.php"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+            </ul>
+        </div>
 
-<?php include 'sidebar.php'; ?>
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="header">
+                <h1>Department Head Dashboard</h1>
+                <div class="user-info">
+                    <img src="<?= $profile_img_path ?>" alt="Profile">
+                    <div>
+                        <div><?= htmlspecialchars($current_user['username']) ?></div>
+                        <small>Department Head</small>
+                    </div>
+                </div>
+            </div>
 
-<div class="main-content">
-    <div class="welcome-section">
-        <h1>Welcome, <?= htmlspecialchars($current_user['username']); ?> 👋</h1>
-        <p>Here is your department dashboard. Use the sidebar to manage students, courses, enrollments, and announcements.</p>
+            <!-- Welcome Section -->
+            <div class="welcome-section">
+                <h1>Welcome, <?= htmlspecialchars($current_user['username']); ?> 👋</h1>
+                <p>Here is your department dashboard. Use the sidebar to manage students, courses, enrollments, and announcements.</p>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="stats-cards">
+                <div class="card">
+                    <h3><i class="fas fa-users"></i> Total Students</h3>
+                    <p><?= $total_students ?></p>
+                </div>
+                <div class="card">
+                    <h3><i class="fas fa-book"></i> Total Courses</h3>
+                    <p><?= $total_courses ?></p>
+                </div>
+                <div class="card">
+                    <h3><i class="fas fa-calendar-check"></i> Total Enrollments</h3>
+                    <p><?= $total_enrollments ?></p>
+                </div>
+            </div>
+
+            <!-- Enrollments Table -->
+            <div class="table-section">
+                <div class="card-header">
+                    <h3><i class="fas fa-list"></i> Current Enrollments</h3>
+                </div>
+                <div class="card-body">
+                    <table class="enrollments-table">
+                        <thead>
+                            <tr>
+                                <th>Student</th>
+                                <th>Course</th>
+                                <th>Days</th>
+                                <th>Start Time</th>
+                                <th>End Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if($enrollments): ?>
+                                <?php foreach($enrollments as $e): ?>
+                                    <tr>
+                                        <td><?= htmlspecialchars($e['student_name']) ?></td>
+                                        <td><?= htmlspecialchars($e['course_name']) ?></td>
+                                        <td><?= htmlspecialchars($e['days']) ?></td>
+                                        <td><?= date('h:i A', strtotime($e['start_time'])) ?></td>
+                                        <td><?= date('h:i A', strtotime($e['end_time'])) ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <tr>
+                                    <td colspan="5" style="text-align:center; padding: 20px;">
+                                        <i class="fas fa-inbox" style="font-size: 2rem; color: var(--gray); margin-bottom: 10px;"></i>
+                                        <p>No enrollments found.</p>
+                                    </td>
+                                </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Announcements Section -->
+            <div class="announcement-section">
+                <div class="card-header">
+                    <h3><i class="fas fa-bullhorn"></i> Announcements</h3>
+                </div>
+                <div class="card-body">
+                    <h4>Post New Announcement</h4>
+                    <form method="post" class="announcement-form">
+                        <input type="text" name="announcement_title" placeholder="Announcement Title" required>
+                        <textarea name="announcement_message" placeholder="Announcement Message" rows="4" required></textarea>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-paper-plane"></i> Post Announcement
+                        </button>
+                    </form>
+                    
+                    <?php if($announcement_msg): ?>
+                        <div class="message <?= strpos($announcement_msg, 'successfully') !== false ? 'success' : 'error' ?>">
+                            <i class="fas fa-<?= strpos($announcement_msg, 'successfully') !== false ? 'check-circle' : 'exclamation-circle' ?>"></i>
+                            <?= $announcement_msg ?>
+                        </div>
+                    <?php endif; ?>
+
+                    <h4 style="margin-top: 30px;">Recent Announcements</h4>
+                    <table class="announcements-table">
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Message</th>
+                                <th>Posted At</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if($announcements): ?>
+                                <?php foreach($announcements as $a): ?>
+                                    <tr>
+                                        <td><strong><?= htmlspecialchars($a['title']) ?></strong></td>
+                                        <td><?= nl2br(htmlspecialchars($a['message'])) ?></td>
+                                        <td><?= date('M d, Y h:i A', strtotime($a['created_at'])) ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <tr>
+                                    <td colspan="3" style="text-align:center; padding: 20px;">
+                                        <i class="fas fa-bullhorn" style="font-size: 2rem; color: var(--gray); margin-bottom: 10px;"></i>
+                                        <p>No announcements yet.</p>
+                                    </td>
+                                </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <!-- Stats Cards -->
-    <div class="stats-cards">
-        <div class="card"><h3>Total Students</h3><p><?= $total_students ?></p></div>
-        <div class="card"><h3>Total Courses</h3><p><?= $total_courses ?></p></div>
-        <div class="card"><h3>Total Enrollments</h3><p><?= $total_enrollments ?></p></div>
-    </div>
-
-    <!-- Enrollments Table -->
-    <div class="table-section">
-        <h2>Current Enrollments</h2>
-        <table class="enrollments-table">
-            <thead>
-                <tr><th>Student</th><th>Course</th><th>Days</th><th>Start Time</th><th>End Time</th></tr>
-            </thead>
-            <tbody>
-                <?php if($enrollments): ?>
-                    <?php foreach($enrollments as $e): ?>
-                        <tr>
-                            <td><?= htmlspecialchars($e['student_name']) ?></td>
-                            <td><?= htmlspecialchars($e['course_name']) ?></td>
-                            <td><?= htmlspecialchars($e['days']) ?></td>
-                            <td><?= date('h:i A', strtotime($e['start_time'])) ?></td>
-                            <td><?= date('h:i A', strtotime($e['end_time'])) ?></td>
-                        </tr>
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <tr><td colspan="5" style="text-align:center;">No enrollments found.</td></tr>
-                <?php endif; ?>
-            </tbody>
-        </table>
-    </div>
-
-    <!-- Announcements Section -->
-    <div class="announcement-section">
-        <h2>Post Announcement</h2>
-        <form method="post" class="announcement-form">
-            <input type="text" name="announcement_title" placeholder="Title" required>
-            <textarea name="announcement_message" placeholder="Message" rows="4" required></textarea>
-            <button type="submit">Post Announcement</button>
-        </form>
-        <?php if($announcement_msg): ?>
-            <p style="color:green;"><?= $announcement_msg ?></p>
-        <?php endif; ?>
-
-        <h2>Recent Announcements</h2>
-        <table class="announcements-table">
-            <thead>
-                <tr><th>Title</th><th>Message</th><th>Posted At</th></tr>
-            </thead>
-            <tbody>
-                <?php if($announcements): ?>
-                    <?php foreach($announcements as $a): ?>
-                        <tr>
-                            <td><?= htmlspecialchars($a['title']) ?></td>
-                            <td><?= nl2br(htmlspecialchars($a['message'])) ?></td>
-                            <td><?= date('M d, Y h:i A', strtotime($a['created_at'])) ?></td>
-                        </tr>
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <tr><td colspan="3" style="text-align:center;">No announcements yet.</td></tr>
-                <?php endif; ?>
-            </tbody>
-        </table>
-    </div>
-</div>
-
+    <script>
+        // Simple script for sidebar active state
+        document.addEventListener('DOMContentLoaded', function() {
+            const currentPage = window.location.pathname.split('/').pop();
+            const navLinks = document.querySelectorAll('.nav-links a');
+            
+            navLinks.forEach(link => {
+                const linkPage = link.getAttribute('href');
+                if (linkPage === currentPage) {
+                    link.parentElement.classList.add('active');
+                }
+            });
+        });
+    </script>
 </body>
 </html>

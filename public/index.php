@@ -757,7 +757,7 @@
         <div class="footer-content">
             <div class="footer-column">
                 <h3>DKU Scheduler</h3>
-                <p>Secure academic scheduling platform for Debre Markos University.</p>
+                <p>Secure academic scheduling platform for Debark University.</p>
                 <div class="social-links">
                     <a href="#"><i class="fab fa-facebook-f"></i></a>
                     <a href="#"><i class="fab fa-twitter"></i></a>
