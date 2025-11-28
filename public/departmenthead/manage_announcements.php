@@ -11,6 +11,19 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'department_head'){
 $dept_id = $_SESSION['department_id'] ?? 0;
 $user_id = $_SESSION['user_id'];
 
+// Fetch current user info for sidebar
+$user_stmt = $pdo->prepare("SELECT username, profile_picture FROM users WHERE user_id = ?");
+$user_stmt->execute([$_SESSION['user_id']]);
+$current_user = $user_stmt->fetch(PDO::FETCH_ASSOC);
+
+// Determine profile picture path
+$profile_path = '../../uploads/profiles/' . ($current_user['profile_picture'] ?? '');
+if (!empty($current_user['profile_picture']) && file_exists($profile_path)) {
+    $profile_src = $profile_path;
+} else {
+    $profile_src = '../assets/default_profile.png';
+}
+
 // ------------------ Handle Create/Edit Announcement ------------------
 $message = "";
 $editing = false;
@@ -96,289 +109,823 @@ $current_page = basename($_SERVER['PHP_SELF']);
 <head>
 <meta charset="UTF-8">
 <title>Manage Announcements</title>
-<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
-/* Layout */
-.main-content { margin-left: 240px; padding: 30px; background:#f9fafb; min-height:100vh; font-family:'Segoe UI', sans-serif;}
-h1 { margin-bottom: 20px; }
+* { box-sizing: border-box; margin:0; padding:0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
 
-/* Form */
-.announcement-form input, .announcement-form textarea, .announcement-form input[type="url"], .announcement-form input[type="file"] { width: 100%; padding: 10px; margin-bottom: 10px; border-radius:6px; border:1px solid #ccc; }
-.announcement-form button { padding: 10px 20px; background-color: #4f46e5; color: #fff; border:none; border-radius:6px; cursor:pointer; }
-.announcement-form button:hover { background-color: #3b36c4; }
+/* ================= Topbar for Hamburger ================= */
+.topbar {
+    display: none;
+    position: fixed; top:0; left:0; width:100%;
+    background:#2c3e50; color:#fff;
+    padding:15px 20px;
+    z-index:1200;
+    justify-content:space-between; align-items:center;
+}
+.menu-btn {
+    font-size:26px;
+    background:#1abc9c;
+    border:none; color:#fff;
+    cursor:pointer;
+    padding:10px 14px;
+    border-radius:8px;
+    font-weight:600;
+    transition: background 0.3s, transform 0.2s;
+}
+.menu-btn:hover { background:#159b81; transform:translateY(-2px); }
 
-/* Table */
-.ann-table { width:100%; border-collapse: collapse; background:#fff; border-radius:10px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.05);}
-.ann-table th, .ann-table td { padding:12px 14px; border-bottom:1px solid #f1f5f9; text-align:left; vertical-align: middle;}
-.ann-table th { background:#f8fafc; font-weight:600; color:#111827; }
-.ann-table tr:hover { background:#fcfcfe; }
+/* ================= Sidebar ================= */
+.sidebar {
+    position: fixed; top:0; left:0;
+    width:250px; height:100%;
+    background:#1f2937; color:#fff;
+    z-index:1100;
+    transition: transform 0.3s ease;
+    padding: 20px 0;
+}
+.sidebar.hidden { transform:translateX(-260px); }
+.sidebar a { 
+    display:block; 
+    padding:12px 20px; 
+    color:#fff; 
+    text-decoration:none; 
+    transition: background 0.3s; 
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.sidebar a:hover, .sidebar a.active { background:#1abc9c; }
 
-/* Action links */
-.btn { display:inline-block; padding:6px 10px; border-radius:6px; text-decoration:none; cursor:pointer; }
-.btn-view { background:#06b6d4; color:#fff; }
-.btn-edit { background:#10b981; color:#fff; }
-.btn-delete { background:#ef4444; color:#fff; }
+.sidebar-profile {
+    text-align: center;
+    margin-bottom: 20px;
+    padding: 0 20px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.2);
+}
+
+.sidebar-profile img {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-bottom: 10px;
+    border: 2px solid #1abc9c;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+.sidebar-profile p {
+    color: #fff;
+    font-weight: bold;
+    margin: 0;
+    font-size: 16px;
+}
+
+/* ================= Overlay ================= */
+.overlay {
+    position: fixed; top:0; left:0; width:100%; height:100%;
+    background: rgba(0,0,0,0.4); z-index:1050;
+    display:none; opacity:0; transition: opacity 0.3s ease;
+}
+.overlay.active { display:block; opacity:1; }
+
+/* ================= Main content ================= */
+.main-content {
+    margin-left: 250px;
+    padding:30px 50px;
+    min-height:100vh;
+    background:#f9fafb;
+    transition: all 0.3s ease;
+}
+
+/* Header Styles */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    padding: 20px 0;
+}
+
+.header h1 {
+    font-size: 2.2rem;
+    color: #1f2937;
+    font-weight: 700;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: white;
+    padding: 12px 18px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.user-info img {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+/* Card Styles */
+.card {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.1);
+    margin-bottom: 25px;
+    overflow: hidden;
+}
+
+.card-header {
+    padding: 20px 25px;
+    background: linear-gradient(135deg, #6366f1, #3b82f6);
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-radius: 15px 15px 0 0;
+}
+
+.card-header h3 {
+    font-size: 1.4rem;
+    font-weight: 600;
+}
+
+.card-body {
+    padding: 25px;
+}
+
+/* Form Styles */
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #374151;
+}
+
+.form-control {
+    width: 100%;
+    padding: 14px 16px;
+    border: 1px solid #d1d5db;
+    border-radius: 10px;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+
+.form-row {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.form-row .form-group {
+    flex: 1;
+    min-width: 250px;
+}
+
+/* Button Styles */
+.btn {
+    padding: 12px 20px;
+    border: none;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+}
+
+.btn-primary {
+    background: #6366f1;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #4f46e5;
+    transform: translateY(-2px);
+}
+
+.btn-success {
+    background: #10b981;
+    color: white;
+}
+
+.btn-success:hover {
+    background: #059669;
+    transform: translateY(-2px);
+}
+
+.btn-danger {
+    background: #ef4444;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #dc2626;
+    transform: translateY(-2px);
+}
+
+.btn-info {
+    background: #06b6d4;
+    color: white;
+}
+
+.btn-info:hover {
+    background: #0891b2;
+    transform: translateY(-2px);
+}
+
+.btn-sm {
+    padding: 8px 16px;
+    font-size: 0.9rem;
+}
+
+/* Message Styles */
+.message {
+    padding: 16px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 500;
+}
+
+.message.success {
+    background: #dcfce7;
+    color: #166534;
+    border: 1px solid #bbf7d0;
+}
+
+.message.error {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+}
+
+.message.warning {
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fde68a;
+}
+
+/* Table Styles */
+.ann-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.ann-table th, .ann-table td {
+    padding: 16px;
+    text-align: left;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.ann-table th {
+    background: #f8fafc;
+    color: #374151;
+    font-weight: 600;
+}
+
+.ann-table tr:hover {
+    background: #f9fafb;
+}
+
+.ann-table tr:last-child td {
+    border-bottom: none;
+}
+
+/* Badge Styles */
+.badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    background: #eef2ff;
+    color: #0f172a;
+}
 
 /* Details row */
-.details-row td { background:#ffffff; padding:18px; }
-.details-content { display:flex; gap:20px; align-items:flex-start; }
-.details-left { flex:1; }
-.details-right { width:320px; }
+.details-row td {
+    background: #ffffff;
+    padding: 25px;
+}
+
+.details-content {
+    display: flex;
+    gap: 30px;
+    align-items: flex-start;
+}
+
+.details-left {
+    flex: 1;
+}
+
+.details-right {
+    width: 300px;
+    background: #f8fafc;
+    padding: 20px;
+    border-radius: 10px;
+}
 
 /* Like button */
-.like-btn { background:none; border:none; cursor:pointer; font-size:16px; }
+.like-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 18px;
+    padding: 8px;
+    border-radius: 6px;
+    transition: background 0.3s;
+}
+
+.like-btn:hover {
+    background: #f3f4f6;
+}
 
 /* Comments */
-.comment-section { margin-top:10px; background:#f3f4f6; padding:8px; border-radius:8px; max-height:220px; overflow-y:auto; }
-.comment { margin-bottom:8px; padding:8px; background:#eef2ff; border-radius:6px; display:flex; justify-content:space-between; align-items:center; }
-.comment .meta { font-size:12px; color:#334155; }
-.comment button.delete-comment { background:none; border:none; color:#ef4444; cursor:pointer; font-weight:bold; }
+.comment-section {
+    margin-top: 15px;
+    background: #f3f4f6;
+    padding: 15px;
+    border-radius: 10px;
+    max-height: 250px;
+    overflow-y: auto;
+}
 
-/* add-comment form */
-.add-comment-form { display:flex; gap:8px; margin-top:8px; }
-.add-comment-form input { flex:1; padding:8px; border-radius:6px; border:1px solid #d1d5db; }
-.add-comment-form button { padding:8px 12px; border:none; background:#3b82f6; color:#fff; border-radius:6px; cursor:pointer; }
+.comment {
+    margin-bottom: 12px;
+    padding: 12px;
+    background: #eef2ff;
+    border-radius: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
 
-/* small badges */
-.badge { display:inline-block; padding:3px 8px; border-radius:999px; background:#eef2ff; font-size:12px; color:#0f172a; margin-right:6px; }
+.comment .meta {
+    font-size: 13px;
+    color: #334155;
+}
+
+.comment button.delete-comment {
+    background: none;
+    border: none;
+    color: #ef4444;
+    cursor: pointer;
+    font-weight: bold;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.comment button.delete-comment:hover {
+    background: #fee2e2;
+}
+
+/* Add-comment form */
+.add-comment-form {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.add-comment-form input {
+    flex: 1;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #d1d5db;
+    font-size: 1rem;
+}
+
+.add-comment-form button {
+    padding: 12px 20px;
+    border: none;
+    background: #3b82f6;
+    color: #fff;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.add-comment-form button:hover {
+    background: #2563eb;
+}
+
+.text-muted {
+    color: #6b7280;
+    font-size: 0.875rem;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 50px;
+    color: #6b7280;
+}
+
+.empty-state i {
+    font-size: 3.5rem;
+    margin-bottom: 20px;
+    color: #d1d5db;
+}
+
+.empty-state h3 {
+    font-size: 1.5rem;
+    margin-bottom: 10px;
+    color: #374151;
+}
+
+/* ================= Responsive ================= */
+@media(max-width: 768px){
+    .topbar { display:flex; }
+    .sidebar { transform:translateX(-100%); }
+    .sidebar.active { transform:translateX(0); }
+    .main-content { margin-left:0; padding: 20px; padding-top: 80px; }
+    .header { flex-direction: column; gap: 15px; align-items: flex-start; }
+    .header h1 { font-size: 1.8rem; }
+    .form-row { flex-direction: column; }
+    .form-row .form-group { min-width: auto; }
+    .details-content { flex-direction: column; }
+    .details-right { width: 100%; }
+    .action-buttons { flex-direction: column; }
+}
 </style>
 </head>
 <body>
-<?php include 'sidebar.php'; ?>
+    <!-- Topbar for Mobile -->
+    <div class="topbar">
+        <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+        <h2>Manage Announcements</h2>
+    </div>
 
-<div class="main-content">
-    <h1><?= $editing ? "Edit Announcement" : "Post New Announcement" ?></h1>
-    <form method="post" class="announcement-form" enctype="multipart/form-data">
-        <input type="text" name="title" placeholder="Title" value="<?= $editing ? htmlspecialchars($edit_announcement['title']) : '' ?>" required>
-        <textarea name="message" placeholder="Message" rows="4" required><?= $editing ? htmlspecialchars($edit_announcement['message']) : '' ?></textarea>
-        <label>Attach a File:</label>
-        <input type="file" name="attachment">
-        <?php if($editing && $edit_announcement['attachment']): ?>
-            <p>Current: <a href="../../uploads/announcements/<?= htmlspecialchars($edit_announcement['attachment']) ?>" target="_blank"><?= htmlspecialchars($edit_announcement['attachment']) ?></a></p>
-        <?php endif; ?>
-        <label>External Link / Video URL:</label>
-        <input type="url" name="external_link" placeholder="https://example.com" value="<?= $editing ? htmlspecialchars($edit_announcement['external_link']) : '' ?>">
-        <button type="submit"><?= $editing ? "Update Announcement" : "Post Announcement" ?></button>
-    </form>
-    <?php if(!$editing && $message): ?><p style="color:green;"><?= htmlspecialchars($message) ?></p><?php endif; ?>
+    <!-- Overlay for Mobile -->
+    <div class="overlay" onclick="toggleSidebar()"></div>
 
-    <h1>All Announcements</h1>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-profile">
+            <img src="<?= htmlspecialchars($profile_src) ?>" alt="Profile Picture">
+            <p><?= htmlspecialchars($current_user['username'] ?? 'User') ?></p>
+        </div>
+        <a href="departmenthead_dashboard.php" class="<?= $current_page=='departmenthead_dashboard.php'?'active':'' ?>">Dashboard</a>
+        <a href="manage_enrollments.php" class="<?= $current_page=='manage_enrollments.php'?'active':'' ?>">Manage Enrollments</a>
+        <a href="manage_schedules.php" class="<?= $current_page=='manage_schedules.php'?'active':'' ?>">Manage Schedules</a>
+        <a href="assign_courses.php" class="<?= $current_page=='assign_courses.php'?'active':'' ?>">Assign Courses</a>
+        <a href="add_courses.php" class="<?= $current_page=='add_courses.php'?'active':'' ?>">Add Courses</a>
+        <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">Edit Profile</a>
+        <a href="manage_announcements.php" class="<?= $current_page=='manage_announcements.php'?'active':'' ?>">Announcements</a>
+        <a href="../logout.php">Logout</a>
+    </div>
 
-    <?php if($announcements): ?>
-    <table class="ann-table">
-        <thead>
-            <tr>
-                <th>Title</th>
-                <th>Posted By</th>
-                <th>Date</th>
-                <th>Likes</th>
-                <th>Comments</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-        <?php foreach($announcements as $a): ?>
-            <tr>
-                <td><?= htmlspecialchars($a['title']) ?></td>
-                <td><?= htmlspecialchars($a['username']) ?></td>
-                <td><?= date('M d, Y H:i', strtotime($a['created_at'])) ?></td>
-                <td><span class="badge like-count-badge" data-ann="<?= $a['announcement_id'] ?>"><?= (int)$a['like_count'] ?></span></td>
-                <td><span class="badge comment-count-badge" data-ann="<?= $a['announcement_id'] ?>"><?= (int)$a['comment_count'] ?></span></td>
-                <td>
-                    <button class="btn btn-view" data-id="<?= $a['announcement_id'] ?>">View</button>
-                    <?php if($a['created_by'] == $user_id): ?>
-                        <a class="btn btn-edit" href="?edit=<?= $a['announcement_id'] ?>">Edit</a>
-                        <a class="btn btn-delete" href="?delete=<?= $a['announcement_id'] ?>" onclick="return confirm('Delete this announcement?')">Delete</a>
-                    <?php endif; ?>
-                </td>
-            </tr>
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="header">
+            <h1>Manage Announcements</h1>
+            <div class="user-info">
+                <img src="<?= htmlspecialchars($profile_src) ?>" alt="Profile">
+                <div>
+                    <div><?= htmlspecialchars($current_user['username'] ?? 'User') ?></div>
+                    <small>Department Head</small>
+                </div>
+            </div>
+        </div>
 
-            <!-- Details row (collapsed by default) -->
-            <tr class="details-row" id="details-<?= $a['announcement_id'] ?>" style="display:none;">
-                <td colspan="6">
-                    <div class="details-content">
-                        <div class="details-left">
-                            <h3><?= htmlspecialchars($a['title']) ?></h3>
-                            <div class="announcement-meta">Posted by <?= htmlspecialchars($a['username']) ?> on <?= date('M d, Y H:i', strtotime($a['created_at'])) ?></div>
-                            <p><?= nl2br(htmlspecialchars($a['message'])) ?></p>
+        <!-- Create/Edit Announcement Card -->
+        <div class="card">
+            <div class="card-header">
+                <h3><?= $editing ? "Edit Announcement" : "Post New Announcement" ?></h3>
+            </div>
+            <div class="card-body">
+                <?php if(!$editing && $message): ?>
+                    <div class="message <?= strpos($message, 'successfully') !== false ? 'success' : 'error' ?>">
+                        <i class="fas fa-<?= strpos($message, 'successfully') !== false ? 'check-circle' : 'exclamation-circle' ?>"></i>
+                        <?= htmlspecialchars($message) ?>
+                    </div>
+                <?php endif; ?>
 
-                            <?php if($a['attachment']): ?>
-                                <p><a href="../../uploads/announcements/<?= htmlspecialchars($a['attachment']) ?>" target="_blank">Download attachment</a></p>
+                <form method="post" enctype="multipart/form-data">
+                    <div class="form-group">
+                        <label for="title">Title:</label>
+                        <input type="text" name="title" id="title" class="form-control" 
+                               value="<?= $editing ? htmlspecialchars($edit_announcement['title']) : '' ?>" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="message">Message:</label>
+                        <textarea name="message" id="message" class="form-control" rows="4" required><?= $editing ? htmlspecialchars($edit_announcement['message']) : '' ?></textarea>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="attachment">Attachment:</label>
+                            <input type="file" name="attachment" id="attachment" class="form-control">
+                            <?php if($editing && $edit_announcement['attachment']): ?>
+                                <p class="text-muted">Current: <a href="../../uploads/announcements/<?= htmlspecialchars($edit_announcement['attachment']) ?>" target="_blank"><?= htmlspecialchars($edit_announcement['attachment']) ?></a></p>
                             <?php endif; ?>
-
-                            <?php if($a['external_link']): ?>
-                                <p><a href="<?= htmlspecialchars($a['external_link']) ?>" target="_blank">External link</a></p>
-                            <?php endif; ?>
-
-                            <!-- Like / Likes info -->
-                            <div style="margin-top:10px;">
-                                <button class="like-btn" data-id="<?= $a['announcement_id'] ?>">
-                                    <?= $a['like_count'] > 0 ? '❤️' : '🤍' ?> <span class="like-count-inline"><?= (int)$a['like_count'] ?></span>
-                                </button>
-                                <span style="margin-left:8px; font-size:13px; color:#475569;">
-                                    <small class="liked-users"><?= htmlspecialchars($a['liked_users'] ?: 'No likes yet') ?></small>
-                                </span>
-                            </div>
-
-                            <!-- Comments -->
-                            <div class="comment-section" id="comments-<?= $a['announcement_id'] ?>"></div>
-
-                            <form class="add-comment-form" data-id="<?= $a['announcement_id'] ?>">
-                                <input type="text" name="comment" placeholder="Add a comment..." required>
-                                <button type="submit">Post</button>
-                            </form>
                         </div>
-
-                        <div class="details-right">
-                            <!-- Additional quick actions or meta can go here -->
-                            <p><strong>Meta</strong></p>
-                            <p>Announcement ID: <?= (int)$a['announcement_id'] ?></p>
-                            <p>Department: <?= htmlspecialchars($a['department_id'] ?? 'Global') ?></p>
+                        
+                        <div class="form-group">
+                            <label for="external_link">External Link / Video URL:</label>
+                            <input type="url" name="external_link" id="external_link" class="form-control" 
+                                   placeholder="https://example.com" value="<?= $editing ? htmlspecialchars($edit_announcement['external_link']) : '' ?>">
                         </div>
                     </div>
-                </td>
-            </tr>
 
-        <?php endforeach; ?>
-        </tbody>
-    </table>
-    <?php else: ?>
-        <p>No announcements found.</p>
-    <?php endif; ?>
-</div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-<?= $editing ? 'save' : 'paper-plane' ?>"></i> 
+                        <?= $editing ? "Update Announcement" : "Post Announcement" ?>
+                    </button>
+                    
+                    <?php if($editing): ?>
+                        <a href="manage_announcements.php" class="btn" style="background: #6b7280; color: white; margin-left: 10px;">
+                            <i class="fas fa-times"></i> Cancel
+                        </a>
+                    <?php endif; ?>
+                </form>
+            </div>
+        </div>
 
-<script>
-// Helper: safe JSON fetch with error handling
-async function safeFetch(url, options = {}) {
-    try {
-        const res = await fetch(url, options);
-        if(!res.ok) throw new Error('Network response was not ok: ' + res.status);
-        const data = await res.json();
-        return data;
-    } catch (err) {
-        console.error('Fetch error:', err);
-        return { error: err.message || 'Fetch error' };
-    }
-}
+        <!-- All Announcements Card -->
+        <div class="card">
+            <div class="card-header">
+                <h3>All Announcements</h3>
+            </div>
+            <div class="card-body">
+                <?php if($announcements): ?>
+                    <div style="overflow-x: auto;">
+                        <table class="ann-table">
+                            <thead>
+                                <tr>
+                                    <th>Title</th>
+                                    <th>Posted By</th>
+                                    <th>Date</th>
+                                    <th>Likes</th>
+                                    <th>Comments</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            <?php foreach($announcements as $a): ?>
+                                <tr>
+                                    <td><strong><?= htmlspecialchars($a['title']) ?></strong></td>
+                                    <td><?= htmlspecialchars($a['username']) ?></td>
+                                    <td><?= date('M d, Y H:i', strtotime($a['created_at'])) ?></td>
+                                    <td><span class="badge like-count-badge" data-ann="<?= $a['announcement_id'] ?>"><?= (int)$a['like_count'] ?></span></td>
+                                    <td><span class="badge comment-count-badge" data-ann="<?= $a['announcement_id'] ?>"><?= (int)$a['comment_count'] ?></span></td>
+                                    <td>
+                                        <div class="action-buttons" style="display: flex; gap: 8px;">
+                                            <button class="btn btn-info btn-sm" data-id="<?= $a['announcement_id'] ?>">View</button>
+                                            <?php if($a['created_by'] == $user_id): ?>
+                                                <a class="btn btn-success btn-sm" href="?edit=<?= $a['announcement_id'] ?>">Edit</a>
+                                                <a class="btn btn-danger btn-sm" href="?delete=<?= $a['announcement_id'] ?>" onclick="return confirm('Delete this announcement?')">Delete</a>
+                                            <?php endif; ?>
+                                        </div>
+                                    </td>
+                                </tr>
 
-// Toggle details
-document.querySelectorAll('.btn-view').forEach(btn => {
-    btn.addEventListener('click', () => {
-        const aid = btn.dataset.id;
-        const details = document.getElementById('details-' + aid);
-        if(details.style.display === 'none' || details.style.display === ''){
-            details.style.display = 'table-row';
-            loadComments(aid);
-        } else {
-            details.style.display = 'none';
+                                <!-- Details row (collapsed by default) -->
+                                <tr class="details-row" id="details-<?= $a['announcement_id'] ?>" style="display:none;">
+                                    <td colspan="6">
+                                        <div class="details-content">
+                                            <div class="details-left">
+                                                <h3><?= htmlspecialchars($a['title']) ?></h3>
+                                                <div class="text-muted" style="margin-bottom: 15px;">
+                                                    Posted by <?= htmlspecialchars($a['username']) ?> on <?= date('M d, Y H:i', strtotime($a['created_at'])) ?>
+                                                </div>
+                                                <p style="line-height: 1.6;"><?= nl2br(htmlspecialchars($a['message'])) ?></p>
+
+                                                <?php if($a['attachment']): ?>
+                                                    <p style="margin-top: 15px;">
+                                                        <a href="../../uploads/announcements/<?= htmlspecialchars($a['attachment']) ?>" target="_blank" class="btn btn-primary btn-sm">
+                                                            <i class="fas fa-download"></i> Download Attachment
+                                                        </a>
+                                                    </p>
+                                                <?php endif; ?>
+
+                                                <?php if($a['external_link']): ?>
+                                                    <p style="margin-top: 10px;">
+                                                        <a href="<?= htmlspecialchars($a['external_link']) ?>" target="_blank" class="btn btn-info btn-sm">
+                                                            <i class="fas fa-external-link-alt"></i> External Link
+                                                        </a>
+                                                    </p>
+                                                <?php endif; ?>
+
+                                                <!-- Like / Likes info -->
+                                                <div style="margin-top:20px; display: flex; align-items: center; gap: 10px;">
+                                                    <button class="like-btn" data-id="<?= $a['announcement_id'] ?>">
+                                                        <?= $a['like_count'] > 0 ? '❤️' : '🤍' ?> <span class="like-count-inline"><?= (int)$a['like_count'] ?></span>
+                                                    </button>
+                                                    <span class="text-muted">
+                                                        <small class="liked-users"><?= htmlspecialchars($a['liked_users'] ?: 'No likes yet') ?></small>
+                                                    </span>
+                                                </div>
+
+                                                <!-- Comments -->
+                                                <div class="comment-section" id="comments-<?= $a['announcement_id'] ?>"></div>
+
+                                                <form class="add-comment-form" data-id="<?= $a['announcement_id'] ?>">
+                                                    <input type="text" name="comment" placeholder="Add a comment..." required>
+                                                    <button type="submit">Post</button>
+                                                </form>
+                                            </div>
+
+                                            <div class="details-right">
+                                                <h4 style="margin-bottom: 15px;">Announcement Details</h4>
+                                                <p><strong>ID:</strong> <?= (int)$a['announcement_id'] ?></p>
+                                                <p><strong>Department:</strong> <?= htmlspecialchars($a['department_id'] ?? 'Global') ?></p>
+                                                <p><strong>Status:</strong> <span class="badge">Active</span></p>
+                                                <?php if($a['updated_at'] && $a['updated_at'] != $a['created_at']): ?>
+                                                    <p><strong>Last Updated:</strong> <?= date('M d, Y H:i', strtotime($a['updated_at'])) ?></p>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php else: ?>
+                    <div class="empty-state">
+                        <i class="fas fa-bullhorn"></i>
+                        <h3>No Announcements Found</h3>
+                        <p>No announcements have been posted yet. Create your first announcement using the form above.</p>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleSidebar() {
+            const sidebar = document.querySelector('.sidebar');
+            const overlay = document.querySelector('.overlay');
+            sidebar.classList.toggle('active');
+            overlay.classList.toggle('active');
         }
-    });
-});
 
-// Load comments for an announcement
-async function loadComments(aid){
-    const container = document.getElementById('comments-' + aid);
-    container.innerHTML = '<em>Loading comments...</em>';
-    const data = await safeFetch(`../common/load_comments.php?announcement_id=${aid}`);
-    if(data.error){
-        container.innerHTML = `<div style="color:#ef4444">Error loading comments: ${data.error}</div>`;
-        return;
-    }
-    container.innerHTML = '';
-    if(data.length === 0){
-        container.innerHTML = '<div style="color:#64748b">No comments yet.</div>';
-    } else {
-        data.forEach(c => {
-            const div = document.createElement('div');
-            div.className = 'comment';
-            const left = document.createElement('div');
-            left.innerHTML = `<div class="meta"><strong>${escapeHtml(c.username)}</strong> <small style="color:#475569"> • ${c.created_at}</small></div>
-                              <div style="margin-top:6px;">${escapeHtml(c.comment)}</div>`;
-            const btn = document.createElement('button');
-            btn.className = 'delete-comment';
-            btn.textContent = 'X';
-            btn.title = 'Delete comment';
-            btn.addEventListener('click', async () => {
-                if(!confirm('Delete this comment?')) return;
-                const resp = await safeFetch('../common/delete_comment.php', {
-                    method: 'POST',
-                    headers: {'Content-Type':'application/x-www-form-urlencoded'},
-                    body: `comment_id=${encodeURIComponent(c.comment_id)}`
-                });
-                if(resp && resp.success){
-                    await loadComments(aid);
-                    // update comment count badge
-                    document.querySelector('.comment-count-badge[data-ann="'+aid+'"]').textContent = resp.new_comment_count ?? 0;
-                } else {
-                    alert('Error deleting comment: ' + (resp.error || 'unknown'));
+        // Set active state for current page
+        document.addEventListener('DOMContentLoaded', function() {
+            const currentPage = window.location.pathname.split('/').pop();
+            const navLinks = document.querySelectorAll('.sidebar a');
+            
+            navLinks.forEach(link => {
+                const linkPage = link.getAttribute('href');
+                if (linkPage === currentPage) {
+                    link.classList.add('active');
                 }
             });
-            div.appendChild(left);
-            div.appendChild(btn);
-            container.appendChild(div);
         });
-    }
-    // update comment count badge
-    const badge = document.querySelector('.comment-count-badge[data-ann="'+aid+'"]');
-    if(badge) badge.textContent = data.length;
-}
 
-// Add comment
-document.querySelectorAll('.add-comment-form').forEach(form=>{
-    form.addEventListener('submit', async e=>{
-        e.preventDefault();
-        const aid = form.dataset.id;
-        const commentInput = form.querySelector('input[name="comment"]');
-        const comment = commentInput.value.trim();
-        if(!comment) return;
-        const res = await safeFetch('../common/add_comment.php', {
-            method: 'POST',
-            headers: {'Content-Type':'application/x-www-form-urlencoded'},
-            body: `announcement_id=${encodeURIComponent(aid)}&comment=${encodeURIComponent(comment)}`
-        });
-        if(res && res.success){
-            commentInput.value = '';
-            await loadComments(aid);
-            // update comment count badge
-            document.querySelector('.comment-count-badge[data-ann="'+aid+'"]').textContent = res.new_comment_count ?? '';
-        } else {
-            alert('Error adding comment: ' + (res.error || 'unknown'));
-        }
-    });
-});
-
-// Like button (in details)
-document.addEventListener('click', function(e){
-    if(e.target && e.target.matches('.like-btn')){
-        const aid = e.target.dataset.id;
-        (async ()=>{
-            const res = await safeFetch(`../common/like_announcement.php?announcement_id=${aid}`);
-            if(res && !res.error){
-                // update inline like count
-                const inline = e.target.querySelector('.like-count-inline');
-                if(inline) inline.textContent = res.like_count;
-                // update table badge
-                const badge = document.querySelector('.like-count-badge[data-ann="'+aid+'"]');
-                if(badge) badge.textContent = res.like_count;
-                // toggle heart (server returns liked_by_user)
-                e.target.innerHTML = (res.liked_by_user ? '❤️' : '🤍') + ' <span class="like-count-inline">' + res.like_count + '</span>';
-            } else {
-                alert('Error toggling like: ' + (res.error || 'unknown'));
+        // Helper: safe JSON fetch with error handling
+        async function safeFetch(url, options = {}) {
+            try {
+                const res = await fetch(url, options);
+                if(!res.ok) throw new Error('Network response was not ok: ' + res.status);
+                const data = await res.json();
+                return data;
+            } catch (err) {
+                console.error('Fetch error:', err);
+                return { error: err.message || 'Fetch error' };
             }
-        })();
-    }
-});
+        }
 
-// small helper to escape html
-function escapeHtml(unsafe) {
-    if(unsafe === null || unsafe === undefined) return '';
-    return unsafe
-         .replaceAll('&','&amp;')
-         .replaceAll('<','&lt;')
-         .replaceAll('>','&gt;')
-         .replaceAll('"','&quot;')
-         .replaceAll("'",'&#039;');
-}
-</script>
+        // Toggle details
+        document.querySelectorAll('.btn-info').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const aid = btn.dataset.id;
+                const details = document.getElementById('details-' + aid);
+                if(details.style.display === 'none' || details.style.display === ''){
+                    details.style.display = 'table-row';
+                    loadComments(aid);
+                } else {
+                    details.style.display = 'none';
+                }
+            });
+        });
+
+        // Load comments for an announcement
+        async function loadComments(aid){
+            const container = document.getElementById('comments-' + aid);
+            container.innerHTML = '<em>Loading comments...</em>';
+            const data = await safeFetch(`../common/load_comments.php?announcement_id=${aid}`);
+            if(data.error){
+                container.innerHTML = `<div style="color:#ef4444">Error loading comments: ${data.error}</div>`;
+                return;
+            }
+            container.innerHTML = '';
+            if(data.length === 0){
+                container.innerHTML = '<div style="color:#64748b">No comments yet.</div>';
+            } else {
+                data.forEach(c => {
+                    const div = document.createElement('div');
+                    div.className = 'comment';
+                    const left = document.createElement('div');
+                    left.innerHTML = `<div class="meta"><strong>${escapeHtml(c.username)}</strong> <small style="color:#475569"> • ${c.created_at}</small></div>
+                                      <div style="margin-top:6px;">${escapeHtml(c.comment)}</div>`;
+                    const btn = document.createElement('button');
+                    btn.className = 'delete-comment';
+                    btn.textContent = 'X';
+                    btn.title = 'Delete comment';
+                    btn.addEventListener('click', async () => {
+                        if(!confirm('Delete this comment?')) return;
+                        const resp = await safeFetch('../common/delete_comment.php', {
+                            method: 'POST',
+                            headers: {'Content-Type':'application/x-www-form-urlencoded'},
+                            body: `comment_id=${encodeURIComponent(c.comment_id)}`
+                        });
+                        if(resp && resp.success){
+                            await loadComments(aid);
+                            // update comment count badge
+                            document.querySelector('.comment-count-badge[data-ann="'+aid+'"]').textContent = resp.new_comment_count ?? 0;
+                        } else {
+                            alert('Error deleting comment: ' + (resp.error || 'unknown'));
+                        }
+                    });
+                    div.appendChild(left);
+                    div.appendChild(btn);
+                    container.appendChild(div);
+                });
+            }
+            // update comment count badge
+            const badge = document.querySelector('.comment-count-badge[data-ann="'+aid+'"]');
+            if(badge) badge.textContent = data.length;
+        }
+
+        // Add comment
+        document.querySelectorAll('.add-comment-form').forEach(form=>{
+            form.addEventListener('submit', async e=>{
+                e.preventDefault();
+                const aid = form.dataset.id;
+                const commentInput = form.querySelector('input[name="comment"]');
+                const comment = commentInput.value.trim();
+                if(!comment) return;
+                const res = await safeFetch('../common/add_comment.php', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/x-www-form-urlencoded'},
+                    body: `announcement_id=${encodeURIComponent(aid)}&comment=${encodeURIComponent(comment)}`
+                });
+                if(res && res.success){
+                    commentInput.value = '';
+                    await loadComments(aid);
+                    // update comment count badge
+                    document.querySelector('.comment-count-badge[data-ann="'+aid+'"]').textContent = res.new_comment_count ?? '';
+                } else {
+                    alert('Error adding comment: ' + (res.error || 'unknown'));
+                }
+            });
+        });
+
+        // Like button (in details)
+        document.addEventListener('click', function(e){
+            if(e.target && e.target.matches('.like-btn')){
+                const aid = e.target.dataset.id;
+                (async ()=>{
+                    const res = await safeFetch(`../common/like_announcement.php?announcement_id=${aid}`);
+                    if(res && !res.error){
+                        // update inline like count
+                        const inline = e.target.querySelector('.like-count-inline');
+                        if(inline) inline.textContent = res.like_count;
+                        // update table badge
+                        const badge = document.querySelector('.like-count-badge[data-ann="'+aid+'"]');
+                        if(badge) badge.textContent = res.like_count;
+                        // toggle heart (server returns liked_by_user)
+                        e.target.innerHTML = (res.liked_by_user ? '❤️' : '🤍') + ' <span class="like-count-inline">' + res.like_count + '</span>';
+                    } else {
+                        alert('Error toggling like: ' + (res.error || 'unknown'));
+                    }
+                })();
+            }
+        });
+
+        // small helper to escape html
+        function escapeHtml(unsafe) {
+            if(unsafe === null || unsafe === undefined) return '';
+            return unsafe
+                 .replaceAll('&','&amp;')
+                 .replaceAll('<','&lt;')
+                 .replaceAll('>','&gt;')
+                 .replaceAll('"','&quot;')
+                 .replaceAll("'",'&#039;');
+        }
+    </script>
 </body>
 </html>

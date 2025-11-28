@@ -1,39 +1,11 @@
 <?php
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-
 session_start();
 
-// Enhanced Session Security
-// Regenerate session ID to prevent session fixation
-session_regenerate_id(true);
-
-// Check if user is logged in
+// Check if user is logged in and is a student
 if(!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'student'){
     header("Location: ../index.php");
     exit;
 }
-
-// Validate user agent to prevent session hijacking
-if(!isset($_SESSION['user_agent'])) {
-    $_SESSION['user_agent'] = $_SERVER['HTTP_USER_AGENT'];
-} else {
-    if($_SESSION['user_agent'] !== $_SERVER['HTTP_USER_AGENT']) {
-        // User agent changed - possible session hijacking
-        session_destroy();
-        header("Location: ../index.php");
-        exit;
-    }
-}
-
-// Session expiration (30 minutes)
-if(isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity'] > 1800)) {
-    // Session expired
-    session_destroy();
-    header("Location: ../index.php?expired=1");
-    exit;
-}
-$_SESSION['last_activity'] = time();
 
 require __DIR__ . '/../../includes/db.php';
 
@@ -43,6 +15,16 @@ $student_id = $_SESSION['user_id'];
 $user_stmt = $pdo->prepare("SELECT username, profile_picture FROM users WHERE user_id = ?");
 $user_stmt->execute([$student_id]);
 $user = $user_stmt->fetch(PDO::FETCH_ASSOC);
+
+
+// Fetch current user info for profile picture
+$user_stmt = $pdo->prepare("SELECT username, profile_picture FROM users WHERE user_id=?");
+$user_stmt->execute([$_SESSION['user_id']]);
+$current_user = $user_stmt->fetch();
+
+$profile_img_path = !empty($current_user['profile_picture']) && file_exists(__DIR__ . '/uploads/' . $current_user['profile_picture'])
+    ? 'uploads/' . $current_user['profile_picture']
+    : 'assets/default_profile.png';
 
 // Fetch student's schedule
 $schedules = $pdo->prepare("
@@ -104,341 +86,433 @@ $current_page = basename($_SERVER['PHP_SELF']);
 <head>
 <meta charset="UTF-8">
 <title>Student Dashboard</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
-/* ================= General Reset ================= */
-* {margin:0;padding:0;box-sizing:border-box;}
-body {
-    font-family: Arial, sans-serif;
-    display: flex;
-    min-height: 100vh;
-    background: linear-gradient(-45deg, #1e3c72, #2a5298, #00c6ff, #0072ff);
-    background-size: 400% 400%;
-    animation: gradientBG 15s ease infinite;
+* { box-sizing: border-box; margin:0; padding:0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+
+/* ================= Topbar for Hamburger ================= */
+.topbar {
+    display: none;
+    position: fixed; top:0; left:0; width:100%;
+    background:#2c3e50; color:#fff;
+    padding:15px 20px;
+    z-index:1200;
+    justify-content:space-between; align-items:center;
 }
-@keyframes gradientBG {
-    0% {background-position:0% 50%;}
-    50% {background-position:100% 50%;}
-    100% {background-position:0% 50%;}
+.menu-btn {
+    font-size:26px;
+    background:#1abc9c;
+    border:none; color:#fff;
+    cursor:pointer;
+    padding:10px 14px;
+    border-radius:8px;
+    font-weight:600;
+    transition: background 0.3s, transform 0.2s;
 }
+.menu-btn:hover { background:#159b81; transform:translateY(-2px); }
 
 /* ================= Sidebar ================= */
 .sidebar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    height: 100vh;
-    width: 240px;
-    background-color: rgba(44, 62, 80, 0.95);
-    padding-top: 20px;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    box-shadow: 2px 0 10px rgba(0,0,0,0.2);
-    z-index: 1000;
-    overflow-y: auto;
+    position: fixed; top:0; left:0;
+    width:250px; height:100%;
+    background:#1f2937; color:#fff;
+    z-index:1100;
+    transition: transform 0.3s ease;
+    padding: 20px 0;
 }
-.sidebar h2 {
-    color: #ecf0f1;
-    text-align: center;
-    width: 100%;
-    margin-bottom: 25px;
-    font-size: 22px;
+.sidebar.hidden { transform:translateX(-260px); }
+.sidebar a { 
+    display:block; 
+    padding:12px 20px; 
+    color:#fff; 
+    text-decoration:none; 
+    transition: background 0.3s; 
+    border-bottom: 1px solid rgba(255,255,255,0.1);
 }
-.sidebar a {
-    padding: 12px 20px;
-    text-decoration: none;
-    font-size: 16px;
-    color: #bdc3c7;
-    width: 100%;
-    transition: background 0.3s,color 0.3s;
-    border-radius: 6px;
-    margin: 3px 0;
-}
-.sidebar a.active, .sidebar a:hover {
-    background-color: #34495e;
-    color: #fff;
-    font-weight: bold;
-}
+.sidebar a:hover, .sidebar a.active { background:#1abc9c; }
 
-/* ================= Main Content ================= */
-.main-content {
-    margin-left: 240px;
-    padding: 30px;
-    flex-grow: 1;
-    min-height: 100vh;
-    background-color: rgba(243, 244, 246, 0.95);
-    border-radius: 12px;
-    margin-top: 20px;
+.sidebar-profile {
+    text-align: center;
     margin-bottom: 20px;
+    padding: 0 20px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.2);
 }
 
-/* ================= Profile Picture ================= */
-.profile-picture {
-    text-align: center;
-    margin-bottom: 25px;
-}
-.profile-picture img {
+.sidebar-profile img {
+    width: 100px;
+    height: 100px;
     border-radius: 50%;
     object-fit: cover;
-    width: 130px;
-    height: 130px;
-    border: 3px solid #2563eb;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    margin-bottom: 10px;
+    border: 2px solid #1abc9c;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
 }
 
-/* ================= Quick Stats Cards ================= */
+.sidebar-profile p {
+    color: #fff;
+    font-weight: bold;
+    margin: 0;
+    font-size: 16px;
+}
+
+/* ================= Overlay ================= */
+.overlay {
+    position: fixed; top:0; left:0; width:100%; height:100%;
+    background: rgba(0,0,0,0.4); z-index:1050;
+    display:none; opacity:0; transition: opacity 0.3s ease;
+}
+.overlay.active { display:block; opacity:1; }
+
+/* ================= Main content ================= */
+.main-content {
+    margin-left: 250px;
+    padding:20px;
+    min-height:100vh;
+    background: #f8fafc;
+    transition: all 0.3s ease;
+}
+
+/* Content Wrapper */
+.content-wrapper {
+    background: white;
+    border-radius: 15px;
+    padding: 30px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    min-height: calc(100vh - 40px);
+}
+
+/* Header Styles */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.header h1 {
+    font-size: 2.2rem;
+    color: #1f2937;
+    font-weight: 700;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #f8fafc;
+    padding: 12px 18px;
+    border-radius: 12px;
+    border: 1px solid #e5e7eb;
+}
+
+.user-info img {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+/* Welcome Section */
+.welcome-section {
+    margin-bottom: 30px;
+}
+
+.welcome-section p {
+    color: #6b7280;
+    font-size: 1.1rem;
+    margin-top: 10px;
+}
+
+/* ================= Stats Cards ================= */
 .stats-cards {
     display: flex;
-    gap: 25px;
+    gap: 20px;
+    margin-bottom: 30px;
     flex-wrap: wrap;
-    margin-bottom: 35px;
 }
-.stats-cards .card {
+
+.stat-card {
     flex: 1;
-    min-width: 180px;
-    background: linear-gradient(135deg,#6a11cb,#2575fc);
-    color: #fff;
+    min-width: 200px;
+    background: white;
     padding: 25px;
-    border-radius: 16px;
-    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    border: 1px solid #e5e7eb;
     text-align: center;
-    transition: transform 0.3s, box-shadow 0.3s;
-    position: relative;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
-.stats-cards .card:hover {
+
+.stat-card:hover {
     transform: translateY(-5px);
-    box-shadow: 0 12px 25px rgba(0,0,0,0.25);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
 }
-.stats-cards .card h3 {
-    font-size: 17px;
-    margin-bottom: 12px;
+
+.stat-card h3 {
+    font-size: 1rem;
+    color: #6b7280;
+    margin-bottom: 10px;
+    font-weight: 600;
 }
-.stats-cards .card p {
-    font-size: 24px;
+
+.stat-card .number {
+    font-size: 2rem;
     font-weight: bold;
+    color: #1f2937;
+    margin-bottom: 10px;
 }
-.stats-cards .card::before {
-    content: "📚";
-    font-size: 28px;
-    position: absolute;
-    top: 15px;
-    right: 15px;
+
+.stat-card .icon {
+    font-size: 2rem;
+    margin-bottom: 15px;
+    display: block;
 }
 
 /* ================= Schedule Table ================= */
+.schedule-section {
+    margin-top: 30px;
+}
+
+.table-container {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    border: 1px solid #e5e7eb;
+}
+
 .schedule-table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 15px;
-    background-color: #fff;
-    border-radius: 12px;
-    overflow: hidden;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.1);
 }
-.schedule-table th, .schedule-table td {
-    border: none;
-    padding: 14px;
-    text-align: left;
-}
+
 .schedule-table th {
-    background-color: #2575fc;
-    color: #fff;
+    background: #f8fafc;
+    padding: 15px;
+    text-align: left;
     font-weight: 600;
-}
-.schedule-table tr:nth-child(even) {background-color: #f7f9fc;}
-.schedule-table tr:hover {background-color: #d0e7ff;}
-.schedule-table .today-row {background-color: #ffeaa7 !important;font-weight:bold;}
-
-/* ================= Security Notice ================= */
-.security-notice {
-    background: #fff3cd;
-    border: 1px solid #ffeaa7;
-    color: #856404;
-    padding: 12px 15px;
-    border-radius: 8px;
-    margin-bottom: 20px;
-    font-size: 14px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-.security-notice i {
-    font-size: 16px;
+    color: #374151;
+    border-bottom: 1px solid #e5e7eb;
 }
 
-/* ================= Session Timer ================= */
-.session-timer {
-    background: #d1ecf1;
-    border: 1px solid #bee5eb;
-    color: #0c5460;
-    padding: 8px 12px;
-    border-radius: 5px;
-    font-size: 12px;
-    margin-top: 10px;
-    display: inline-block;
+.schedule-table td {
+    padding: 15px;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.schedule-table tr:last-child td {
+    border-bottom: none;
+}
+
+.schedule-table tr:hover {
+    background: #f9fafb;
+}
+
+.schedule-table .today-row {
+    background: #fff7ed !important;
+    border-left: 4px solid #f59e0b;
+}
+
+/* Profile Section */
+.profile-section {
+    text-align: center;
+    margin: 30px 0;
+    padding: 20px;
+    background: #f8fafc;
+    border-radius: 12px;
+}
+
+.profile-picture {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid #3b82f6;
+    margin-bottom: 15px;
 }
 
 /* ================= Responsive ================= */
-@media screen and (max-width:768px){
-    body{flex-direction:column;}
-    .sidebar{width:100%;padding:15px;box-shadow:none;}
-    .main-content{margin:0;padding:20px;border-radius:0;}
-    .stats-cards{flex-direction:column;}
-    .schedule-table th,.schedule-table td{padding:10px;font-size:12px;}
+@media (max-width: 768px) {
+    .topbar { display: flex; }
+    .sidebar { transform: translateX(-100%); }
+    .sidebar.active { transform: translateX(0); }
+    .main-content { margin-left: 0; padding: 15px; }
+    .content-wrapper { padding: 20px; border-radius: 0; }
+    .header { flex-direction: column; gap: 15px; align-items: flex-start; }
+    .header h1 { font-size: 1.8rem; }
+    .stats-cards { flex-direction: column; }
+    .stat-card { min-width: auto; }
+    .table-container { overflow-x: auto; }
+    .schedule-table { min-width: 600px; }
 }
 </style>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-<!-- Sidebar -->
-<div class="sidebar">
-    <h2>Student Panel</h2>
-    <a href="student_dashboard.php" class="<?= $current_page=='student_dashboard.php'?'active':'' ?>">Dashboard</a>
-    <a href="my_schedule.php" class="<?= $current_page=='my_schedule.php'?'active':'' ?>">My Schedule</a>
-    <a href="view_announcements.php" class="<?= $current_page=='view_announcements.php'?'active':'' ?>">Announcements</a>
-    <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">Edit Profile</a>
-    <a href="../logout.php" onclick="return confirm('Are you sure you want to logout?')">Logout</a>
+    <!-- Topbar for Mobile -->
+    <div class="topbar">
+        <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+        <h2>Student Dashboard</h2>
+    </div>
+
+    <!-- Overlay for Mobile -->
+    <div class="overlay" onclick="toggleSidebar()"></div>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-profile">
+            <img src="<?= htmlspecialchars($profile_src) ?>" alt="Profile Picture">
+            <p><?= htmlspecialchars($user['username'] ?? 'Student') ?></p>
+        </div>
+        <a href="student_dashboard.php" class="<?= $current_page=='student_dashboard.php'?'active':'' ?>">Dashboard</a>
+        <a href="my_schedule.php" class="<?= $current_page=='my_schedule.php'?'active':'' ?>">My Schedule</a>
+        <a href="view_announcements.php" class="<?= $current_page=='view_announcements.php'?'active':'' ?>">Announcements</a>
+        <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">Edit Profile</a>
+        <a href="../logout.php">Logout</a>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="content-wrapper">
+            <div class="header">
+                <div class="welcome-section">
+                    <h1>Welcome, <?= htmlspecialchars($user['username']); ?> 👋</h1>
+                    <p>Here is your personal dashboard. Use the sidebar to navigate.</p>
+                </div>
+                <div class="user-info">
+                    <img src="<?= htmlspecialchars($profile_src) ?>" alt="Profile">
+                    <div>
+                        <div><?= htmlspecialchars($user['username'] ?? 'Student') ?></div>
+                        <small>Student</small>
+                    </div>
+                </div>
+            </div>
+
+<!-- Profile Picture -->
+<div class="profile-section">
+    <?php 
+    $profile_pic_path = __DIR__ . '/../uploads/' . ($user['profile_picture'] ?? '');
+    if(!empty($user['profile_picture']) && file_exists($profile_pic_path)): 
+    ?>
+        <img src="../uploads/<?= htmlspecialchars($user['profile_picture']) ?>" alt="Profile Picture" class="profile-picture">
+    <?php else: ?>
+        <img src="../assets/default_profile.png" alt="Profile Picture" class="profile-picture">
+    <?php endif; ?>
 </div>
+            <!-- Quick Stats Cards -->
+            <div class="stats-cards">
+                <div class="stat-card">
+                    <i class="fas fa-book icon" style="color: #3b82f6;"></i>
+                    <h3>Total Courses</h3>
+                    <div class="number"><?= $total_courses ?></div>
+                </div>
+                <div class="stat-card">
+                    <i class="fas fa-calendar-alt icon" style="color: #10b981;"></i>
+                    <h3>Upcoming Classes Today</h3>
+                    <div class="number"><?= $upcoming_classes ?></div>
+                </div>
+                <div class="stat-card">
+                    <i class="fas fa-clock icon" style="color: #f59e0b;"></i>
+                    <h3>Next Class</h3>
+                    <?php if($next_class): ?>
+                        <div class="number" style="font-size: 1.2rem;">
+                            <?= htmlspecialchars($next_class['course_name']) ?>
+                        </div>
+                        <div style="color: #6b7280; font-size: 0.9rem;">
+                            at <?= date('H:i', strtotime($next_class['start_time'])) ?>
+                        </div>
+                        <div id="countdown" style="color: #ef4444; font-size: 0.8rem; margin-top: 5px;"></div>
+                        <script>
+                            const startTime = "<?= date('H:i:s', strtotime($next_class['start_time'])) ?>";
+                            let todayDate = new Date().toISOString().split('T')[0];
+                            const classDateTime = new Date(todayDate + "T" + startTime);
+                            function updateCountdown(){
+                                const now = new Date();
+                                const diff = classDateTime - now;
+                                if(diff <= 0){
+                                    document.getElementById('countdown').innerText = "Class is starting now!";
+                                    clearInterval(timerInterval);
+                                    return;
+                                }
+                                const hours = Math.floor(diff/(1000*60*60));
+                                const minutes = Math.floor((diff % (1000*60*60))/(1000*60));
+                                const seconds = Math.floor((diff % (1000*60))/1000);
+                                document.getElementById('countdown').innerText = `Starts in: ${hours}h ${minutes}m ${seconds}s`;
+                            }
+                            updateCountdown();
+                            const timerInterval = setInterval(updateCountdown,1000);
+                        </script>
+                    <?php else: ?>
+                        <div class="number" style="font-size: 1rem; color: #6b7280;">No more classes today</div>
+                    <?php endif; ?>
+                </div>
+            </div>
 
-<!-- Main Content -->
-<div class="main-content">
-    <!-- Security Notice -->
-    <div class="security-notice">
-        <i class="fas fa-shield-alt"></i>
-        <div>
-            <strong>Security Notice:</strong> This session will automatically expire after 30 minutes of inactivity. 
-            For your security, please logout when finished.
+            <!-- Schedule Table -->
+            <div class="schedule-section">
+                <h2 style="margin-bottom: 20px; color: #1f2937;">My Schedule</h2>
+                <div class="table-container">
+                    <table class="schedule-table">
+                        <thead>
+                            <tr>
+                                <th>Course</th>
+                                <th>Instructor</th>
+                                <th>Room</th>
+                                <th>Day</th>
+                                <th>Start</th>
+                                <th>End</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        <?php 
+                        $today = date('l'); // Current day name
+                        foreach($my_schedule as $s): 
+                            $todayClass = ($s['day'] === $today) ? 'today-row' : '';
+                        ?>
+                            <tr class="<?= $todayClass ?>">
+                                <td><?= htmlspecialchars($s['course_name']) ?></td>
+                                <td><?= htmlspecialchars($s['instructor_name']) ?></td>
+                                <td><?= htmlspecialchars($s['room_name']) ?></td>
+                                <td><?= htmlspecialchars($s['day']) ?></td>
+                                <td><?= date('H:i', strtotime($s['start_time'])) ?></td>
+                                <td><?= date('H:i', strtotime($s['end_time'])) ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Session Timer -->
-    <div class="session-timer" id="sessionTimer">
-        <i class="fas fa-clock"></i> Session expires in: <span id="timer">30:00</span>
-    </div>
-
-    <!-- Profile Picture -->
-    <div class="profile-picture">
-        <?php if($user['profile_picture'] && file_exists(__DIR__.'/uploads/'.$user['profile_picture'])): ?>
-            <img src="uploads/<?= htmlspecialchars($user['profile_picture']) ?>" alt="Profile Picture">
-        <?php else: ?>
-            <img src="https://via.placeholder.com/130" alt="Profile Picture">
-        <?php endif; ?>
-    </div>
-
-    <h1>Welcome, <?= htmlspecialchars($user['username']); ?> 👋</h1>
-    <p>Here is your personal dashboard. Use the sidebar to navigate.</p>
-
-    <!-- Quick Stats Cards -->
-    <div class="stats-cards">
-        <div class="card">
-            <h3>Total Courses</h3>
-            <p><?= $total_courses ?></p>
-        </div>
-        <div class="card">
-            <h3>Upcoming Classes Today</h3>
-            <p><?= $upcoming_classes ?></p>
-        </div>
-        <div class="card">
-            <h3>Next Class</h3>
-            <?php if($next_class): ?>
-                <p><?= htmlspecialchars($next_class['course_name']) ?> at <?= date('H:i', strtotime($next_class['start_time'])) ?></p>
-                <p id="countdown"></p>
-                <script>
-                    const startTime = "<?= date('H:i:s', strtotime($next_class['start_time'])) ?>";
-                    let todayDate = new Date().toISOString().split('T')[0];
-                    const classDateTime = new Date(todayDate + "T" + startTime);
-                    function updateCountdown(){
-                        const now = new Date();
-                        const diff = classDateTime - now;
-                        if(diff <= 0){document.getElementById('countdown').innerText = "Class is starting now!";clearInterval(timerInterval);return;}
-                        const hours=Math.floor(diff/(1000*60*60));
-                        const minutes=Math.floor((diff % (1000*60*60))/(1000*60));
-                        const seconds=Math.floor((diff % (1000*60))/1000);
-                        document.getElementById('countdown').innerText = `Starts in: ${hours}h ${minutes}m ${seconds}s`;
-                    }
-                    updateCountdown();
-                    const timerInterval = setInterval(updateCountdown,1000);
-                </script>
-            <?php else: ?>
-                <p>No more classes today</p>
-            <?php endif; ?>
-        </div>
-    </div>
-
-    <!-- Schedule Table -->
-    <h2>My Schedule</h2>
-    <table class="schedule-table">
-        <thead>
-            <tr>
-                <th>Course</th>
-                <th>Instructor</th>
-                <th>Room</th>
-                <th>Day</th>
-                <th>Start</th>
-                <th>End</th>
-            </tr>
-        </thead>
-        <tbody>
-        <?php 
-        $today = date('l'); // Current day name
-        foreach($my_schedule as $s): 
-            $todayClass = ($s['day'] === $today) ? 'today-row' : '';
-        ?>
-            <tr class="<?= $todayClass ?>">
-                <td><?= htmlspecialchars($s['course_name']) ?></td>
-                <td><?= htmlspecialchars($s['instructor_name']) ?></td>
-                <td><?= htmlspecialchars($s['room_name']) ?></td>
-                <td><?= htmlspecialchars($s['day']) ?></td>
-                <td><?= htmlspecialchars($s['start_time']) ?></td>
-                <td><?= htmlspecialchars($s['end_time']) ?></td>
-            </tr>
-        <?php endforeach; ?>
-        </tbody>
-    </table>
-</div>
-
-<script>
-// Session timer countdown (30 minutes = 1800 seconds)
-let sessionTime = 1800; // 30 minutes in seconds
-
-function updateSessionTimer() {
-    const minutes = Math.floor(sessionTime / 60);
-    const seconds = sessionTime % 60;
-    
-    document.getElementById('timer').textContent = 
-        `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-    
-    if (sessionTime <= 0) {
-        // Session expired, redirect to logout
-        window.location.href = '../logout.php?expired=1';
-    } else {
-        sessionTime--;
+    <script>
+    function toggleSidebar() {
+        const sidebar = document.querySelector('.sidebar');
+        const overlay = document.querySelector('.overlay');
+        sidebar.classList.toggle('active');
+        overlay.classList.toggle('active');
     }
-}
 
-// Update timer every second
-setInterval(updateSessionTimer, 1000);
+    // Set active state for current page
+    document.addEventListener('DOMContentLoaded', function() {
+        const currentPage = window.location.pathname.split('/').pop();
+        const navLinks = document.querySelectorAll('.sidebar a');
+        
+        navLinks.forEach(link => {
+            const linkPage = link.getAttribute('href');
+            if (linkPage === currentPage) {
+                link.classList.add('active');
+            }
+        });
+    });
 
-// Reset timer on user activity
-function resetSessionTimer() {
-    sessionTime = 1800; // Reset to 30 minutes
-}
-
-// Add event listeners for user activity
-document.addEventListener('mousemove', resetSessionTimer);
-document.addEventListener('keypress', resetSessionTimer);
-document.addEventListener('click', resetSessionTimer);
-document.addEventListener('scroll', resetSessionTimer);
-
-// Initial timer update
-updateSessionTimer();
-
-// Confirm logout
-document.querySelector('a[href="../logout.php"]').addEventListener('click', function(e) {
-    if(!confirm('Are you sure you want to logout?')) {
-        e.preventDefault();
-    }
-});
-</script>
+    // Confirm logout
+    document.querySelector('a[href="../logout.php"]').addEventListener('click', function(e) {
+        if(!confirm('Are you sure you want to logout?')) {
+            e.preventDefault();
+        }
+    });
+    </script>
 </body>
 </html>

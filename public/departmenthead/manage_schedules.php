@@ -12,6 +12,21 @@ $dept_id = $_SESSION['department_id'] ?? 0;
 $message = "";
 $message_type = "success";
 
+// Fetch current user info for sidebar
+$user_stmt = $pdo->prepare("SELECT username, profile_picture FROM users WHERE user_id = ?");
+$user_stmt->execute([$_SESSION['user_id']]);
+$user = $user_stmt->fetch(PDO::FETCH_ASSOC);
+
+// Determine profile picture path
+$profile_path = '../../uploads/profiles/' . ($user['profile_picture'] ?? '');
+if (!empty($user['profile_picture']) && file_exists($profile_path)) {
+    $profile_src = $profile_path;
+} else {
+    $profile_src = '../assets/default_profile.png';
+}
+
+$current_page = basename($_SERVER['PHP_SELF']);
+
 // Check for stored session messages from redirect
 if(isset($_SESSION['schedule_message'])) {
     $message = $_SESSION['schedule_message'];
@@ -112,7 +127,7 @@ if(isset($_POST['auto_generate'])){
         // Define available days and time slots
         $days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
         $time_slots = [
-            ["08:30:00", "04:20:00"],   
+            ["02:30:00", "04:20:00"],   
             ["04:30:00", "06:20:00"],   
             ["08:00:00", "11:00:00"]    
         ];
@@ -612,130 +627,118 @@ $courses_with_instructors = fetchAllSafe($courses_with_instructors_stmt);
     <title>Schedule Management | Department Head Portal</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        :root {
-            --primary: #4361ee;
-            --primary-dark: #3a56d4;
-            --secondary: #7209b7;
-            --success: #4cc9f0;
-            --danger: #f72585;
-            --warning: #f8961e;
-            --light: #f8f9fa;
-            --dark: #212529;
-            --gray: #6c757d;
-            --gray-light: #e9ecef;
-            --border-radius: 8px;
-            --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            --transition: all 0.3s ease;
-        }
+        * { box-sizing: border-box; margin:0; padding:0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        /* ================= Topbar for Hamburger ================= */
+        .topbar {
+            display: none;
+            position: fixed; top:0; left:0; width:100%;
+            background:#2c3e50; color:#fff;
+            padding:15px 20px;
+            z-index:1200;
+            justify-content:space-between; align-items:center;
         }
-
-        body {
-            background-color: #f5f7fb;
-            color: var(--dark);
-            line-height: 1.6;
+        .menu-btn {
+            font-size:26px;
+            background:#1abc9c;
+            border:none; color:#fff;
+            cursor:pointer;
+            padding:10px 14px;
+            border-radius:8px;
+            font-weight:600;
+            transition: background 0.3s, transform 0.2s;
         }
+        .menu-btn:hover { background:#159b81; transform:translateY(-2px); }
 
-        .container {
-            display: flex;
-            min-height: 100vh;
-        }
-
-        /* Sidebar Styles */
+        /* ================= Sidebar ================= */
         .sidebar {
-            width: 250px;
-            background: linear-gradient(180deg, var(--primary), var(--secondary));
-            color: white;
+            position: fixed; top:0; left:0;
+            width:250px; height:100%;
+            background:#1f2937; color:#fff;
+            z-index:1100;
+            transition: transform 0.3s ease;
             padding: 20px 0;
-            box-shadow: var(--box-shadow);
-            z-index: 100;
         }
+        .sidebar.hidden { transform:translateX(-260px); }
+        .sidebar a { 
+            display:block; 
+            padding:12px 20px; 
+            color:#fff; 
+            text-decoration:none; 
+            transition: background 0.3s; 
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .sidebar a:hover, .sidebar a.active { background:#1abc9c; }
 
-        .logo {
+        .sidebar-profile {
             text-align: center;
-            padding: 0 20px 20px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
             margin-bottom: 20px;
+            padding: 0 20px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
         }
 
-        .logo h2 {
-            font-size: 1.5rem;
-            font-weight: 600;
+        .sidebar-profile img {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin-bottom: 10px;
+            border: 2px solid #1abc9c;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
         }
 
-        .logo p {
-            font-size: 0.8rem;
-            opacity: 0.8;
+        .sidebar-profile p {
+            color: #fff;
+            font-weight: bold;
+            margin: 0;
+            font-size: 16px;
         }
 
-        .nav-links {
-            list-style: none;
+        /* ================= Overlay ================= */
+        .overlay {
+            position: fixed; top:0; left:0; width:100%; height:100%;
+            background: rgba(0,0,0,0.4); z-index:1050;
+            display:none; opacity:0; transition: opacity 0.3s ease;
         }
+        .overlay.active { display:block; opacity:1; }
 
-        .nav-links li {
-            padding: 12px 20px;
-            transition: var(--transition);
-        }
-
-        .nav-links li:hover {
-            background-color: rgba(255, 255, 255, 0.1);
-        }
-
-        .nav-links li.active {
-            background-color: rgba(255, 255, 255, 0.2);
-            border-left: 4px solid white;
-        }
-
-        .nav-links a {
-            color: white;
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .nav-links i {
-            font-size: 1.2rem;
-        }
-
-        /* Main Content Styles */
+        /* ================= Main content ================= */
         .main-content {
-            flex: 1;
-            padding: 30px;
-            overflow-y: auto;
+            margin-left: 250px;
+            padding:30px 50px;
+            min-height:100vh;
+            background:#ffffff;
+            transition: all 0.3s ease;
         }
 
+        /* Header Styles */
         .header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 30px;
+            padding: 20px 0;
         }
 
         .header h1 {
-            font-size: 2rem;
-            color: var(--primary);
+            font-size: 2.2rem;
+            color: #1f2937;
             font-weight: 700;
         }
 
         .user-info {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
             background: white;
-            padding: 10px 15px;
-            border-radius: var(--border-radius);
-            box-shadow: var(--box-shadow);
+            padding: 12px 18px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
         }
 
         .user-info img {
-            width: 40px;
-            height: 40px;
+            width: 45px;
+            height: 45px;
             border-radius: 50%;
             object-fit: cover;
         }
@@ -743,36 +746,76 @@ $courses_with_instructors = fetchAllSafe($courses_with_instructors_stmt);
         /* Card Styles */
         .card {
             background: white;
-            border-radius: var(--border-radius);
-            box-shadow: var(--box-shadow);
+            border-radius: 15px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.1);
             margin-bottom: 25px;
             overflow: hidden;
         }
 
         .card-header {
-            padding: 20px;
-            background: var(--primary);
+            padding: 20px 25px;
+            background: linear-gradient(135deg, #6366f1, #3b82f6);
             color: white;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            border-radius: 15px 15px 0 0;
         }
 
         .card-header h3 {
-            font-size: 1.3rem;
+            font-size: 1.4rem;
             font-weight: 600;
         }
 
         .badge {
-            background: var(--success);
-            padding: 5px 10px;
+            background: #10b981;
+            padding: 6px 12px;
             border-radius: 20px;
             font-size: 0.8rem;
             font-weight: 600;
         }
 
         .card-body {
-            padding: 20px;
+            padding: 25px;
+        }
+
+        /* Stats */
+        .stats {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .stat-card {
+            flex: 1;
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.1);
+            text-align: center;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        }
+
+        .stat-card i {
+            font-size: 2.5rem;
+            color: #6366f1;
+            margin-bottom: 15px;
+        }
+
+        .stat-card h3 {
+            font-size: 2rem;
+            margin-bottom: 8px;
+            color: #1f2937;
+        }
+
+        .stat-card p {
+            color: #6b7280;
+            font-weight: 500;
         }
 
         /* Form Styles */
@@ -784,22 +827,22 @@ $courses_with_instructors = fetchAllSafe($courses_with_instructors_stmt);
             display: block;
             margin-bottom: 8px;
             font-weight: 600;
-            color: var(--dark);
+            color: #374151;
         }
 
         .form-control {
             width: 100%;
-            padding: 12px 15px;
-            border: 1px solid var(--gray-light);
-            border-radius: var(--border-radius);
+            padding: 14px 16px;
+            border: 1px solid #d1d5db;
+            border-radius: 10px;
             font-size: 1rem;
-            transition: var(--transition);
+            transition: all 0.3s ease;
         }
 
         .form-control:focus {
             outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.2);
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
         }
 
         select.form-control[multiple] {
@@ -817,84 +860,89 @@ $courses_with_instructors = fetchAllSafe($courses_with_instructors_stmt);
 
         /* Button Styles */
         .btn {
-            padding: 12px 20px;
+            padding: 14px 24px;
             border: none;
-            border-radius: var(--border-radius);
+            border-radius: 10px;
             font-size: 1rem;
             font-weight: 600;
             cursor: pointer;
-            transition: var(--transition);
+            transition: all 0.3s ease;
             display: inline-flex;
             align-items: center;
             gap: 8px;
         }
 
         .btn-primary {
-            background: var(--primary);
+            background: #6366f1;
             color: white;
         }
 
         .btn-primary:hover {
-            background: var(--primary-dark);
+            background: #4f46e5;
+            transform: translateY(-2px);
         }
 
         .btn-danger {
-            background: var(--danger);
+            background: #ef4444;
             color: white;
         }
 
         .btn-danger:hover {
-            background: #e1156f;
+            background: #dc2626;
+            transform: translateY(-2px);
         }
 
         .btn-success {
-            background: var(--success);
+            background: #10b981;
             color: white;
         }
 
         .btn-success:hover {
-            background: #3ab3d6;
+            background: #059669;
+            transform: translateY(-2px);
         }
 
         .btn:disabled {
-            background: var(--gray);
+            background: #9ca3af;
             cursor: not-allowed;
+            transform: none;
         }
 
         /* Message Styles */
         .message {
-            padding: 15px;
-            border-radius: var(--border-radius);
+            padding: 16px;
+            border-radius: 10px;
             margin-bottom: 20px;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
+            font-weight: 500;
             white-space: pre-line;
         }
 
         .message.success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
+            background: #dcfce7;
+            color: #166534;
+            border: 1px solid #bbf7d0;
         }
 
         .message.error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
         }
 
         .message.warning {
-            background: #fff3cd;
-            color: #856404;
-            border: 1px solid #ffeaa7;
+            background: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fde68a;
         }
 
         /* Table Styles */
         .table-container {
             overflow-x: auto;
-            border-radius: var(--border-radius);
-            box-shadow: var(--box-shadow);
+            border-radius: 15px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
 
         .schedule-table {
@@ -905,14 +953,14 @@ $courses_with_instructors = fetchAllSafe($courses_with_instructors_stmt);
 
         .schedule-table th,
         .schedule-table td {
-            padding: 15px;
+            padding: 16px;
             text-align: left;
-            border-bottom: 1px solid var(--gray-light);
+            border-bottom: 1px solid #e5e7eb;
         }
 
         .schedule-table th {
-            background: var(--primary);
-            color: white;
+            background: #f8fafc;
+            color: #374151;
             font-weight: 600;
         }
 
@@ -921,47 +969,16 @@ $courses_with_instructors = fetchAllSafe($courses_with_instructors_stmt);
         }
 
         .schedule-table tr:hover {
-            background: #f8f9fa;
+            background: #f9fafb;
         }
 
         .schedule-table tr.selected {
-            background-color: #e3f2fd;
+            background-color: #e0e7ff;
         }
 
         .checkbox-cell {
             width: 50px;
             text-align: center;
-        }
-
-        /* Stats */
-        .stats {
-            display: flex;
-            gap: 20px;
-            margin-bottom: 25px;
-        }
-
-        .stat-card {
-            flex: 1;
-            background: white;
-            padding: 20px;
-            border-radius: var(--border-radius);
-            box-shadow: var(--box-shadow);
-            text-align: center;
-        }
-
-        .stat-card i {
-            font-size: 2rem;
-            color: var(--primary);
-            margin-bottom: 10px;
-        }
-
-        .stat-card h3 {
-            font-size: 1.8rem;
-            margin-bottom: 5px;
-        }
-
-        .stat-card p {
-            color: var(--gray);
         }
 
         /* Schedule Preview */
@@ -972,69 +989,78 @@ $courses_with_instructors = fetchAllSafe($courses_with_instructors_stmt);
         .preview-grid {
             display: grid;
             grid-template-columns: repeat(5, 1fr);
-            gap: 10px;
+            gap: 15px;
             margin-top: 15px;
         }
 
         .preview-day {
             background: white;
-            border-radius: var(--border-radius);
-            padding: 15px;
-            box-shadow: var(--box-shadow);
-            min-height: 250px;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            min-height: 280px;
         }
 
         .preview-day h4 {
             text-align: center;
-            margin-bottom: 10px;
-            color: var(--primary);
-            border-bottom: 1px solid var(--gray-light);
-            padding-bottom: 8px;
+            margin-bottom: 15px;
+            color: #6366f1;
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 10px;
+            font-weight: 600;
         }
 
         .time-slot {
-            background: var(--light);
-            padding: 8px;
-            margin-bottom: 8px;
-            border-radius: 4px;
-            font-size: 0.85rem;
+            background: #f8fafc;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            border-left: 4px solid #6366f1;
         }
 
         .time-slot.morning {
-            border-left: 3px solid #4cc9f0;
+            border-left-color: #4cc9f0;
         }
 
         .time-slot.afternoon1 {
-            border-left: 3px solid #f8961e;
+            border-left-color: #f8961e;
         }
 
         .time-slot.afternoon2 {
-            border-left: 3px solid #7209b7;
+            border-left-color: #7209b7;
         }
 
         .empty-state {
             text-align: center;
-            padding: 40px;
-            color: var(--gray);
+            padding: 50px;
+            color: #6b7280;
         }
 
         .empty-state i {
-            font-size: 3rem;
-            margin-bottom: 15px;
-            color: var(--gray-light);
+            font-size: 3.5rem;
+            margin-bottom: 20px;
+            color: #d1d5db;
+        }
+
+        .empty-state h3 {
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+            color: #374151;
         }
 
         .course-info {
-            background: #e7f3ff;
-            padding: 15px;
-            border-radius: var(--border-radius);
-            margin-bottom: 20px;
-            border-left: 4px solid var(--primary);
+            background: #e0e7ff;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            border-left: 5px solid #6366f1;
         }
 
         .course-info h4 {
-            color: var(--primary);
-            margin-bottom: 10px;
+            color: #374151;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
         }
 
         .course-list {
@@ -1042,8 +1068,8 @@ $courses_with_instructors = fetchAllSafe($courses_with_instructors_stmt);
         }
 
         .course-list li {
-            padding: 5px 0;
-            border-bottom: 1px solid #d1e7ff;
+            padding: 8px 0;
+            border-bottom: 1px solid #c7d2fe;
         }
 
         .course-list li:last-child {
@@ -1051,16 +1077,31 @@ $courses_with_instructors = fetchAllSafe($courses_with_instructors_stmt);
         }
 
         .time-slot-info {
-            background: #f8f9fa;
-            padding: 10px;
-            border-radius: var(--border-radius);
-            margin-bottom: 15px;
-            font-size: 0.9rem;
+            background: #f8fafc;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            font-size: 1rem;
+            border-left: 5px solid #10b981;
         }
 
         .time-slot-info h5 {
-            color: var(--primary);
-            margin-bottom: 5px;
+            color: #374151;
+            margin-bottom: 10px;
+            font-size: 1.2rem;
+        }
+
+        /* ================= Responsive ================= */
+        @media(max-width: 768px){
+            .topbar { display:flex; }
+            .sidebar { transform:translateX(-100%); }
+            .sidebar.active { transform:translateX(0); }
+            .main-content { margin-left:0; padding: 20px; padding-top: 80px; }
+            .stats { flex-direction: column; }
+            .header { flex-direction: column; gap: 15px; align-items: flex-start; }
+            .header h1 { font-size: 1.8rem; }
+            .form-row { flex-direction: column; }
+            .preview-grid { grid-template-columns: 1fr; }
         }
 
         @media (max-width: 1200px) {
@@ -1068,334 +1109,317 @@ $courses_with_instructors = fetchAllSafe($courses_with_instructors_stmt);
                 grid-template-columns: repeat(3, 1fr);
             }
         }
-
-        @media (max-width: 768px) {
-            .container {
-                flex-direction: column;
-            }
-            
-            .sidebar {
-                width: 100%;
-                position: relative;
-            }
-            
-            .main-content {
-                margin-left: 0;
-            }
-            
-            .form-row {
-                flex-direction: column;
-            }
-            
-            .stats {
-                flex-direction: column;
-            }
-            
-            .preview-grid {
-                grid-template-columns: 1fr;
-            }
-        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <!-- Sidebar -->
-        <div class="sidebar">
-            <div class="logo">
-                <h2><i class="fas fa-calendar-alt"></i> DKU Scheduler</h2>
-                <p>Department Head Portal</p>
+    <!-- Topbar for Mobile -->
+    <div class="topbar">
+        <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+        <h2>Schedule Management</h2>
+    </div>
+
+    <!-- Overlay for Mobile -->
+    <div class="overlay" onclick="toggleSidebar()"></div>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-profile">
+            <img src="<?= htmlspecialchars($profile_src) ?>" alt="Profile Picture">
+            <p><?= htmlspecialchars($user['username'] ?? 'User') ?></p>
+        </div>
+        <a href="departmenthead_dashboard.php" class="<?= $current_page=='departmenthead_dashboard.php'?'active':'' ?>">Dashboard</a>
+        <a href="manage_enrollments.php" class="<?= $current_page=='manage_enrollments.php'?'active':'' ?>">Manage Enrollments</a>
+        <a href="manage_schedules.php" class="<?= $current_page=='manage_schedules.php'?'active':'' ?>">Manage Schedules</a>
+        <a href="assign_courses.php" class="<?= $current_page=='assign_courses.php'?'active':'' ?>">Assign Courses</a>
+        <a href="add_courses.php" class="<?= $current_page=='add_courses.php'?'active':'' ?>">Add Courses</a>
+        <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">Edit Profile</a>
+        <a href="manage_announcements.php" class="<?= $current_page=='manage_announcements.php'?'active':'' ?>">Announcements</a>
+        <a href="../logout.php">Logout</a>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="header">
+            <h1>Schedule Management</h1>
+            <div class="user-info">
+                <img src="<?= htmlspecialchars($profile_src) ?>" alt="Profile">
+                <div>
+                    <div><?= htmlspecialchars($user['username'] ?? 'User') ?></div>
+                    <small>Department Head</small>
+                </div>
             </div>
-            <ul class="nav-links">
-                <li class="active"><a href="manage_schedules.php"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
-                <li><a href="assign_courses.php"><i class="fas fa-book"></i> Assign Courses</a></li>
-                <li><a href="manage_schedules.php"><i class="fas fa-calendar-plus"></i> Create Schedule</a></li>
-                <li><a href="#"><i class="fas fa-chart-bar"></i> Reports</a></li>
-                <li><a href="#"><i class="fas fa-cog"></i> Settings</a></li>
-                <li><a href="../logout.php"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats">
+            <div class="stat-card">
+                <i class="fas fa-book"></i>
+                <h3><?php echo $total_courses_count; ?></h3>
+                <p>Total Courses</p>
+            </div>
+            <div class="stat-card">
+                <i class="fas fa-chalkboard-teacher"></i>
+                <h3><?php echo $active_instructors_count; ?></h3>
+                <p>Active Instructors</p>
+            </div>
+            <div class="stat-card">
+                <i class="fas fa-door-open"></i>
+                <h3><?php echo $available_rooms_count; ?></h3>
+                <p>Available Rooms</p>
+            </div>
+            <div class="stat-card">
+                <i class="fas fa-calendar-check"></i>
+                <h3><?php echo $scheduled_classes_count; ?></h3>
+                <p>Scheduled Classes</p>
+            </div>
+        </div>
+
+        <!-- Messages -->
+        <?php if($message): ?>
+            <div class="message <?= $message_type ?>">
+                <i class="fas fa-<?= $message_type === 'success' ? 'check-circle' : ($message_type === 'warning' ? 'exclamation-triangle' : 'exclamation-circle') ?>"></i>
+                <?= htmlspecialchars($message) ?>
+            </div>
+        <?php endif; ?>
+
+        <!-- Time Slot Information -->
+        <div class="time-slot-info">
+            <h5><i class="fas fa-clock"></i> Scheduling Information</h5>
+            <div><strong>Room:</strong> Same room used for all courses</div>
+            <div><strong>Days:</strong> Monday to Friday</div>
+            <div><strong>Time Slots:</strong>  2:30-4:20, 4:30-6:20, 8:00-11:00</div>
+            <div><strong>Total Slots:</strong> 15 (5 days × 3 time slots)</div>
+            <div><strong>Guarantee:</strong> ALL selected courses will be included in the schedule</div>
+            <div><small>Courses will be repeated to fill remaining slots after all courses are scheduled at least once.</small></div>
+        </div>
+
+        <!-- Course Information -->
+        <div class="course-info">
+            <h4><i class="fas fa-info-circle"></i> Available Courses with Current Instructors</h4>
+            <ul class="course-list">
+                <?php 
+                // Get all courses for the department
+                $all_courses_stmt = $pdo->prepare("
+                    SELECT course_id, course_name, course_code 
+                    FROM courses 
+                    WHERE department_id = ? 
+                    ORDER BY course_name
+                ");
+                $all_courses_stmt->execute([$dept_id]);
+                $all_courses = fetchAllSafe($all_courses_stmt);
+                
+                foreach($all_courses as $course): 
+                    // Improved query to check for course assignments
+                    $instructor_stmt = $pdo->prepare("
+                        SELECT u.user_id, u.full_name, u.username, ca.semester, ca.academic_year 
+                        FROM course_assignments ca 
+                        JOIN users u ON ca.user_id = u.user_id 
+                        WHERE ca.course_id = ? AND u.role = 'instructor'
+                        ORDER BY ca.assigned_date DESC 
+                        LIMIT 1
+                    ");
+                    $instructor_stmt->execute([$course['course_id']]);
+                    $instructor = $instructor_stmt->fetch(PDO::FETCH_ASSOC);
+                ?>
+                    <li>
+                        <strong><?= htmlspecialchars($course['course_name']) ?> (<?= htmlspecialchars($course['course_code']) ?>)</strong>
+                        <?php if($instructor && !empty($instructor['full_name'])): ?>
+                            - Currently assigned to: <?= htmlspecialchars($instructor['full_name']) ?>
+                            <?php if(!empty($instructor['semester']) && !empty($instructor['academic_year'])): ?>
+                                (<?= htmlspecialchars($instructor['semester']) ?> <?= htmlspecialchars($instructor['academic_year']) ?>)
+                            <?php endif; ?>
+                        <?php elseif($instructor && !empty($instructor['username'])): ?>
+                            - Currently assigned to: <?= htmlspecialchars($instructor['username']) ?>
+                            <?php if(!empty($instructor['semester']) && !empty($instructor['academic_year'])): ?>
+                                (<?= htmlspecialchars($instructor['semester']) ?> <?= htmlspecialchars($instructor['academic_year']) ?>)
+                            <?php endif; ?>
+                        <?php else: ?>
+                            <span style="color: #ef4444;">- No instructor assigned</span>
+                        <?php endif; ?>
+                    </li>
+                <?php endforeach; ?>
             </ul>
         </div>
 
-        <!-- Main Content -->
-        <div class="main-content">
-            <div class="header">
-                <h1>Schedule Management</h1>
-                <div class="user-info">
-                    <img src="https://ui-avatars.com/api/?name=Department+Head&background=4361ee&color=fff" alt="User">
-                    <div>
-                        <div>Department Head</div>
-                        <small>Computer Science Dept.</small>
+        <!-- Auto Generate Schedule Card -->
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-magic"></i> Auto Generate Schedule</h3>
+                <span class="badge">Smart Scheduling</span>
+            </div>
+            <div class="card-body">
+                <form method="POST" id="scheduleForm">
+                    <input type="hidden" name="auto_generate" value="1">
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="auto_courses">Select Courses (ALL selected courses will be included)</label>
+                            <select name="auto_courses[]" id="auto_courses" multiple class="form-control" required>
+                                <?php foreach($courses as $c): 
+                                    // Check course_assignments table
+                                    $has_instructor = $pdo->prepare("SELECT COUNT(*) FROM course_assignments WHERE course_id = ?");
+                                    $has_instructor->execute([$c['course_id']]);
+                                    $instructor_count = $has_instructor->fetchColumn();
+                                ?>
+                                    <option value="<?= $c['course_id'] ?>" <?= $instructor_count > 0 ? '' : 'disabled' ?>>
+                                        <?= htmlspecialchars($c['course_name']) ?> 
+                                        (<?= htmlspecialchars($c['course_code']) ?>)
+                                        <?= $instructor_count > 0 ? '✓' : '✗ No Instructor' ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <small>Hold Ctrl/Cmd to select multiple courses. ALL selected courses will be guaranteed in the schedule.</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="auto_year">Year</label>
+                            <select name="auto_year" id="auto_year" class="form-control" required>
+                                <option value="">Select Year</option>
+                               <?php for($y=1;$y<=4;$y++): ?>
+                               <option value="<?= $y ?>" <?= (isset($_POST['auto_year']) && $_POST['auto_year'] == $y) ? 'selected' : '' ?>>Year <?= $y ?></option>
+                                <?php endfor; ?>
+                            </select>
+                        </div>
                     </div>
-                </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="auto_academic_year">Academic Year</label>
+                            <input type="text" name="auto_academic_year" id="auto_academic_year" class="form-control" placeholder="e.g., 2024-2025" required value="<?= isset($_POST['auto_academic_year']) ? htmlspecialchars($_POST['auto_academic_year']) : '2024-2025' ?>">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="auto_semester">Semester</label>
+                            <select name="auto_semester" id="auto_semester" class="form-control" required>
+                                <option value="">Select Semester</option>
+                                <option value="Fall" <?= (isset($_POST['auto_semester']) && $_POST['auto_semester'] == 'Fall') ? 'selected' : 'selected' ?>>Fall</option>
+                                <option value="Spring" <?= (isset($_POST['auto_semester']) && $_POST['auto_semester'] == 'Spring') ? 'selected' : '' ?>>Spring</option>
+                                <option value="Summer" <?= (isset($_POST['auto_semester']) && $_POST['auto_semester'] == 'Summer') ? 'selected' : '' ?>>Summer</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary" id="generateBtn">
+                        <i class="fas fa-bolt"></i> Generate Schedule
+                    </button>
+                </form>
             </div>
+        </div>
 
-            <!-- Stats -->
-            <div class="stats">
-                <div class="stat-card">
-                    <i class="fas fa-book"></i>
-                    <h3><?php echo $total_courses_count; ?></h3>
-                    <p>Total Courses</p>
-                </div>
-                <div class="stat-card">
-                    <i class="fas fa-chalkboard-teacher"></i>
-                    <h3><?php echo $active_instructors_count; ?></h3>
-                    <p>Active Instructors</p>
-                </div>
-                <div class="stat-card">
-                    <i class="fas fa-door-open"></i>
-                    <h3><?php echo $available_rooms_count; ?></h3>
-                    <p>Available Rooms</p>
-                </div>
-                <div class="stat-card">
-                    <i class="fas fa-calendar-check"></i>
-                    <h3><?php echo $scheduled_classes_count; ?></h3>
-                    <p>Scheduled Classes</p>
-                </div>
+        <!-- Schedule Preview -->
+        <div class="card schedule-preview">
+            <div class="card-header">
+                <h3><i class="fas fa-eye"></i> Schedule Preview</h3>
+                <span class="badge">Recent Schedules</span>
             </div>
-
-            <!-- Messages -->
-            <?php if($message): ?>
-                <div class="message <?= $message_type ?>">
-                    <i class="fas fa-<?= $message_type === 'success' ? 'check-circle' : ($message_type === 'warning' ? 'exclamation-triangle' : 'exclamation-circle') ?>"></i>
-                    <?= htmlspecialchars($message) ?>
+            <div class="card-body">
+                <?php if(!empty($recent_schedules)): ?>
+                <div class="preview-grid">
+                    <?php foreach($preview_schedules as $day => $day_schedules): ?>
+                        <div class="preview-day">
+                            <h4><?= $day ?></h4>
+                            <?php if(!empty($day_schedules)): ?>
+                                <?php foreach($day_schedules as $schedule): 
+                                    // Determine time slot type for styling
+                                    $start_time = $schedule['start_time'];
+                                    $time_slot_class = '';
+                                    if ($start_time == '02:30') $time_slot_class = 'morning';
+                                    elseif ($start_time == '04:30') $time_slot_class = 'morning2';
+                                    elseif ($start_time == '08:00') $time_slot_class = 'afternoon';
+                                ?>
+                                    <div class="time-slot <?= $time_slot_class ?>">
+                                        <strong><?= htmlspecialchars($schedule['course_name']) ?></strong><br>
+                                        (<?= htmlspecialchars($schedule['course_code']) ?>)<br>
+                                        <?= htmlspecialchars($schedule['instructor_name']) ?> | <?= htmlspecialchars($schedule['room_name']) ?><br>
+                                        <?= $schedule['start_time'] ?> - <?= $schedule['end_time'] ?>
+                                    </div>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <p style="text-align:center; color:#6b7280; font-style:italic; margin-top: 20px;">No classes</p>
+                            <?php endif; ?>
+                        </div>
+                    <?php endforeach; ?>
                 </div>
-            <?php endif; ?>
-
-            <!-- Time Slot Information -->
-            <div class="time-slot-info">
-                <h5><i class="fas fa-clock"></i> Scheduling Information</h5>
-                <div><strong>Room:</strong> Same room used for all courses</div>
-                <div><strong>Days:</strong> Monday to Friday</div>
-                <div><strong>Time Slots:</strong>  2:30-4:20, 4:30-6:20, 8:00-11:00</div>
-                <div><strong>Total Slots:</strong> 15 (5 days × 3 time slots)</div>
-                <div><strong>Guarantee:</strong> ALL selected courses will be included in the schedule</div>
-                <div><small>Courses will be repeated to fill remaining slots after all courses are scheduled at least once.</small></div>
-            </div>
-
-          <!-- Course Information -->
-<div class="course-info">
-    <h4><i class="fas fa-info-circle"></i> Available Courses with Current Instructors</h4>
-    <ul class="course-list">
-        <?php 
-        // Get all courses for the department
-        $all_courses_stmt = $pdo->prepare("
-            SELECT course_id, course_name, course_code 
-            FROM courses 
-            WHERE department_id = ? 
-            ORDER BY course_name
-        ");
-        $all_courses_stmt->execute([$dept_id]);
-        $all_courses = fetchAllSafe($all_courses_stmt);
-        
-        foreach($all_courses as $course): 
-            // Improved query to check for course assignments
-            $instructor_stmt = $pdo->prepare("
-                SELECT u.user_id, u.full_name, u.username, ca.semester, ca.academic_year 
-                FROM course_assignments ca 
-                JOIN users u ON ca.user_id = u.user_id 
-                WHERE ca.course_id = ? AND u.role = 'instructor'
-                ORDER BY ca.assigned_date DESC 
-                LIMIT 1
-            ");
-            $instructor_stmt->execute([$course['course_id']]);
-            $instructor = $instructor_stmt->fetch(PDO::FETCH_ASSOC);
-            
-            // Debug: Check what we're getting from the query
-            // echo "<!-- Debug - Course ID: " . $course['course_id'] . " -->";
-            // echo "<!-- Debug - Instructor Data: " . print_r($instructor, true) . " -->";
-        ?>
-            <li>
-                <strong><?= htmlspecialchars($course['course_name']) ?> (<?= htmlspecialchars($course['course_code']) ?>)</strong>
-                <?php if($instructor && !empty($instructor['full_name'])): ?>
-                    - Currently assigned to: <?= htmlspecialchars($instructor['full_name']) ?>
-                    <?php if(!empty($instructor['semester']) && !empty($instructor['academic_year'])): ?>
-                        (<?= htmlspecialchars($instructor['semester']) ?> <?= htmlspecialchars($instructor['academic_year']) ?>)
-                    <?php endif; ?>
-                <?php elseif($instructor && !empty($instructor['username'])): ?>
-                    - Currently assigned to: <?= htmlspecialchars($instructor['username']) ?>
-                    <?php if(!empty($instructor['semester']) && !empty($instructor['academic_year'])): ?>
-                        (<?= htmlspecialchars($instructor['semester']) ?> <?= htmlspecialchars($instructor['academic_year']) ?>)
-                    <?php endif; ?>
                 <?php else: ?>
-                    <span style="color: var(--danger);">- No instructor assigned</span>
+                <div class="empty-state">
+                    <i class="fas fa-calendar-plus"></i>
+                    <h3>No Schedules Yet</h3>
+                    <p>Generate your first schedule to see the preview here.</p>
+                </div>
                 <?php endif; ?>
-            </li>
-        <?php endforeach; ?>
-    </ul>
-</div>
+            </div>
+        </div>
 
-            <!-- Auto Generate Schedule Card -->
-            <div class="card">
-                <div class="card-header">
-                    <h3><i class="fas fa-magic"></i> Auto Generate Schedule</h3>
-                    <span class="badge">Smart Scheduling</span>
-                </div>
-                <div class="card-body">
-                    <form method="POST" id="scheduleForm">
-                        <input type="hidden" name="auto_generate" value="1">
-                        
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="auto_courses">Select Courses (ALL selected courses will be included)</label>
-                                <select name="auto_courses[]" id="auto_courses" multiple class="form-control" required>
-                                    <?php foreach($courses as $c): 
-                                        // Check course_assignments table
-                                        $has_instructor = $pdo->prepare("SELECT COUNT(*) FROM course_assignments WHERE course_id = ?");
-                                        $has_instructor->execute([$c['course_id']]);
-                                        $instructor_count = $has_instructor->fetchColumn();
-                                    ?>
-                                        <option value="<?= $c['course_id'] ?>" <?= $instructor_count > 0 ? '' : 'disabled' ?>>
-                                            <?= htmlspecialchars($c['course_name']) ?> 
-                                            (<?= htmlspecialchars($c['course_code']) ?>)
-                                            <?= $instructor_count > 0 ? '✓' : '✗ No Instructor' ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                                <small>Hold Ctrl/Cmd to select multiple courses. ALL selected courses will be guaranteed in the schedule.</small>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="auto_year">Year</label>
-                                <select name="auto_year" id="auto_year" class="form-control" required>
-                                    <option value="">Select Year</option>
-                                    <?php for($y=1;$y<=4;$y++): ?>
-                                        <option value="<?= $y ?>" <?= (isset($_POST['auto_year']) && $_POST['auto_year'] == $y) ? 'selected' : '' ?>>Year <?= $y ?></option>
-                                    <?php endfor; ?>
-                                </select>
-                            </div>
-                        </div>
-                        
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="auto_academic_year">Academic Year</label>
-                                <input type="text" name="auto_academic_year" id="auto_academic_year" class="form-control" placeholder="e.g., 2024-2025" required value="<?= isset($_POST['auto_academic_year']) ? htmlspecialchars($_POST['auto_academic_year']) : '2024-2025' ?>">
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="auto_semester">Semester</label>
-                                <select name="auto_semester" id="auto_semester" class="form-control" required>
-                                    <option value="">Select Semester</option>
-                                    <option value="Fall" <?= (isset($_POST['auto_semester']) && $_POST['auto_semester'] == 'Fall') ? 'selected' : 'selected' ?>>Fall</option>
-                                    <option value="Spring" <?= (isset($_POST['auto_semester']) && $_POST['auto_semester'] == 'Spring') ? 'selected' : '' ?>>Spring</option>
-                                    <option value="Summer" <?= (isset($_POST['auto_semester']) && $_POST['auto_semester'] == 'Summer') ? 'selected' : '' ?>>Summer</option>
-                                </select>
-                            </div>
-                        </div>
-                        
-                        <button type="submit" class="btn btn-primary" id="generateBtn">
-                            <i class="fas fa-bolt"></i> Generate Schedule
-                        </button>
-                    </form>
+        <!-- Current Schedules -->
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-list"></i> Current Schedules</h3>
+                <div>
+                    <button type="submit" form="deleteForm" name="delete_selected" class="btn btn-danger" id="deleteBtn" disabled onclick="return confirm('Are you sure you want to delete selected schedules?')">
+                        <i class="fas fa-trash"></i> Delete Selected
+                    </button>
                 </div>
             </div>
-
-            <!-- Schedule Preview -->
-            <div class="card schedule-preview">
-                <div class="card-header">
-                    <h3><i class="fas fa-eye"></i> Schedule Preview</h3>
-                    <span class="badge">Recent Schedules</span>
-                </div>
-                <div class="card-body">
-                    <?php if(!empty($recent_schedules)): ?>
-                    <div class="preview-grid">
-                        <?php foreach($preview_schedules as $day => $day_schedules): ?>
-                            <div class="preview-day">
-                                <h4><?= $day ?></h4>
-                                <?php if(!empty($day_schedules)): ?>
-                                    <?php foreach($day_schedules as $schedule): 
-                                        // Determine time slot type for styling
-                                        $start_time = $schedule['start_time'];
-                                        $time_slot_class = '';
-                                        if ($start_time == '08:30') $time_slot_class = 'morning';
-                                        elseif ($start_time == '04:30') $time_slot_class = 'morning2';
-                                        elseif ($start_time == '08:00') $time_slot_class = 'afternoon';
-                                    ?>
-                                        <div class="time-slot <?= $time_slot_class ?>">
-                                            <strong><?= htmlspecialchars($schedule['course_name']) ?></strong><br>
-                                            (<?= htmlspecialchars($schedule['course_code']) ?>)<br>
-                                            <?= htmlspecialchars($schedule['instructor_name']) ?> | <?= htmlspecialchars($schedule['room_name']) ?><br>
-                                            <?= $schedule['start_time'] ?> - <?= $schedule['end_time'] ?>
-                                        </div>
-                                    <?php endforeach; ?>
-                                <?php else: ?>
-                                    <p style="text-align:center; color:var(--gray); font-style:italic; margin-top: 20px;">No classes</p>
-                                <?php endif; ?>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                    <?php else: ?>
-                    <div class="empty-state">
-                        <i class="fas fa-calendar-plus"></i>
-                        <h3>No Schedules Yet</h3>
-                        <p>Generate your first schedule to see the preview here.</p>
-                    </div>
-                    <?php endif; ?>
-                </div>
-            </div>
-
-            <!-- Current Schedules -->
-            <div class="card">
-                <div class="card-header">
-                    <h3><i class="fas fa-list"></i> Current Schedules</h3>
-                    <div>
-                        <button type="submit" form="deleteForm" name="delete_selected" class="btn btn-danger" id="deleteBtn" disabled onclick="return confirm('Are you sure you want to delete selected schedules?')">
-                            <i class="fas fa-trash"></i> Delete Selected
-                        </button>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <?php if(!empty($grouped_schedules)): ?>
-                    <form method="POST" id="deleteForm">
-                        <div class="table-container">
-                            <table class="schedule-table">
-                                <thead>
+            <div class="card-body">
+                <?php if(!empty($grouped_schedules)): ?>
+                <form method="POST" id="deleteForm">
+                    <div class="table-container">
+                        <table class="schedule-table">
+                            <thead>
+                                <tr>
+                                    <th class="checkbox-cell">
+                                        <input type="checkbox" id="select_all" onclick="toggleAll(this)">
+                                    </th>
+                                    <th>Course</th>
+                                    <th>Instructor</th>
+                                    <th>Room</th>
+                                    <th>Academic Year</th>
+                                    <th>Semester</th>
+                                    <th>Year</th>
+                                    <th>Schedule</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach($grouped_schedules as $key=>$s): ?>
                                     <tr>
-                                        <th class="checkbox-cell">
-                                            <input type="checkbox" id="select_all" onclick="toggleAll(this)">
-                                        </th>
-                                        <th>Course</th>
-                                        <th>Instructor</th>
-                                        <th>Room</th>
-                                        <th>Academic Year</th>
-                                        <th>Semester</th>
-                                        <th>Year</th>
-                                        <th>Schedule</th>
+                                        <td class="checkbox-cell">
+                                            <input type="checkbox" name="delete_ids[]" value="<?= $s['schedule_id'] ?>" class="delete-checkbox">
+                                        </td>
+                                        <td>
+                                            <strong><?= htmlspecialchars($s['course_name']) ?></strong><br>
+                                            <small><?= htmlspecialchars($s['course_code']) ?></small>
+                                        </td>
+                                        <td><?= htmlspecialchars($s['instructor_name']) ?></td>
+                                        <td><?= htmlspecialchars($s['room_name']) ?></td>
+                                        <td><?= htmlspecialchars($s['academic_year']) ?></td>
+                                        <td><?= htmlspecialchars($s['semester']) ?></td>
+                                        <td><?= htmlspecialchars($s['year']) ?></td>
+                                        <td><?= implode('<br>', $s['time_slots']) ?></td>
                                     </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach($grouped_schedules as $key=>$s): ?>
-                                        <tr>
-                                            <td class="checkbox-cell">
-                                                <input type="checkbox" name="delete_ids[]" value="<?= $s['schedule_id'] ?>" class="delete-checkbox">
-                                            </td>
-                                            <td>
-                                                <strong><?= htmlspecialchars($s['course_name']) ?></strong><br>
-                                                <small><?= htmlspecialchars($s['course_code']) ?></small>
-                                            </td>
-                                            <td><?= htmlspecialchars($s['instructor_name']) ?></td>
-                                            <td><?= htmlspecialchars($s['room_name']) ?></td>
-                                            <td><?= htmlspecialchars($s['academic_year']) ?></td>
-                                            <td><?= htmlspecialchars($s['semester']) ?></td>
-                                            <td><?= htmlspecialchars($s['year']) ?></td>
-                                            <td><?= implode('<br>', $s['time_slots']) ?></td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    </form>
-                    <?php else: ?>
-                        <div class="empty-state">
-                            <i class="fas fa-calendar-times"></i>
-                            <h3>No Schedules Found</h3>
-                            <p>Generate a schedule using the form above to get started.</p>
-                        </div>
-                    <?php endif; ?>
-                </div>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </form>
+                <?php else: ?>
+                    <div class="empty-state">
+                        <i class="fas fa-calendar-times"></i>
+                        <h3>No Schedules Found</h3>
+                        <p>Generate a schedule using the form above to get started.</p>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
 
     <script>
+        function toggleSidebar() {
+            const sidebar = document.querySelector('.sidebar');
+            const overlay = document.querySelector('.overlay');
+            sidebar.classList.toggle('active');
+            overlay.classList.toggle('active');
+        }
+
         // Toggle all checkboxes
         function toggleAll(master) {
             const checkboxes = document.querySelectorAll('.delete-checkbox');
@@ -1444,6 +1468,17 @@ $courses_with_instructors = fetchAllSafe($courses_with_instructors_stmt);
 
             // Initialize delete button state
             updateDeleteButton();
+
+            // Set active state for current page
+            const currentPage = window.location.pathname.split('/').pop();
+            const navLinks = document.querySelectorAll('.sidebar a');
+            
+            navLinks.forEach(link => {
+                const linkPage = link.getAttribute('href');
+                if (linkPage === currentPage) {
+                    link.classList.add('active');
+                }
+            });
         });
     </script>
 </body>
