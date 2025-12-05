@@ -37,23 +37,40 @@ $total_enrollments_stmt = $pdo->prepare("
 $total_enrollments_stmt->execute([$dept_id]);
 $total_enrollments = $total_enrollments_stmt->fetchColumn();
 
-// Fetch current enrollments with multiple days aggregated
+// Fetch current enrollments with schedule details
 $enrollments_stmt = $pdo->prepare("
     SELECT u.username AS student_name, 
-           c.course_name, 
-           GROUP_CONCAT(DISTINCT s.day ORDER BY FIELD(s.day, 'Monday','Tuesday','Wednesday','Thursday','Friday') SEPARATOR ', ') AS days,
-           MIN(s.start_time) AS start_time,
-           MAX(s.end_time) AS end_time
+           c.course_name,
+           s.day,
+           TIME_FORMAT(s.start_time, '%h:%i %p') AS start_time,
+           TIME_FORMAT(s.end_time, '%h:%i %p') AS end_time
     FROM enrollments e
     JOIN users u ON e.student_id = u.user_id
     JOIN schedule s ON e.schedule_id = s.schedule_id
     JOIN courses c ON s.course_id = c.course_id
     WHERE c.department_id = ?
-    GROUP BY u.username, c.course_name
-    ORDER BY u.username, FIELD(s.day, 'Monday','Tuesday','Wednesday','Thursday','Friday')
+    ORDER BY u.username, FIELD(s.day, 'Monday','Tuesday','Wednesday','Thursday','Friday'), s.start_time
 ");
 $enrollments_stmt->execute([$dept_id]);
 $enrollments = $enrollments_stmt->fetchAll();
+
+// Group enrollments by student and course for display
+$grouped_enrollments = [];
+foreach($enrollments as $e){
+    $key = $e['student_name'] . '|' . $e['course_name'];
+    if(!isset($grouped_enrollments[$key])){
+        $grouped_enrollments[$key] = [
+            'student_name' => $e['student_name'],
+            'course_name' => $e['course_name'],
+            'schedules' => []
+        ];
+    }
+    $grouped_enrollments[$key]['schedules'][] = [
+        'day' => $e['day'],
+        'start_time' => $e['start_time'],
+        'end_time' => $e['end_time']
+    ];
+}
 
 // ---------------- Handle Announcement Form ----------------
 $announcement_msg = "";
@@ -434,20 +451,40 @@ $current_page = basename($_SERVER['PHP_SELF']);
     <!-- Overlay for Mobile -->
     <div class="overlay" onclick="toggleSidebar()"></div>
 
-    <!-- Sidebar -->
     <div class="sidebar">
         <div class="sidebar-profile">
-            <img src="<?= $profile_img_path ?>" alt="Profile Picture">
-            <p><?= htmlspecialchars($current_user['username']); ?></p>
+            <img src="<?= htmlspecialchars($profile_src) ?>" alt="Profile Picture">
+            <p><?= htmlspecialchars($user['username'] ?? 'User') ?></p>
         </div>
-        <a href="departmenthead_dashboard.php" class="<?= $current_page=='departmenthead_dashboard.php'?'active':'' ?>">Dashboard</a>
-        <a href="manage_enrollments.php" class="<?= $current_page=='manage_enrollments.php'?'active':'' ?>">Manage Enrollments</a>
-        <a href="manage_schedules.php" class="<?= $current_page=='manage_schedules.php'?'active':'' ?>">Manage Schedules</a>
-        <a href="assign_courses.php" class="<?= $current_page=='assign_courses.php'?'active':'' ?>">Assign Courses</a>
-        <a href="add_courses.php" class="<?= $current_page=='add_courses.php'?'active':'' ?>">Add Courses</a>
-        <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">Edit Profile</a>
-        <a href="manage_announcements.php" class="<?= $current_page=='manage_announcements.php'?'active':'' ?>">Announcements</a>
-        <a href="../logout.php">Logout</a>
+        <nav>
+            <a href="departmenthead_dashboard.php" class="<?= $current_page=='departmenthead_dashboard.php'?'active':'' ?>">
+                <i class="fas fa-home"></i> Dashboard
+            </a>
+            <a href="manage_enrollments.php" class="<?= $current_page=='manage_enrollments.php'?'active':'' ?>">
+                <i class="fas fa-users"></i> Manage Enrollments
+            </a>
+            <a href="manage_schedules.php" class="<?= $current_page=='manage_schedules.php'?'active':'' ?>">
+                <i class="fas fa-calendar-alt"></i> Manage Schedules
+            </a>
+            <a href="assign_courses.php" class="<?= $current_page=='assign_courses.php'?'active':'' ?>">
+                <i class="fas fa-chalkboard-teacher"></i> Assign Courses
+            </a>
+            <a href="add_courses.php" class="<?= $current_page=='add_courses.php'?'active':'' ?>">
+                <i class="fas fa-book"></i> Add Courses
+            </a>
+            <a href="exam_schedules.php" class="<?= $current_page=='exam_schedules.php'?'active':'' ?>">
+                <i class="fas fa-clipboard-list"></i> Exam Schedules
+            </a>
+            <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
+                <i class="fas fa-user-edit"></i> Edit Profile
+            </a>
+            <a href="manage_announcements.php" class="<?= $current_page=='manage_announcements.php'?'active':'' ?>">
+                <i class="fas fa-bullhorn"></i> Announcements
+            </a>
+            <a href="../logout.php">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </nav>
     </div>
 
     <!-- Main Content -->
@@ -494,45 +531,48 @@ $current_page = basename($_SERVER['PHP_SELF']);
             </div>
         </div>
 
-        <!-- Enrollments Table -->
-        <div class="table-section">
-            <div class="card-header">
-                <h3><i class="fas fa-list"></i> Current Enrollments</h3>
-            </div>
-            <div class="card-body">
-                <table class="enrollments-table">
-                    <thead>
+       <!-- Enrollments Table -->
+<div class="table-section">
+    <div class="card-header">
+        <h3><i class="fas fa-list"></i> Current Enrollments</h3>
+    </div>
+    <div class="card-body">
+        <table class="enrollments-table">
+            <thead>
+                <tr>
+                    <th>Student</th>
+                    <th>Course</th>
+                    <th>Schedule</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if(!empty($grouped_enrollments)): ?>
+                    <?php foreach($grouped_enrollments as $enrollment): ?>
                         <tr>
-                            <th>Student</th>
-                            <th>Course</th>
-                            <th>Days</th>
-                            <th>Start Time</th>
-                            <th>End Time</th>
+                            <td><?= htmlspecialchars($enrollment['student_name']) ?></td>
+                            <td><?= htmlspecialchars($enrollment['course_name']) ?></td>
+                            <td>
+                                <?php foreach($enrollment['schedules'] as $schedule): ?>
+                                    <div style="margin-bottom: 5px;">
+                                        <strong><?= htmlspecialchars($schedule['day']) ?>:</strong>
+                                        <?= htmlspecialchars($schedule['start_time']) ?> - <?= htmlspecialchars($schedule['end_time']) ?>
+                                    </div>
+                                <?php endforeach; ?>
+                            </td>
                         </tr>
-                    </thead>
-                    <tbody>
-                        <?php if($enrollments): ?>
-                            <?php foreach($enrollments as $e): ?>
-                                <tr>
-                                    <td><?= htmlspecialchars($e['student_name']) ?></td>
-                                    <td><?= htmlspecialchars($e['course_name']) ?></td>
-                                    <td><?= htmlspecialchars($e['days']) ?></td>
-                                    <td><?= date('h:i A', strtotime($e['start_time'])) ?></td>
-                                    <td><?= date('h:i A', strtotime($e['end_time'])) ?></td>
-                                </tr>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <tr>
-                                <td colspan="5" style="text-align:center; padding: 30px;">
-                                    <i class="fas fa-inbox" style="font-size: 2.5rem; color: #9ca3af; margin-bottom: 15px;"></i>
-                                    <p style="color: #6b7280; font-size: 1.1rem;">No enrollments found.</p>
-                                </td>
-                            </tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <tr>
+                        <td colspan="3" style="text-align:center; padding: 30px;">
+                            <i class="fas fa-inbox" style="font-size: 2.5rem; color: #9ca3af; margin-bottom: 15px;"></i>
+                            <p style="color: #6b7280; font-size: 1.1rem;">No enrollments found.</p>
+                        </td>
+                    </tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
 
         <!-- Announcements Section -->
         <div class="announcement-section">
