@@ -13,20 +13,45 @@ $dept_id = $_SESSION['department_id'] ?? 0;
 $message = "";
 $message_type = "success";
 
-// Fetch current user info
-$user_stmt = $pdo->prepare("SELECT username, full_name, profile_picture FROM users WHERE user_id = ?");
+// Fetch current user info - MATCHING DASHBOARD
+$user_stmt = $pdo->prepare("SELECT username, profile_picture FROM users WHERE user_id = ?");
 $user_stmt->execute([$_SESSION['user_id']]);
 $user = $user_stmt->fetch(PDO::FETCH_ASSOC);
 
-// Determine profile picture path
-$profile_path = '../../uploads/profiles/' . ($user['profile_picture'] ?? '');
-if (!empty($user['profile_picture']) && file_exists($profile_path)) {
-    $profile_src = $profile_path;
-} else {
-    $profile_src = '../assets/default_profile.png';
-}
+// Determine profile picture path - FIXED VERSION
+$uploads_dir = __DIR__ . '/../uploads/';
+$assets_dir = __DIR__ . '/../assets/';
 
-$current_page = basename($_SERVER['PHP_SELF']);
+// Check if profile picture exists in uploads directory
+$profile_picture = $user['profile_picture'] ?? '';
+$default_profile = 'default_profile.png';
+
+// Check multiple possible locations
+if(!empty($profile_picture)) {
+    // Try absolute path first
+    if(file_exists($uploads_dir . $profile_picture)) {
+        $profile_img_path = '../uploads/' . $profile_picture;
+    }
+    // Try relative path from current directory
+    else if(file_exists('uploads/' . $profile_picture)) {
+        $profile_img_path = 'uploads/' . $profile_picture;
+    }
+    // Try direct uploads path
+    else if(file_exists('../uploads/' . $profile_picture)) {
+        $profile_img_path = '../uploads/' . $profile_picture;
+    }
+    // Try ../../uploads path
+    else if(file_exists('../../uploads/' . $profile_picture)) {
+        $profile_img_path = '../../uploads/' . $profile_picture;
+    }
+    else {
+        // Use default if file doesn't exist
+        $profile_img_path = '../assets/' . $default_profile;
+    }
+} else {
+    // Use default if no profile picture
+    $profile_img_path = '../assets/' . $default_profile;
+}
 
 // Helper function to display messages
 function showMessage($type, $text) {
@@ -35,14 +60,14 @@ function showMessage($type, $text) {
     $message_type = $type;
 }
 
-// FIXED: Get exam schedules for enrolled courses only - USING DISTINCT
+// Get exam schedules for enrolled courses only
 try {
     $exams_stmt = $pdo->prepare("
         SELECT DISTINCT es.exam_id, es.course_id, es.exam_type, es.exam_date, es.start_time, es.end_time,
                es.room_id, es.supervisor_id, es.max_students, es.is_published,
                c.course_code, c.course_name,
                r.room_name, r.capacity,
-               u.full_name as supervisor_name
+               u.username as supervisor_name
         FROM exam_schedules es
         JOIN courses c ON es.course_id = c.course_id
         JOIN enrollments e ON es.course_id = e.course_id
@@ -61,7 +86,7 @@ try {
     $exams = [];
 }
 
-// FIXED: Fetch exam statistics for student - USING DISTINCT
+// Fetch exam statistics for student
 try {
     $stats_stmt = $pdo->prepare("
         SELECT 
@@ -92,7 +117,7 @@ try {
     error_log("Stats error: " . $e->getMessage());
 }
 
-// FIXED: Fetch upcoming exams (next 7 days) - USING DISTINCT
+// Fetch upcoming exams (next 7 days)
 try {
     $upcoming_stmt = $pdo->prepare("
         SELECT DISTINCT es.exam_id, es.course_id, es.exam_type, es.exam_date, es.start_time, es.end_time,
@@ -117,125 +142,65 @@ try {
     $upcoming_exams = [];
     error_log("Upcoming exams error: " . $e->getMessage());
 }
-
-// Set default academic year
-$default_year = date('Y') . '-' . (date('Y') + 1);
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>My Exam Schedules | Student Portal</title>
+<title>Exam Schedule | Student Dashboard</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <!-- FullCalendar CSS -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css">
 <style>
-:root {
-    --primary: #6366f1;
-    --primary-dark: #4f46e5;
-    --secondary: #8b5cf6;
-    --success: #10b981;
-    --warning: #f59e0b;
-    --danger: #ef4444;
-    --info: #06b6d4;
-    --light: #f8fafc;
-    --dark: #1f2937;
-    --gray: #6b7280;
-    --gray-light: #e5e7eb;
-    --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-    --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-    --radius: 12px;
-    --radius-lg: 20px;
-    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
+* { box-sizing: border-box; margin:0; padding:0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
 
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-}
-
-body {
-    background: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%);
-    min-height: 100vh;
-    color: #374151;
-    line-height: 1.6;
-}
-
-/* ================= Topbar ================= */
+/* ================= Topbar for Hamburger ================= */
 .topbar {
     display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    background: white;
-    padding: 1rem 1.5rem;
-    box-shadow: var(--shadow);
-    z-index: 1000;
-    align-items: center;
-    justify-content: space-between;
-    backdrop-filter: blur(10px);
-    background: rgba(255, 255, 255, 0.95);
+    position: fixed; top:0; left:0; width:100%;
+    background:#2c3e50; color:#fff;
+    padding:15px 20px;
+    z-index:1200;
+    justify-content:space-between; align-items:center;
 }
-
 .menu-btn {
-    background: var(--primary);
-    color: white;
-    border: none;
-    width: 48px;
-    height: 48px;
-    border-radius: var(--radius);
-    font-size: 1.5rem;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: var(--transition);
+    font-size:26px;
+    background:#1abc9c;
+    border:none; color:#fff;
+    cursor:pointer;
+    padding:10px 14px;
+    border-radius:8px;
+    font-weight:600;
+    transition: background 0.3s, transform 0.2s;
 }
-
-.menu-btn:hover {
-    background: var(--primary-dark);
-    transform: translateY(-2px);
-}
-
-.topbar h2 {
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: var(--dark);
-    background: linear-gradient(135deg, var(--primary), var(--secondary));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-}
+.menu-btn:hover { background:#159b81; transform:translateY(-2px); }
 
 /* ================= Sidebar ================= */
 .sidebar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    width: 280px;
-    background: linear-gradient(180deg, #1f2937 0%, #111827 100%);
-    color: white;
-    z-index: 1000;
-    transition: var(--transition);
-    overflow-y: auto;
-    box-shadow: var(--shadow-lg);
-    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    position: fixed; top:0; left:0;
+    width:250px; height:100%;
+    background:#1f2937; color:#fff;
+    z-index:1100;
+    transition: transform 0.3s ease;
+    padding: 20px 0;
 }
-
-.sidebar.hidden {
-    transform: translateX(-100%);
+.sidebar.hidden { transform:translateX(-260px); }
+.sidebar a { 
+    display:block; 
+    padding:12px 20px; 
+    color:#fff; 
+    text-decoration:none; 
+    transition: background 0.3s; 
+    border-bottom: 1px solid rgba(255,255,255,0.1);
 }
+.sidebar a:hover, .sidebar a.active { background:#1abc9c; }
 
 .sidebar-profile {
-    padding: 2.5rem 1.5rem 1.5rem;
     text-align: center;
-    background: linear-gradient(180deg, rgba(99, 102, 241, 0.1) 0%, transparent 100%);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 20px;
+    padding: 0 20px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.2);
 }
 
 .sidebar-profile img {
@@ -243,984 +208,622 @@ body {
     height: 100px;
     border-radius: 50%;
     object-fit: cover;
-    border: 3px solid var(--primary);
-    box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
-    margin-bottom: 1rem;
-    transition: var(--transition);
-}
-
-.sidebar-profile img:hover {
-    transform: scale(1.05);
+    margin-bottom: 10px;
+    border: 2px solid #1abc9c;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
 }
 
 .sidebar-profile p {
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: white;
+    color: #fff;
+    font-weight: bold;
     margin: 0;
+    font-size: 16px;
 }
 
-.sidebar nav {
-    padding: 1rem 0;
-}
-
-.sidebar a {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 1rem 1.5rem;
-    color: rgba(255, 255, 255, 0.8);
-    text-decoration: none;
-    transition: var(--transition);
-    border-left: 3px solid transparent;
-    font-weight: 500;
-}
-
-.sidebar a i {
-    width: 20px;
-    font-size: 1.1rem;
-}
-
-.sidebar a:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: white;
-    border-left-color: var(--primary);
-}
-
-.sidebar a.active {
-    background: linear-gradient(90deg, rgba(99, 102, 241, 0.2) 0%, transparent 100%);
-    color: white;
-    border-left-color: var(--primary);
+/* Sidebar title */
+.sidebar h2 {
+    text-align: center;
+    color: #ecf0f1;
+    margin-bottom: 25px;
+    font-size: 22px;
+    padding: 0 20px;
 }
 
 /* ================= Overlay ================= */
 .overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    z-index: 999;
-    display: none;
-    backdrop-filter: blur(4px);
+    position: fixed; top:0; left:0; width:100%; height:100%;
+    background: rgba(0,0,0,0.4); z-index:1050;
+    display:none; opacity:0; transition: opacity 0.3s ease;
 }
+.overlay.active { display:block; opacity:1; }
 
-.overlay.active {
-    display: block;
-    animation: fadeIn 0.3s ease;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-/* ================= Main Content ================= */
+/* ================= Main content ================= */
 .main-content {
-    margin-left: 280px;
-    padding: 2rem;
-    min-height: 100vh;
-    transition: var(--transition);
+    margin-left: 250px;
+    padding:20px;
+    min-height:100vh;
+    background: #f8fafc;
+    transition: all 0.3s ease;
 }
 
-@media (max-width: 1024px) {
-    .main-content {
-        margin-left: 0;
-        padding-top: 80px;
-    }
+/* Content Wrapper */
+.content-wrapper {
+    background: white;
+    border-radius: 15px;
+    padding: 30px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    min-height: calc(100vh - 40px);
 }
 
-/* ================= Header ================= */
+/* Header Styles */
 .header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 2.5rem;
-    padding: 1.5rem 0;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #e5e7eb;
 }
 
 .header h1 {
-    font-size: 2.5rem;
+    font-size: 2.2rem;
+    color: #1f2937;
     font-weight: 700;
-    background: linear-gradient(135deg, var(--primary), var(--secondary));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    line-height: 1.2;
 }
 
 .user-info {
     display: flex;
     align-items: center;
-    gap: 1rem;
-    background: white;
-    padding: 0.75rem 1.25rem;
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow);
-    transition: var(--transition);
-}
-
-.user-info:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
+    gap: 12px;
+    background: #f8fafc;
+    padding: 12px 18px;
+    border-radius: 12px;
+    border: 1px solid #e5e7eb;
 }
 
 .user-info img {
-    width: 50px;
-    height: 50px;
+    width: 45px;
+    height: 45px;
     border-radius: 50%;
     object-fit: cover;
-    border: 2px solid var(--primary);
 }
 
-.user-info div {
-    display: flex;
-    flex-direction: column;
+/* Welcome Section */
+.welcome-section {
+    margin-bottom: 30px;
 }
 
-.user-info div div {
-    font-weight: 600;
-    color: var(--dark);
-}
-
-.user-info small {
-    color: var(--gray);
-    font-size: 0.875rem;
-}
-
-/* ================= Message ================= */
-.message {
-    padding: 1.25rem 1.5rem;
-    border-radius: var(--radius);
-    margin-bottom: 2rem;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    font-weight: 500;
-    animation: slideIn 0.3s ease;
-    box-shadow: var(--shadow);
-}
-
-@keyframes slideIn {
-    from {
-        transform: translateY(-10px);
-        opacity: 0;
-    }
-    to {
-        transform: translateY(0);
-        opacity: 1;
-    }
-}
-
-.message.success {
-    background: linear-gradient(135deg, #dcfce7, #bbf7d0);
-    color: #166534;
-    border-left: 4px solid var(--success);
-}
-
-.message.error {
-    background: linear-gradient(135deg, #fee2e2, #fecaca);
-    color: #991b1b;
-    border-left: 4px solid var(--danger);
-}
-
-.message.warning {
-    background: linear-gradient(135deg, #fef3c7, #fde68a);
-    color: #92400e;
-    border-left: 4px solid var(--warning);
-}
-
-.message.info {
-    background: linear-gradient(135deg, #dbeafe, #bfdbfe);
-    color: #1e40af;
-    border-left: 4px solid var(--info);
+.welcome-section p {
+    color: #6b7280;
+    font-size: 1.1rem;
+    margin-top: 10px;
 }
 
 /* ================= Stats Cards ================= */
-.stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 1.5rem;
-    margin-bottom: 2.5rem;
+.stats-cards {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
 }
 
 .stat-card {
+    flex: 1;
+    min-width: 200px;
     background: white;
-    border-radius: var(--radius-lg);
-    padding: 1.75rem;
-    box-shadow: var(--shadow);
-    transition: var(--transition);
-    border: 1px solid var(--gray-light);
-    position: relative;
-    overflow: hidden;
-}
-
-.stat-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 4px;
-    background: linear-gradient(90deg, var(--primary), var(--secondary));
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    border: 1px solid #e5e7eb;
+    text-align: center;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 .stat-card:hover {
     transform: translateY(-5px);
-    box-shadow: var(--shadow-lg);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
 }
 
-.stat-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 1rem;
-}
-
-.stat-icon {
-    width: 56px;
-    height: 56px;
-    border-radius: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.5rem;
-    background: linear-gradient(135deg, var(--primary), var(--secondary));
-    color: white;
-    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-}
-
-.stat-content h3 {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--gray);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 0.5rem;
-}
-
-.stat-content .stat-value {
-    font-size: 2rem;
-    font-weight: 700;
-    color: var(--dark);
-    line-height: 1;
-    margin-bottom: 0.5rem;
-}
-
-.stat-content .stat-desc {
-    font-size: 0.875rem;
-    color: var(--gray);
-}
-
-/* ================= Upcoming Exams ================= */
-.upcoming-card {
-    background: white;
-    border-radius: var(--radius-lg);
-    padding: 1.75rem;
-    box-shadow: var(--shadow);
-    margin-bottom: 2rem;
-    border: 1px solid var(--gray-light);
-}
-
-.upcoming-card .card-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 1.5rem;
-}
-
-.upcoming-card h3 {
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: var(--dark);
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.upcoming-list {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.upcoming-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 1rem;
-    background: var(--light);
-    border-radius: var(--radius);
-    border: 1px solid var(--gray-light);
-    transition: var(--transition);
-}
-
-.upcoming-item:hover {
-    transform: translateX(4px);
-    box-shadow: var(--shadow);
-}
-
-.upcoming-info h4 {
+.stat-card h3 {
     font-size: 1rem;
+    color: #6b7280;
+    margin-bottom: 10px;
     font-weight: 600;
-    color: var(--dark);
-    margin-bottom: 0.25rem;
 }
 
-.upcoming-info p {
-    color: var(--gray);
-    font-size: 0.875rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
+.stat-card .number {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #1f2937;
+    margin-bottom: 10px;
 }
 
-.upcoming-time {
-    text-align: right;
-}
-
-.upcoming-time .date {
-    font-weight: 600;
-    color: var(--dark);
+.stat-card .icon {
+    font-size: 2rem;
+    margin-bottom: 15px;
     display: block;
-    margin-bottom: 0.25rem;
-}
-
-.upcoming-time .time {
-    color: var(--gray);
-    font-size: 0.875rem;
 }
 
 /* ================= Calendar Card ================= */
 .calendar-card {
     background: white;
-    border-radius: var(--radius-lg);
+    border-radius: 12px;
     overflow: hidden;
-    box-shadow: var(--shadow);
-    margin-bottom: 2rem;
-    border: 1px solid var(--gray-light);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    border: 1px solid #e5e7eb;
+    margin-top: 30px;
 }
 
 .calendar-header {
-    padding: 1.5rem 1.75rem;
-    background: linear-gradient(135deg, var(--primary), var(--secondary));
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+    padding: 20px;
+    background: #f8fafc;
+    border-bottom: 1px solid #e5e7eb;
 }
 
 .calendar-header h3 {
     font-size: 1.25rem;
     font-weight: 600;
+    color: #1f2937;
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 10px;
 }
 
 #examCalendar {
-    padding: 1.5rem;
+    padding: 20px;
     background: white;
 }
 
-/* ================= Table Card ================= */
-.table-card {
-    background: white;
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-    box-shadow: var(--shadow);
-    border: 1px solid var(--gray-light);
+/* FullCalendar Custom Styling */
+.fc {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
-.table-card .card-header {
-    padding: 1.5rem 1.75rem;
-    background: linear-gradient(135deg, #f8fafc, #f1f5f9);
-    border-bottom: 1px solid var(--gray-light);
-}
-
-.table-card h3 {
-    font-size: 1.25rem;
+.fc-toolbar-title {
+    font-size: 1.5rem !important;
     font-weight: 600;
-    color: var(--dark);
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
+    color: #1f2937;
+}
+
+.fc-button {
+    background: #f8fafc !important;
+    border: 1px solid #e5e7eb !important;
+    color: #374151 !important;
+    font-weight: 500 !important;
+    border-radius: 8px !important;
+    padding: 6px 12px !important;
+    transition: all 0.3s ease !important;
+}
+
+.fc-button:hover {
+    background: #e5e7eb !important;
+    transform: translateY(-1px);
+}
+
+.fc-button-primary:not(:disabled):active, 
+.fc-button-primary:not(:disabled).fc-button-active {
+    background: #1abc9c !important;
+    border-color: #1abc9c !important;
+}
+
+.fc-day-today {
+    background-color: #fff7ed !important;
+}
+
+.fc-event {
+    border-radius: 6px !important;
+    border: none !important;
+    padding: 4px 8px !important;
+    font-size: 0.85rem !important;
+    cursor: pointer !important;
+}
+
+.fc-event:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* ================= Exam Table ================= */
+.exam-section {
+    margin-top: 30px;
 }
 
 .table-container {
-    overflow-x: auto;
-    padding: 0.5rem;
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    border: 1px solid #e5e7eb;
 }
 
 .exam-table {
     width: 100%;
     border-collapse: collapse;
-    min-width: 800px;
-}
-
-.exam-table thead {
-    background: linear-gradient(135deg, #f8fafc, #f1f5f9);
 }
 
 .exam-table th {
-    padding: 1rem 1.25rem;
+    background: #f8fafc;
+    padding: 15px;
     text-align: left;
     font-weight: 600;
-    color: var(--dark);
-    font-size: 0.875rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    border-bottom: 2px solid var(--gray-light);
+    color: #374151;
+    border-bottom: 1px solid #e5e7eb;
 }
 
 .exam-table td {
-    padding: 1.25rem;
-    border-bottom: 1px solid var(--gray-light);
-    transition: var(--transition);
+    padding: 15px;
+    border-bottom: 1px solid #f3f4f6;
 }
 
-.exam-table tbody tr {
-    transition: var(--transition);
-}
-
-.exam-table tbody tr:hover {
-    background: linear-gradient(90deg, rgba(99, 102, 241, 0.05) 0%, transparent 100%);
-    transform: translateX(4px);
-}
-
-.exam-table tbody tr:last-child td {
+.exam-table tr:last-child td {
     border-bottom: none;
 }
 
-/* ================= Badges ================= */
+.exam-table tr:hover {
+    background: #f9fafb;
+}
+
+.exam-table .today-exam {
+    background: #fff7ed !important;
+    border-left: 4px solid #f59e0b;
+}
+
+.exam-table .upcoming-exam {
+    background: #f0fdf4 !important;
+    border-left: 4px solid #10b981;
+}
+
+.exam-table .past-exam {
+    background: #f8fafc !important;
+    border-left: 4px solid #94a3b8;
+}
+
+/* Badge styles */
 .badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.375rem;
-    padding: 0.375rem 0.875rem;
-    border-radius: 20px;
-    font-size: 0.75rem;
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.8rem;
     font-weight: 600;
-    line-height: 1;
 }
 
 .badge-primary {
-    background: linear-gradient(135deg, #e0e7ff, #c7d2fe);
-    color: var(--primary-dark);
+    background: #e0e7ff;
+    color: #3730a3;
 }
 
 .badge-success {
-    background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+    background: #dcfce7;
     color: #166534;
 }
 
 .badge-warning {
-    background: linear-gradient(135deg, #fef3c7, #fde68a);
+    background: #fef3c7;
     color: #92400e;
 }
 
 .badge-danger {
-    background: linear-gradient(135deg, #fee2e2, #fecaca);
+    background: #fee2e2;
     color: #991b1b;
 }
 
-.badge-info {
-    background: linear-gradient(135deg, #dbeafe, #bfdbfe);
-    color: #1e40af;
-}
-
 .badge-secondary {
-    background: linear-gradient(135deg, #f3f4f6, #e5e7eb);
-    color: var(--gray);
+    background: #f3f4f6;
+    color: #6b7280;
 }
 
-/* ================= Buttons ================= */
-.btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.625rem 1.25rem;
-    border: none;
-    border-radius: var(--radius);
-    font-weight: 600;
-    font-size: 0.875rem;
-    cursor: pointer;
-    transition: var(--transition);
-    text-decoration: none;
-}
-
-.btn-sm {
-    padding: 0.5rem 1rem;
-    font-size: 0.75rem;
-}
-
-.btn-primary {
-    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-    color: white;
-    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-}
-
-.btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
-}
-
-.btn-success {
-    background: linear-gradient(135deg, var(--success), #059669);
-    color: white;
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-}
-
-.btn-success:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
-}
-
-.btn-warning {
-    background: linear-gradient(135deg, var(--warning), #d97706);
-    color: white;
-    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
-}
-
-.btn-warning:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(245, 158, 11, 0.4);
-}
-
-.btn-danger {
-    background: linear-gradient(135deg, var(--danger), #dc2626);
-    color: white;
-    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
-}
-
-.btn-danger:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4);
-}
-
-.btn-group {
+/* Message styling */
+.message {
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
     display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
 }
 
-/* ================= Progress Bar ================= */
-.progress-container {
-    width: 100px;
+.message.success {
+    background: #dcfce7;
+    color: #166534;
+    border-left: 4px solid #10b981;
 }
 
-.progress-bar {
-    width: 100%;
-    height: 8px;
-    background: var(--gray-light);
-    border-radius: 4px;
-    overflow: hidden;
-    margin-top: 0.5rem;
+.message.error {
+    background: #fee2e2;
+    color: #991b1b;
+    border-left: 4px solid #ef4444;
 }
 
-.progress-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--success), #059669);
-    border-radius: 4px;
-    transition: width 0.6s ease;
+.message.warning {
+    background: #fef3c7;
+    color: #92400e;
+    border-left: 4px solid #f59e0b;
 }
 
-/* ================= Empty State ================= */
+/* Empty state */
 .empty-state {
     text-align: center;
-    padding: 3rem 1rem;
-    color: var(--gray);
+    padding: 40px 20px;
+    color: #6b7280;
 }
 
 .empty-state i {
-    font-size: 4rem;
-    margin-bottom: 1.5rem;
-    color: var(--gray-light);
-    opacity: 0.5;
+    font-size: 3rem;
+    margin-bottom: 15px;
+    color: #d1d5db;
 }
 
 .empty-state h3 {
     font-size: 1.5rem;
-    font-weight: 600;
-    color: var(--dark);
-    margin-bottom: 0.75rem;
+    margin-bottom: 10px;
+    color: #374151;
 }
 
 .empty-state p {
-    color: var(--gray);
+    color: #6b7280;
     max-width: 400px;
     margin: 0 auto;
 }
 
-/* ================= Registration Status ================= */
-.registration-status {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.375rem;
-    padding: 0.375rem 0.75rem;
-    border-radius: 20px;
-    font-size: 0.75rem;
-    font-weight: 600;
-}
-
-.registered {
-    background: linear-gradient(135deg, #dcfce7, #bbf7d0);
-    color: #166534;
-}
-
-.not-registered {
-    background: linear-gradient(135deg, #fef3c7, #fde68a);
-    color: #92400e;
-}
-
-/* ================= Responsive Design ================= */
+/* ================= Responsive ================= */
 @media (max-width: 768px) {
-    .topbar {
-        display: flex;
+    .topbar { display: flex; }
+    .sidebar { transform: translateX(-100%); }
+    .sidebar.active { transform: translateX(0); }
+    .main-content { margin-left: 0; padding: 15px; }
+    .content-wrapper { padding: 20px; border-radius: 0; }
+    .header { flex-direction: column; gap: 15px; align-items: flex-start; }
+    .header h1 { font-size: 1.8rem; }
+    .stats-cards { flex-direction: column; }
+    .stat-card { min-width: auto; }
+    .table-container { overflow-x: auto; }
+    .exam-table { min-width: 600px; }
+    .fc-toolbar {
+        flex-direction: column !important;
+        gap: 10px !important;
     }
-    
-    .sidebar {
-        transform: translateX(-100%);
+    .fc-toolbar-title {
+        font-size: 1.2rem !important;
     }
-    
-    .sidebar.active {
-        transform: translateX(0);
-    }
-    
-    .header {
-        flex-direction: column;
-        gap: 1rem;
-        align-items: flex-start;
-    }
-    
-    .header h1 {
-        font-size: 2rem;
-    }
-    
-    .stats-grid {
-        grid-template-columns: 1fr;
-    }
-    
-    .form-row {
-        grid-template-columns: 1fr;
-    }
-    
-    .btn-group {
-        flex-wrap: wrap;
-    }
-    
-    .exam-table {
-        min-width: 600px;
-    }
-    
-    .upcoming-item {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.5rem;
-    }
-    
-    .upcoming-time {
-        text-align: left;
-        width: 100%;
-    }
-}
-
-/* ================= Custom Scrollbar ================= */
-::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-}
-
-::-webkit-scrollbar-track {
-    background: var(--gray-light);
-    border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb {
-    background: linear-gradient(135deg, var(--primary), var(--secondary));
-    border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(135deg, var(--primary-dark), var(--secondary));
 }
 </style>
 </head>
 <body>
     <!-- Topbar for Mobile -->
     <div class="topbar">
-        <button class="menu-btn" onclick="toggleSidebar()">
-            <i class="fas fa-bars"></i>
-        </button>
-        <h2>My Exam Schedules</h2>
+        <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+        <h2>Exam Schedule</h2>
     </div>
 
     <!-- Overlay for Mobile -->
     <div class="overlay" onclick="toggleSidebar()"></div>
 
-    <!-- Sidebar -->
+    <!-- Sidebar - EXACTLY LIKE STUDENT DASHBOARD -->
     <div class="sidebar">
         <div class="sidebar-profile">
-            <img src="<?= htmlspecialchars($profile_src) ?>" alt="Profile Picture">
-            <p><?= htmlspecialchars($user['full_name'] ?? $user['username'] ?? 'Student') ?></p>
+            <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture">
+            <p><?= htmlspecialchars($user['username'] ?? 'Student') ?></p>
         </div>
-        <nav>
-            <a href="student_dashboard.php" class="<?= $current_page=='student_dashboard.php'?'active':'' ?>">
-                <i class="fas fa-home"></i> Dashboard
-            </a>
-            <a href="my_courses.php" class="<?= $current_page=='my_courses.php'?'active':'' ?>">
-                <i class="fas fa-book"></i> My Courses
-            </a>
-            <a href="view_exam_schedules.php" class="<?= $current_page=='view_exam_schedules.php'?'active':'' ?>">
-                <i class="fas fa-clipboard-list"></i> Exam Schedules
-            </a>
-            <a href="my_grades.php" class="<?= $current_page=='my_grades.php'?'active':'' ?>">
-                <i class="fas fa-chart-line"></i> My Grades
-            </a>
-            <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
-                <i class="fas fa-user-edit"></i> Edit Profile
-            </a>
-            <a href="../logout.php">
-                <i class="fas fa-sign-out-alt"></i> Logout
-            </a>
-        </nav>
+        <h2>Student Panel</h2>
+        <a href="student_dashboard.php" class="<?= $current_page=='student_dashboard.php'?'active':'' ?>">Dashboard</a>
+        <a href="my_schedule.php" class="<?= $current_page=='my_schedule.php'?'active':'' ?>">My Schedule</a>
+        <a href="view_exam_schedules.php" class="<?= $current_page=='view_exam_schedules.php'?'active':'' ?>">Exam Schedule</a>
+        <a href="view_announcements.php" class="<?= $current_page=='view_announcements.php'?'active':'' ?>">Announcements</a>
+        <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">Edit Profile</a>
+        <a href="../logout.php">Logout</a>
     </div>
 
     <!-- Main Content -->
     <div class="main-content">
-        <!-- Header -->
-        <div class="header">
-            <div>
-                <h1>My Exam Schedules</h1>
-                <p style="color: var(--gray); margin-top: 0.5rem;">View exam schedules for your enrolled courses</p>
-            </div>
-            <div class="user-info">
-                <img src="<?= htmlspecialchars($profile_src) ?>" alt="Profile">
-                <div>
-                    <div><?= htmlspecialchars($user['full_name'] ?? $user['username'] ?? 'Student') ?></div>
-                    <small>Student</small>
+        <div class="content-wrapper">
+            <div class="header">
+                <div class="welcome-section">
+                    <h1>Exam Schedules</h1>
+                    <p>View all your upcoming and past exam schedules</p>
                 </div>
-            </div>
-        </div>
-
-        <!-- Messages -->
-        <?php if($message): ?>
-            <div class="message <?= $message_type ?>">
-                <i class="fas fa-<?= $message_type === 'success' ? 'check-circle' : ($message_type === 'warning' ? 'exclamation-triangle' : ($message_type === 'error' ? 'exclamation-circle' : 'info-circle')) ?>"></i>
-                <?= htmlspecialchars($message) ?>
-            </div>
-        <?php endif; ?>
-
-        <!-- Statistics Cards -->
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-header">
-                    <div class="stat-icon">
-                        <i class="fas fa-calendar-alt"></i>
+                <div class="user-info">
+                    <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile">
+                    <div>
+                        <div><?= htmlspecialchars($user['username'] ?? 'Student') ?></div>
+                        <small>Student</small>
                     </div>
                 </div>
-                <div class="stat-content">
+            </div>
+
+            <!-- Messages -->
+            <?php if($message): ?>
+                <div class="message <?= $message_type ?>">
+                    <i class="fas fa-<?= $message_type === 'success' ? 'check-circle' : ($message_type === 'warning' ? 'exclamation-triangle' : ($message_type === 'error' ? 'exclamation-circle' : 'info-circle')) ?>"></i>
+                    <?= htmlspecialchars($message) ?>
+                </div>
+            <?php endif; ?>
+
+            <!-- Quick Stats Cards -->
+            <div class="stats-cards">
+                <div class="stat-card">
+                    <i class="fas fa-calendar-alt icon" style="color: #3b82f6;"></i>
                     <h3>Total Exams</h3>
-                    <div class="stat-value"><?= htmlspecialchars($stats['total_exams']) ?></div>
-                    <p class="stat-desc">For your enrolled courses</p>
+                    <div class="number"><?= $stats['total_exams'] ?></div>
                 </div>
-            </div>
-            
-            <div class="stat-card">
-                <div class="stat-header">
-                    <div class="stat-icon" style="background: linear-gradient(135deg, var(--success), #059669);">
-                        <i class="fas fa-calendar-check"></i>
-                    </div>
-                </div>
-                <div class="stat-content">
+                <div class="stat-card">
+                    <i class="fas fa-clock icon" style="color: #10b981;"></i>
                     <h3>Upcoming Exams</h3>
-                    <div class="stat-value"><?= htmlspecialchars($stats['upcoming_exams']) ?></div>
-                    <p class="stat-desc">Future scheduled exams</p>
+                    <div class="number"><?= $stats['upcoming_exams'] ?></div>
                 </div>
-            </div>
-            
-            <div class="stat-card">
-                <div class="stat-header">
-                    <div class="stat-icon" style="background: linear-gradient(135deg, var(--info), #0284c7);">
-                        <i class="fas fa-user-check"></i>
-                    </div>
-                </div>
-                <div class="stat-content">
+                <div class="stat-card">
+                    <i class="fas fa-file-alt icon" style="color: #f59e0b;"></i>
                     <h3>Exam Types</h3>
-                    <div class="stat-value"><?= htmlspecialchars($stats['exam_types_count']) ?></div>
-                    <p class="stat-desc">Different exam formats</p>
+                    <div class="number"><?= $stats['exam_types_count'] ?></div>
                 </div>
             </div>
-            
-            <div class="stat-card">
-                <div class="stat-header">
-                    <div class="stat-icon" style="background: linear-gradient(135deg, var(--secondary), #7c3aed);">
-                        <i class="fas fa-chart-pie"></i>
-                    </div>
-                </div>
-                <div class="stat-content">
-                    <h3>Enrolled Courses</h3>
-                    <div class="stat-value">
-                        <?php 
-                        // Get enrolled courses count
-                        try {
-                            $courses_stmt = $pdo->prepare("SELECT COUNT(DISTINCT course_id) as count FROM enrollments WHERE student_id = ?");
-                            $courses_stmt->execute([$student_id]);
-                            $courses_count = $courses_stmt->fetch();
-                            echo htmlspecialchars($courses_count['count'] ?? 0);
-                        } catch (PDOException $e) {
-                            echo "0";
-                        }
-                        ?>
-                    </div>
-                    <p class="stat-desc">Courses you're enrolled in</p>
-                </div>
-            </div>
-        </div>
 
-        <!-- Upcoming Exams -->
-        <?php if(!empty($upcoming_exams)): ?>
-        <div class="upcoming-card">
-            <div class="card-header">
-                <h3><i class="fas fa-clock"></i> Upcoming Exams (Next 7 Days)</h3>
-            </div>
-            <div class="upcoming-list">
-                <?php foreach($upcoming_exams as $exam): ?>
-                <div class="upcoming-item">
-                    <div class="upcoming-info">
-                        <h4><?= htmlspecialchars($exam['course_code']) ?> - <?= htmlspecialchars($exam['exam_type']) ?></h4>
-                        <p>
-                            <i class="fas fa-book"></i> <?= htmlspecialchars($exam['course_name']) ?>
-                            <?php if(!empty($exam['room_name'])): ?>
-                                <span style="margin: 0 8px;">•</span>
-                                <i class="fas fa-door-open"></i> <?= htmlspecialchars($exam['room_name']) ?>
-                            <?php endif; ?>
-                        </p>
-                    </div>
-                    <div class="upcoming-time">
-                        <span class="date"><?= date('M d, Y', strtotime($exam['exam_date'])) ?></span>
-                        <span class="time"><?= date('h:i A', strtotime($exam['start_time'])) ?> - <?= date('h:i A', strtotime($exam['end_time'])) ?></span>
-                    </div>
+            <!-- Calendar View -->
+            <div class="calendar-card">
+                <div class="calendar-header">
+                    <h3><i class="fas fa-calendar"></i> Exam Calendar View</h3>
                 </div>
-                <?php endforeach; ?>
+                <div id="examCalendar"></div>
             </div>
-        </div>
-        <?php endif; ?>
 
-        <!-- Calendar View -->
-        <div class="calendar-card">
-            <div class="calendar-header">
-                <h3><i class="fas fa-calendar"></i> Exam Calendar View</h3>
-            </div>
-            <div id="examCalendar"></div>
-        </div>
-
-        <!-- Exam Schedule Table -->
-        <div class="table-card">
-            <div class="card-header">
-                <h3><i class="fas fa-table"></i> All Exam Schedules</h3>
-            </div>
-            <div class="table-container">
-                <table class="exam-table">
-                    <thead>
-                        <tr>
-                            <th>Course</th>
-                            <th>Exam Type</th>
-                            <th>Date & Time</th>
-                            <th>Room</th>
-                            <th>Supervisor</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if(!empty($exams)): ?>
-                            <?php foreach($exams as $exam): ?>
-                                <?php
-                                $current_time = time();
-                                $exam_timestamp = strtotime($exam['exam_date'] . ' ' . $exam['start_time']);
-                                $is_past = $exam_timestamp < $current_time;
-                                $is_upcoming = $exam_timestamp > $current_time;
-                                ?>
-                                <tr>
-                                    <td>
-                                        <strong style="color: var(--dark); display: block; margin-bottom: 0.25rem;">
-                                            <?= htmlspecialchars($exam['course_code']) ?>
-                                        </strong>
-                                        <small style="color: var(--gray);"><?= htmlspecialchars($exam['course_name']) ?></small>
-                                    </td>
-                                    <td>
-                                        <span class="badge badge-primary"><?= htmlspecialchars($exam['exam_type']) ?></span>
-                                    </td>
-                                    <td>
-                                        <strong style="color: var(--dark); display: block; margin-bottom: 0.25rem;">
-                                            <?= date('M d, Y', strtotime($exam['exam_date'])) ?>
-                                        </strong>
-                                        <small style="color: var(--gray);">
-                                            <?= date('h:i A', strtotime($exam['start_time'])) ?> - <?= date('h:i A', strtotime($exam['end_time'])) ?>
-                                        </small>
-                                    </td>
-                                    <td>
-                                        <?php if(!empty($exam['room_name'])): ?>
-                                            <strong style="color: var(--dark); display: block; margin-bottom: 0.25rem;">
-                                                <?= htmlspecialchars($exam['room_name']) ?>
-                                            </strong>
-                                            <small style="color: var(--gray);">Capacity: <?= htmlspecialchars($exam['capacity'] ?? 'N/A') ?></small>
-                                        <?php else: ?>
-                                            <span class="badge badge-warning">Not Assigned</span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td>
-                                        <?php if(!empty($exam['supervisor_name'])): ?>
-                                            <div style="color: var(--dark); font-weight: 500;">
-                                                <?= htmlspecialchars($exam['supervisor_name']) ?>
-                                            </div>
-                                        <?php else: ?>
-                                            <span class="badge badge-warning">Not Assigned</span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td>
-                                        <?php if($is_past): ?>
-                                            <span class="badge badge-secondary">Completed</span>
-                                        <?php elseif($is_upcoming): ?>
-                                            <span class="badge badge-success">Upcoming</span>
-                                        <?php else: ?>
-                                            <span class="badge badge-primary">Today</span>
-                                        <?php endif; ?>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        <?php else: ?>
+            <!-- Upcoming Exams Section -->
+            <?php if(!empty($upcoming_exams)): ?>
+            <div class="exam-section">
+                <h2 style="margin-bottom: 20px; color: #1f2937;">Upcoming Exams (Next 7 Days)</h2>
+                <div class="table-container">
+                    <table class="exam-table">
+                        <thead>
                             <tr>
-                                <td colspan="6">
-                                    <div class="empty-state">
-                                        <i class="fas fa-calendar-times"></i>
-                                        <h3>No Exam Schedules Found</h3>
-                                        <p>You don't have any exam schedules for your enrolled courses.</p>
-                                    </div>
+                                <th>Course</th>
+                                <th>Exam Type</th>
+                                <th>Date</th>
+                                <th>Time</th>
+                                <th>Room</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach($upcoming_exams as $exam): 
+                                $exam_timestamp = strtotime($exam['exam_date'] . ' ' . $exam['start_time']);
+                                $is_today = date('Y-m-d', $exam_timestamp) == date('Y-m-d');
+                            ?>
+                            <tr class="upcoming-exam">
+                                <td>
+                                    <strong><?= htmlspecialchars($exam['course_code']) ?></strong><br>
+                                    <small style="color: #6b7280;"><?= htmlspecialchars($exam['course_name']) ?></small>
+                                </td>
+                                <td>
+                                    <span class="badge badge-primary"><?= htmlspecialchars($exam['exam_type']) ?></span>
+                                </td>
+                                <td><?= date('M d, Y', strtotime($exam['exam_date'])) ?></td>
+                                <td>
+                                    <?= date('h:i A', strtotime($exam['start_time'])) ?> - 
+                                    <?= date('h:i A', strtotime($exam['end_time'])) ?>
+                                </td>
+                                <td><?= htmlspecialchars($exam['room_name'] ?? 'TBA') ?></td>
+                                <td>
+                                    <?php if($is_today): ?>
+                                        <span class="badge badge-warning">Today</span>
+                                    <?php else: ?>
+                                        <span class="badge badge-success">Upcoming</span>
+                                    <?php endif; ?>
                                 </td>
                             </tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <?php endif; ?>
+
+            <!-- All Exam Schedules Table -->
+            <div class="exam-section">
+                <h2 style="margin-bottom: 20px; color: #1f2937;">All Exam Schedules</h2>
+                <div class="table-container">
+                    <table class="exam-table">
+                        <thead>
+                            <tr>
+                                <th>Course</th>
+                                <th>Exam Type</th>
+                                <th>Date & Time</th>
+                                <th>Room</th>
+                                <th>Supervisor</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if(!empty($exams)): ?>
+                                <?php foreach($exams as $exam): ?>
+                                    <?php
+                                    $current_time = time();
+                                    $exam_timestamp = strtotime($exam['exam_date'] . ' ' . $exam['start_time']);
+                                    $is_today = date('Y-m-d', $exam_timestamp) == date('Y-m-d');
+                                    $is_past = $exam_timestamp < $current_time;
+                                    $is_upcoming = $exam_timestamp > $current_time;
+                                    $row_class = '';
+                                    
+                                    if ($is_today) {
+                                        $row_class = 'today-exam';
+                                        $status = 'Today';
+                                        $status_class = 'badge-warning';
+                                    } elseif ($is_past) {
+                                        $row_class = 'past-exam';
+                                        $status = 'Completed';
+                                        $status_class = 'badge-secondary';
+                                    } else {
+                                        $row_class = 'upcoming-exam';
+                                        $status = 'Upcoming';
+                                        $status_class = 'badge-success';
+                                    }
+                                    ?>
+                                    <tr class="<?= $row_class ?>">
+                                        <td>
+                                            <strong><?= htmlspecialchars($exam['course_code']) ?></strong><br>
+                                            <small style="color: #6b7280;"><?= htmlspecialchars($exam['course_name']) ?></small>
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-primary"><?= htmlspecialchars($exam['exam_type']) ?></span>
+                                        </td>
+                                        <td>
+                                            <?= date('M d, Y', strtotime($exam['exam_date'])) ?><br>
+                                            <small style="color: #6b7280;">
+                                                <?= date('h:i A', strtotime($exam['start_time'])) ?> - 
+                                                <?= date('h:i A', strtotime($exam['end_time'])) ?>
+                                            </small>
+                                        </td>
+                                        <td><?= htmlspecialchars($exam['room_name'] ?? 'TBA') ?></td>
+                                        <td><?= htmlspecialchars($exam['supervisor_name'] ?? 'TBA') ?></td>
+                                        <td>
+                                            <span class="badge <?= $status_class ?>"><?= $status ?></span>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <tr>
+                                    <td colspan="6">
+                                        <div class="empty-state">
+                                            <i class="fas fa-calendar-times"></i>
+                                            <h3>No Exam Schedules Found</h3>
+                                            <p>You don't have any exam schedules for your enrolled courses.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
 
-<script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
-<script>
-    // Sidebar Toggle
+    <!-- FullCalendar JS -->
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
+    <script>
     function toggleSidebar() {
         const sidebar = document.querySelector('.sidebar');
         const overlay = document.querySelector('.overlay');
-        const mainContent = document.querySelector('.main-content');
-        
         sidebar.classList.toggle('active');
         overlay.classList.toggle('active');
-        
-        if(window.innerWidth <= 1024) {
-            mainContent.style.marginLeft = sidebar.classList.contains('active') ? '280px' : '0';
-        }
     }
+
+    // Set active state for current page
+    document.addEventListener('DOMContentLoaded', function() {
+        const currentPage = window.location.pathname.split('/').pop();
+        const navLinks = document.querySelectorAll('.sidebar a');
+        
+        navLinks.forEach(link => {
+            const linkPage = link.getAttribute('href');
+            if (linkPage === currentPage) {
+                link.classList.add('active');
+            }
+        });
+    });
+
+    // Confirm logout
+    document.querySelector('a[href="../logout.php"]').addEventListener('click', function(e) {
+        if(!confirm('Are you sure you want to logout?')) {
+            e.preventDefault();
+        }
+    });
 
     // Initialize FullCalendar
     document.addEventListener('DOMContentLoaded', function() {
@@ -1228,26 +831,49 @@ body {
         
         // Prepare events from PHP data
         const calendarEvents = <?= json_encode(array_map(function($exam) {
+            // Color mapping for different exam types
             $colorMap = [
-                'Midterm' => '#6366f1',
-                'Final' => '#ef4444',
-                'Quiz' => '#10b981',
-                'Practical' => '#f59e0b',
-                'Project Defense' => '#8b5cf6'
+                'Midterm' => '#3b82f6',     // Blue
+                'Final' => '#ef4444',       // Red
+                'Quiz' => '#10b981',        // Green
+                'Practical' => '#f59e0b',   // Orange
+                'Project' => '#8b5cf6',     // Purple
+                'Assignment' => '#06b6d4',  // Cyan
+                'Lab' => '#84cc16',         // Lime
+                'Presentation' => '#f97316' // Orange
             ];
+            
+            // Determine status for styling
+            $current_time = time();
+            $exam_timestamp = strtotime($exam['exam_date'] . ' ' . $exam['start_time']);
+            $is_past = $exam_timestamp < $current_time;
+            $is_today = date('Y-m-d', $exam_timestamp) == date('Y-m-d');
+            
+            // Adjust color for past exams (lighter)
+            $baseColor = $colorMap[$exam['exam_type']] ?? '#6b7280';
+            if ($is_past) {
+                // Make past exams lighter
+                $color = lightenColor($baseColor, 40);
+            } else if ($is_today) {
+                // Make today's exams more vibrant
+                $color = $baseColor;
+            } else {
+                $color = $baseColor;
+            }
             
             return [
                 'id' => $exam['exam_id'],
                 'title' => $exam['course_code'] . ' - ' . $exam['exam_type'],
                 'start' => $exam['exam_date'] . 'T' . $exam['start_time'],
                 'end' => $exam['exam_date'] . 'T' . $exam['end_time'],
-                'backgroundColor' => $colorMap[$exam['exam_type']] ?? '#6b7280',
-                'borderColor' => $colorMap[$exam['exam_type']] ?? '#6b7280',
+                'backgroundColor' => $color,
+                'borderColor' => $color,
                 'textColor' => '#ffffff',
                 'extendedProps' => [
                     'course' => $exam['course_name'],
                     'room' => $exam['room_name'] ?? 'Not Assigned',
-                    'supervisor' => $exam['supervisor_name'] ?? 'Not Assigned'
+                    'supervisor' => $exam['supervisor_name'] ?? 'Not Assigned',
+                    'type' => $exam['exam_type']
                 ]
             ];
         }, $exams)) ?>;
@@ -1265,24 +891,22 @@ body {
                 const course = info.event.extendedProps.course;
                 const room = info.event.extendedProps.room;
                 const supervisor = info.event.extendedProps.supervisor;
+                const type = info.event.extendedProps.type;
                 
                 const startTime = info.event.start ? info.event.start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
                 const endTime = info.event.end ? info.event.end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
+                const date = info.event.start ? info.event.start.toLocaleDateString([], {weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'}) : '';
                 
-                Swal.fire({
-                    title: info.event.title,
-                    html: `
-                        <div style="text-align: left;">
-                            <p><strong>Course:</strong> ${course}</p>
-                            <p><strong>Room:</strong> ${room}</p>
-                            <p><strong>Supervisor:</strong> ${supervisor}</p>
-                            <p><strong>Time:</strong> ${startTime} - ${endTime}</p>
-                        </div>
-                    `,
-                    icon: 'info',
-                    confirmButtonText: 'OK',
-                    confirmButtonColor: '#6366f1'
-                });
+                // Create a simple alert (you could use a modal here)
+                alert(
+                    `📚 ${info.event.title}\n\n` +
+                    `📖 Course: ${course}\n` +
+                    `📅 Date: ${date}\n` +
+                    `⏰ Time: ${startTime} - ${endTime}\n` +
+                    `🚪 Room: ${room}\n` +
+                    `👨‍🏫 Supervisor: ${supervisor}\n` +
+                    `📝 Type: ${type}`
+                );
             },
             eventDidMount: function(info) {
                 // Add tooltip
@@ -1295,31 +919,51 @@ body {
                 
                 // Add custom styling
                 info.el.style.borderRadius = '6px';
-                info.el.style.boxShadow = '0 2px 6px rgba(0,0,0,0.1)';
+                info.el.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
                 info.el.style.padding = '4px 8px';
                 info.el.style.fontSize = '0.85rem';
+                info.el.style.margin = '2px 0';
             },
             editable: false,
             selectable: false,
             height: 'auto',
-            contentHeight: 500,
+            contentHeight: 450,
             dayMaxEvents: 3,
             eventTimeFormat: {
                 hour: '2-digit',
                 minute: '2-digit',
-                meridiem: 'short'
+                hour12: true
             },
-            themeSystem: 'bootstrap5',
             buttonText: {
                 today: 'Today',
                 month: 'Month',
                 week: 'Week',
                 day: 'Day'
+            },
+            themeSystem: 'standard',
+            dayCellContent: function(e) {
+                e.dayNumberText = e.dayNumberText.replace('日', '');
             }
         });
         
         calendar.render();
     });
+    
+    // Helper function to lighten colors
+    function lightenColor(color, percent) {
+        const num = parseInt(color.replace("#", ""), 16);
+        const amt = Math.round(2.55 * percent);
+        const R = (num >> 16) + amt;
+        const G = (num >> 8 & 0x00FF) + amt;
+        const B = (num & 0x0000FF) + amt;
+        
+        return "#" + (
+            0x1000000 +
+            (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
+            (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
+            (B < 255 ? B < 1 ? 0 : B : 255)
+        ).toString(16).slice(1);
+    }
     
     // Auto-close messages after 5 seconds
     setTimeout(function() {
@@ -1334,34 +978,6 @@ body {
             }, 500);
         });
     }, 5000);
-    
-    // Add animation to table rows on page load
-    document.addEventListener('DOMContentLoaded', function() {
-        const rows = document.querySelectorAll('.exam-table tbody tr');
-        rows.forEach((row, index) => {
-            row.style.opacity = '0';
-            row.style.transform = 'translateX(-20px)';
-            setTimeout(() => {
-                row.style.transition = 'all 0.5s ease';
-                row.style.opacity = '1';
-                row.style.transform = 'translateX(0)';
-            }, index * 50);
-        });
-        
-        // Add animation to upcoming items
-        const upcomingItems = document.querySelectorAll('.upcoming-item');
-        upcomingItems.forEach((item, index) => {
-            item.style.opacity = '0';
-            item.style.transform = 'translateY(10px)';
-            setTimeout(() => {
-                item.style.transition = 'all 0.5s ease';
-                item.style.opacity = '1';
-                item.style.transform = 'translateY(0)';
-            }, index * 100);
-        });
-    });
-</script>
-<!-- SweetAlert2 for better alerts -->
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    </script>
 </body>
 </html>

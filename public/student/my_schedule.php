@@ -9,11 +9,44 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'student'){
 
 $student_id = $_SESSION['user_id'];
 
-// Handle PDF Export (Simple HTML to PDF using browser print)
-if(isset($_GET['export']) && $_GET['export'] == 'pdf') {
-    // We'll use a print-friendly page that users can "Save as PDF"
-    header("Location: my_schedule_print.php");
-    exit;
+// Fetch current user info - MATCHING DASHBOARD
+$user_stmt = $pdo->prepare("SELECT username, profile_picture FROM users WHERE user_id = ?");
+$user_stmt->execute([$_SESSION['user_id']]);
+$user = $user_stmt->fetch(PDO::FETCH_ASSOC);
+
+// Determine profile picture path - FIXED VERSION
+$uploads_dir = __DIR__ . '/../uploads/';
+$assets_dir = __DIR__ . '/../assets/';
+
+// Check if profile picture exists in uploads directory
+$profile_picture = $user['profile_picture'] ?? '';
+$default_profile = 'default_profile.png';
+
+// Check multiple possible locations
+if(!empty($profile_picture)) {
+    // Try absolute path first
+    if(file_exists($uploads_dir . $profile_picture)) {
+        $profile_img_path = '../uploads/' . $profile_picture;
+    }
+    // Try relative path from current directory
+    else if(file_exists('uploads/' . $profile_picture)) {
+        $profile_img_path = 'uploads/' . $profile_picture;
+    }
+    // Try direct uploads path
+    else if(file_exists('../uploads/' . $profile_picture)) {
+        $profile_img_path = '../uploads/' . $profile_picture;
+    }
+    // Try ../../uploads path
+    else if(file_exists('../../uploads/' . $profile_picture)) {
+        $profile_img_path = '../../uploads/' . $profile_picture;
+    }
+    else {
+        // Use default if file doesn't exist
+        $profile_img_path = '../assets/' . $default_profile;
+    }
+} else {
+    // Use default if no profile picture
+    $profile_img_path = '../assets/' . $default_profile;
 }
 
 // Handle Excel/CSV Export
@@ -78,125 +111,482 @@ $current_page = basename($_SERVER['PHP_SELF']);
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>My Schedule</title>
+<title>My Schedule | Student Dashboard</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
-/* ================= General Reset & Sidebar =============== */
-* {margin:0;padding:0;box-sizing:border-box;}
-body {font-family:Arial,sans-serif;display:flex;min-height:100vh;background-color:#f3f4f6;}
-.sidebar {position:fixed;top:0;left:0;height:100vh;width:220px;background-color:#2c3e50;padding-top:20px;display:flex;flex-direction:column;align-items:flex-start;box-shadow:2px 0 5px rgba(0,0,0,0.1);z-index:1000;overflow-y:auto;}
-.sidebar h2 {color:#ecf0f1;text-align:center;width:100%;margin-bottom:20px;font-size:20px;}
-.sidebar a {padding:12px 20px;text-decoration:none;font-size:16px;color:#bdc3c7;width:100%;transition:background 0.3s,color 0.3s;}
-.sidebar a.active {background-color:#34495e;color:#fff;font-weight:bold;}
-.sidebar a:hover {background-color:#34495e;color:#fff;}
+* { box-sizing: border-box; margin:0; padding:0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
 
-/* ================= Main Content ================= */
-.main-content {margin-left:220px;padding:30px;flex-grow:1;min-height:100vh;background-color:#f3f4f6;}
-.main-content h1, .main-content h2 {margin-bottom:20px;color:#111827;}
+/* ================= Topbar for Hamburger ================= */
+.topbar {
+    display: none;
+    position: fixed; top:0; left:0; width:100%;
+    background:#2c3e50; color:#fff;
+    padding:15px 20px;
+    z-index:1200;
+    justify-content:space-between; align-items:center;
+}
+.menu-btn {
+    font-size:26px;
+    background:#1abc9c;
+    border:none; color:#fff;
+    cursor:pointer;
+    padding:10px 14px;
+    border-radius:8px;
+    font-weight:600;
+    transition: background 0.3s, transform 0.2s;
+}
+.menu-btn:hover { background:#159b81; transform:translateY(-2px); }
+
+/* ================= Sidebar ================= */
+.sidebar {
+    position: fixed; top:0; left:0;
+    width:250px; height:100%;
+    background:#1f2937; color:#fff;
+    z-index:1100;
+    transition: transform 0.3s ease;
+    padding: 20px 0;
+}
+.sidebar.hidden { transform:translateX(-260px); }
+.sidebar a { 
+    display:block; 
+    padding:12px 20px; 
+    color:#fff; 
+    text-decoration:none; 
+    transition: background 0.3s; 
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.sidebar a:hover, .sidebar a.active { background:#1abc9c; }
+
+.sidebar-profile {
+    text-align: center;
+    margin-bottom: 20px;
+    padding: 0 20px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.2);
+}
+
+.sidebar-profile img {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-bottom: 10px;
+    border: 2px solid #1abc9c;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+.sidebar-profile p {
+    color: #fff;
+    font-weight: bold;
+    margin: 0;
+    font-size: 16px;
+}
+
+/* Sidebar title */
+.sidebar h2 {
+    text-align: center;
+    color: #ecf0f1;
+    margin-bottom: 25px;
+    font-size: 22px;
+    padding: 0 20px;
+}
+
+/* ================= Overlay ================= */
+.overlay {
+    position: fixed; top:0; left:0; width:100%; height:100%;
+    background: rgba(0,0,0,0.4); z-index:1050;
+    display:none; opacity:0; transition: opacity 0.3s ease;
+}
+.overlay.active { display:block; opacity:1; }
+
+/* ================= Main content ================= */
+.main-content {
+    margin-left: 250px;
+    padding:20px;
+    min-height:100vh;
+    background: #f8fafc;
+    transition: all 0.3s ease;
+}
+
+/* Content Wrapper */
+.content-wrapper {
+    background: white;
+    border-radius: 15px;
+    padding: 30px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    min-height: calc(100vh - 40px);
+}
+
+/* Header Styles */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.header h1 {
+    font-size: 2.2rem;
+    color: #1f2937;
+    font-weight: 700;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #f8fafc;
+    padding: 12px 18px;
+    border-radius: 12px;
+    border: 1px solid #e5e7eb;
+}
+
+.user-info img {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+/* Welcome Section */
+.welcome-section {
+    margin-bottom: 30px;
+}
+
+.welcome-section p {
+    color: #6b7280;
+    font-size: 1.1rem;
+    margin-top: 10px;
+}
 
 /* ================= Export Buttons ================= */
-.export-buttons {margin-bottom:20px;display:flex;gap:10px;flex-wrap:wrap;}
-.export-btn {padding:10px 15px;background-color:#34495e;color:white;border:none;border-radius:5px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:5px;font-size:14px;transition:background-color 0.3s;}
-.export-btn:hover {background-color:#2c3e50;}
-.export-btn.pdf {background-color:#e74c3c;}
-.export-btn.pdf:hover {background-color:#c0392b;}
-.export-btn.excel {background-color:#27ae60;}
-.export-btn.excel:hover {background-color:#219a52;}
-.export-btn.print {background-color:#3498db;}
-.export-btn.print:hover {background-color:#2980b9;}
+.export-buttons {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+}
 
-/* ================= Table ================= */
-.schedule-table {width:100%;border-collapse:collapse;margin-top:20px;background-color:#fff;border-radius:8px;overflow:hidden;box-shadow:0 4px 8px rgba(0,0,0,0.05);}
-.schedule-table th, .schedule-table td {border:1px solid #ccc;padding:12px;text-align:left;}
-.schedule-table th {background-color:#34495e;color:#fff;}
-.schedule-table tr:nth-child(even){background-color:#f2f2f2;}
-.schedule-table tr:hover{background-color:#e0e0e0;}
-.schedule-table .today-row{background-color:#dff9fb !important;font-weight:bold;}
-.course-code {font-size:12px;color:#666;margin-top:4px;}
+.export-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+.export-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+}
+
+.export-btn.pdf {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: white;
+}
+
+.export-btn.excel {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+}
+
+.export-btn.print {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: white;
+}
+
+.export-btn i {
+    font-size: 1.1rem;
+}
+
+/* ================= Schedule Table ================= */
+.schedule-section {
+    margin-top: 30px;
+}
+
+.table-container {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    border: 1px solid #e5e7eb;
+}
+
+.schedule-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.schedule-table th {
+    background: #f8fafc;
+    padding: 15px;
+    text-align: left;
+    font-weight: 600;
+    color: #374151;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.schedule-table td {
+    padding: 15px;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.schedule-table tr:last-child td {
+    border-bottom: none;
+}
+
+.schedule-table tr:hover {
+    background: #f9fafb;
+}
+
+.schedule-table .today-row {
+    background: #fff7ed !important;
+    border-left: 4px solid #f59e0b;
+}
+
+.course-code {
+    font-size: 0.85rem;
+    color: #6b7280;
+    margin-top: 4px;
+    font-weight: 500;
+}
+
+/* Empty state */
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: #6b7280;
+}
+
+.empty-state i {
+    font-size: 3rem;
+    margin-bottom: 15px;
+    color: #d1d5db;
+}
+
+.empty-state h3 {
+    font-size: 1.5rem;
+    margin-bottom: 10px;
+    color: #374151;
+}
+
+.empty-state p {
+    color: #6b7280;
+    max-width: 400px;
+    margin: 0 auto;
+}
 
 /* ================= Print Styles ================= */
 @media print {
-    .sidebar, .export-buttons {display:none !important;}
-    .main-content {margin:0 !important;padding:0 !important;}
-    body {background:white !important;}
-    .schedule-table {box-shadow:none !important;border:1px solid #000 !important;}
-    .schedule-table th {background-color:#ccc !important;color:#000 !important;-webkit-print-color-adjust:exact;}
+    .sidebar, .topbar, .overlay, .export-buttons, .user-info { 
+        display: none !important; 
+    }
+    .main-content { 
+        margin-left: 0 !important; 
+        padding: 0 !important; 
+        background: white !important;
+    }
+    .content-wrapper {
+        box-shadow: none !important;
+        border-radius: 0 !important;
+        padding: 20px !important;
+    }
+    .schedule-table {
+        box-shadow: none !important;
+        border: 1px solid #000 !important;
+    }
+    .schedule-table th {
+        background-color: #f1f1f1 !important;
+        color: #000 !important;
+        -webkit-print-color-adjust: exact;
+    }
+    .today-row {
+        background-color: #fef3c7 !important;
+        -webkit-print-color-adjust: exact;
+    }
 }
 
 /* ================= Responsive ================= */
-@media screen and (max-width:768px){
-    body{flex-direction:column;}
-    .sidebar{width:100%;padding:15px;box-shadow:none;}
-    .main-content{margin:0;padding:20px;}
-    .schedule-table th,.schedule-table td{padding:8px;font-size:12px;}
-    .export-buttons{flex-direction:column;}
+@media (max-width: 768px) {
+    .topbar { display: flex; }
+    .sidebar { transform: translateX(-100%); }
+    .sidebar.active { transform: translateX(0); }
+    .main-content { margin-left: 0; padding: 15px; }
+    .content-wrapper { padding: 20px; border-radius: 0; }
+    .header { flex-direction: column; gap: 15px; align-items: flex-start; }
+    .header h1 { font-size: 1.8rem; }
+    .export-buttons { flex-direction: column; }
+    .export-btn { width: 100%; justify-content: center; }
+    .table-container { overflow-x: auto; }
+    .schedule-table { min-width: 600px; }
 }
 </style>
 </head>
 <body>
-<div class="sidebar">
-    <h2>Student Panel</h2>
-    <a href="student_dashboard.php">Dashboard</a>
-    <a href="my_schedule.php" class="active">My Schedule</a>
-    <a href="view_announcements.php">Announcements</a>
-    <a href="edit_profile.php">Edit Profile</a>
-    <a href="../logout.php">Logout</a>
-</div>
-
-<div class="main-content">
-    <h1>My Schedule</h1>
-    
-    <!-- Export Buttons -->
-    <div class="export-buttons">
-        <a href="?export=pdf" class="export-btn pdf" target="_blank">
-            <i class="fas fa-file-pdf"></i> Export PDF
-        </a>
-        <a href="?export=excel" class="export-btn excel">
-            <i class="fas fa-file-excel"></i> Export Excel/CSV
-        </a>
-        <button onclick="window.print()" class="export-btn print">
-            <i class="fas fa-print"></i> Print Schedule
-        </button>
+    <!-- Topbar for Mobile -->
+    <div class="topbar">
+        <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+        <h2>My Schedule</h2>
     </div>
 
-    <table class="schedule-table">
-        <thead>
-            <tr>
-                <th>Course</th>
-                <th>Instructor</th>
-                <th>Room</th>
-                <th>Day</th>
-                <th>Time</th>
-            </tr>
-        </thead>
-        <tbody>
-        <?php 
-        $today = date('l');
-        foreach($my_schedule as $s): 
-            $todayClass = ($s['day']==$today) ? 'today-row' : '';
-        ?>
-            <tr class="<?= $todayClass ?>">
-                <td>
-                    <?= htmlspecialchars($s['course_name']) ?>
-                    <?php if(!empty($s['course_code'])): ?>
-                        <div class="course-code"><?= htmlspecialchars($s['course_code']) ?></div>
-                    <?php endif; ?>
-                </td>
-                <td><?= htmlspecialchars($s['instructor_name']) ?></td>
-                <td><?= htmlspecialchars($s['room_name']) ?></td>
-                <td><?= htmlspecialchars($s['day']) ?></td>
-                <td><?= date('g:i A', strtotime($s['start_time'])) . ' - ' . date('g:i A', strtotime($s['end_time'])) ?></td>
-            </tr>
-        <?php endforeach; ?>
-        <?php if(empty($my_schedule)): ?>
-            <tr>
-                <td colspan="5" style="text-align:center;padding:20px;">No classes scheduled</td>
-            </tr>
-        <?php endif; ?>
-        </tbody>
-    </table>
-</div>
+    <!-- Overlay for Mobile -->
+    <div class="overlay" onclick="toggleSidebar()"></div>
 
-<!-- Font Awesome for icons -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    <!-- Sidebar - SAME AS OTHER PAGES -->
+    <div class="sidebar">
+        <div class="sidebar-profile">
+            <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture">
+            <p><?= htmlspecialchars($user['username'] ?? 'Student') ?></p>
+        </div>
+        <h2>Student Panel</h2>
+        <a href="student_dashboard.php" class="<?= $current_page=='student_dashboard.php'?'active':'' ?>">Dashboard</a>
+        <a href="my_schedule.php" class="<?= $current_page=='my_schedule.php'?'active':'' ?>">My Schedule</a>
+        <a href="view_exam_schedules.php" class="<?= $current_page=='view_exam_schedules.php'?'active':'' ?>">Exam Schedule</a>
+        <a href="view_announcements.php" class="<?= $current_page=='view_announcements.php'?'active':'' ?>">Announcements</a>
+        <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">Edit Profile</a>
+        <a href="../logout.php">Logout</a>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="content-wrapper">
+            <div class="header">
+                <div class="welcome-section">
+                    <h1>My Schedule</h1>
+                    <p>View your class timetable and export to PDF/Excel</p>
+                </div>
+                <div class="user-info">
+                    <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile">
+                    <div>
+                        <div><?= htmlspecialchars($user['username'] ?? 'Student') ?></div>
+                        <small>Student</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Export Buttons -->
+            <div class="export-buttons">
+                <a href="?export=pdf" class="export-btn pdf" target="_blank">
+                    <i class="fas fa-file-pdf"></i> Export PDF
+                </a>
+                <a href="?export=excel" class="export-btn excel">
+                    <i class="fas fa-file-excel"></i> Export Excel/CSV
+                </a>
+                <button onclick="window.print()" class="export-btn print">
+                    <i class="fas fa-print"></i> Print Schedule
+                </button>
+            </div>
+
+            <!-- Schedule Table -->
+            <div class="schedule-section">
+                <h2 style="margin-bottom: 20px; color: #1f2937;">Class Timetable</h2>
+                <div class="table-container">
+                    <table class="schedule-table">
+                        <thead>
+                            <tr>
+                                <th>Course</th>
+                                <th>Instructor</th>
+                                <th>Room</th>
+                                <th>Day</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        <?php 
+                        $today = date('l');
+                        $hasTodayClass = false;
+                        foreach($my_schedule as $s): 
+                            $todayClass = ($s['day']==$today) ? 'today-row' : '';
+                            if($s['day']==$today) $hasTodayClass = true;
+                        ?>
+                            <tr class="<?= $todayClass ?>">
+                                <td>
+                                    <?= htmlspecialchars($s['course_name']) ?>
+                                    <?php if(!empty($s['course_code'])): ?>
+                                        <div class="course-code"><?= htmlspecialchars($s['course_code']) ?></div>
+                                    <?php endif; ?>
+                                </td>
+                                <td><?= htmlspecialchars($s['instructor_name']) ?></td>
+                                <td><?= htmlspecialchars($s['room_name']) ?></td>
+                                <td><?= htmlspecialchars($s['day']) ?></td>
+                                <td><?= date('g:i A', strtotime($s['start_time'])) . ' - ' . date('g:i A', strtotime($s['end_time'])) ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        <?php if(empty($my_schedule)): ?>
+                            <tr>
+                                <td colspan="5">
+                                    <div class="empty-state">
+                                        <i class="fas fa-calendar-times"></i>
+                                        <h3>No Classes Scheduled</h3>
+                                        <p>You don't have any classes scheduled at the moment.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <?php if($hasTodayClass): ?>
+                <div style="margin-top: 15px; padding: 10px; background: #fff7ed; border-radius: 8px; border-left: 4px solid #f59e0b;">
+                    <small style="color: #92400e; font-weight: 600;">
+                        <i class="fas fa-info-circle"></i> Highlighted rows indicate today's classes
+                    </small>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    function toggleSidebar() {
+        const sidebar = document.querySelector('.sidebar');
+        const overlay = document.querySelector('.overlay');
+        sidebar.classList.toggle('active');
+        overlay.classList.toggle('active');
+    }
+
+    // Set active state for current page
+    document.addEventListener('DOMContentLoaded', function() {
+        const currentPage = window.location.pathname.split('/').pop();
+        const navLinks = document.querySelectorAll('.sidebar a');
+        
+        navLinks.forEach(link => {
+            const linkPage = link.getAttribute('href');
+            if (linkPage === currentPage) {
+                link.classList.add('active');
+            }
+        });
+    });
+
+    // Confirm logout
+    document.querySelector('a[href="../logout.php"]').addEventListener('click', function(e) {
+        if(!confirm('Are you sure you want to logout?')) {
+            e.preventDefault();
+        }
+    });
+
+    // Add animation to table rows on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        const rows = document.querySelectorAll('.schedule-table tbody tr');
+        rows.forEach((row, index) => {
+            row.style.opacity = '0';
+            row.style.transform = 'translateX(-20px)';
+            setTimeout(() => {
+                row.style.transition = 'all 0.5s ease';
+                row.style.opacity = '1';
+                row.style.transform = 'translateX(0)';
+            }, index * 50);
+        });
+    });
+    </script>
 </body>
 </html>

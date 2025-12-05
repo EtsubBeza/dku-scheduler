@@ -134,26 +134,31 @@
             box-shadow: var(--shadow-lg);
         }
 
-        /* Hero Section */
+        /* ================= Hero Section ================= */
         .hero {
             min-height: 100vh;
-            display: flex;
-            align-items: center;
             background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #dbeafe 100%);
             position: relative;
             overflow: hidden;
-            padding: 0 5%;
+            padding: 100px 5% 40px;
         }
 
-        .hero::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            right: 0;
-            width: 50%;
-            height: 100%;
-            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" opacity="0.05"><polygon fill="%232563eb" points="1000,500 500,1000 0,500 500,0"/></svg>') no-repeat center right;
-            background-size: cover;
+        .hero-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 3rem;
+            align-items: center;
+            min-height: calc(100vh - 140px);
+        }
+
+        @media (max-width: 1024px) {
+            .hero-container {
+                grid-template-columns: 1fr;
+                text-align: center;
+                gap: 2rem;
+            }
         }
 
         .hero-content {
@@ -161,8 +166,8 @@
             z-index: 2;
         }
 
-        .hero h1 {
-            font-size: 3.5rem;
+        .hero-content h1 {
+            font-size: 3.2rem;
             font-weight: 800;
             line-height: 1.2;
             margin-bottom: 1.5rem;
@@ -172,10 +177,11 @@
             background-clip: text;
         }
 
-        .hero p {
-            font-size: 1.25rem;
+        .hero-content p {
+            font-size: 1.2rem;
             color: var(--gray);
             margin-bottom: 2.5rem;
+            line-height: 1.6;
         }
 
         .hero-buttons {
@@ -216,6 +222,49 @@
         .secondary-btn:hover {
             background: var(--primary-light);
             transform: translateY(-3px);
+        }
+
+        /* ================= Hero Visual ================= */
+        .hero-visual {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 400px;
+            padding: 20px;
+            overflow: visible;
+        }
+
+        .hero-visual svg {
+            width: 100%;
+            max-width: 550px;
+            height: auto;
+            max-height: 450px;
+            filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.1));
+            overflow: visible;
+        }
+
+        /* Floating animations */
+        .floating {
+            animation: floating 6s ease-in-out infinite;
+        }
+
+        .float {
+            animation: floating 4s ease-in-out infinite;
+        }
+
+        .float-delayed {
+            animation: floating 4s ease-in-out infinite;
+            animation-delay: 1s;
+        }
+
+        @keyframes floating {
+            0%, 100% {
+                transform: translateY(0px);
+            }
+            50% {
+                transform: translateY(-15px);
+            }
         }
 
         /* Stats Section */
@@ -418,6 +467,137 @@
             color: var(--gray);
         }
 
+        /* Location Section */
+        .location {
+            padding: 6rem 5%;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        }
+
+        .location-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            align-items: center;
+        }
+
+        @media (max-width: 968px) {
+            .location-container {
+                grid-template-columns: 1fr;
+                gap: 3rem;
+            }
+        }
+
+        .location-info {
+            background: white;
+            padding: 3rem;
+            border-radius: 1rem;
+            box-shadow: var(--shadow);
+        }
+
+        .location-info h3 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            color: var(--dark);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .location-info h3 i {
+            color: var(--primary);
+        }
+
+        .location-info p {
+            color: var(--gray);
+            margin-bottom: 2rem;
+            line-height: 1.6;
+        }
+
+        .contact-details {
+            margin: 2rem 0;
+        }
+
+        .contact-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            padding: 1rem;
+            background: var(--primary-light);
+            border-radius: 0.75rem;
+            transition: transform 0.3s ease;
+        }
+
+        .contact-item:hover {
+            transform: translateX(5px);
+        }
+
+        .contact-item i {
+            font-size: 1.25rem;
+            color: var(--primary);
+            width: 40px;
+            height: 40px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .contact-item h4 {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--gray);
+            margin-bottom: 0.25rem;
+        }
+
+        .contact-item p {
+            margin: 0;
+            color: var(--dark);
+            font-weight: 500;
+        }
+
+        .map-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1rem 2rem;
+            background: var(--gradient-primary);
+            color: white;
+            text-decoration: none;
+            border-radius: 50px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: var(--shadow);
+        }
+
+        .map-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .map-container {
+            height: 400px;
+            border-radius: 1rem;
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+
+        .map-wrapper {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        .map-wrapper iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
         /* CTA Section */
         .cta {
             padding: 6rem 5%;
@@ -544,7 +724,25 @@
             color: #94a3b8;
         }
 
-        /* Responsive Design */
+        /* ================= Responsive Design ================= */
+        @media (max-width: 1024px) {
+            .hero-container {
+                grid-template-columns: 1fr;
+                text-align: center;
+                gap: 2rem;
+            }
+            
+            .hero-visual {
+                order: -1;
+                min-height: 300px;
+            }
+            
+            .hero-visual svg {
+                max-width: 500px;
+                max-height: 350px;
+            }
+        }
+
         @media (max-width: 768px) {
             nav {
                 padding: 1rem;
@@ -556,17 +754,63 @@
                 gap: 1rem;
             }
 
-            .hero h1 {
-                font-size: 2.5rem;
+            .hero {
+                padding: 120px 5% 40px;
             }
-
+            
+            .hero-content h1 {
+                font-size: 2.3rem;
+            }
+            
+            .hero-content p {
+                font-size: 1.1rem;
+                margin-bottom: 2rem;
+            }
+            
             .hero-buttons {
                 flex-direction: column;
                 align-items: center;
+                gap: 0.75rem;
+            }
+            
+            .hero-buttons a {
+                width: 100%;
+                max-width: 300px;
+                justify-content: center;
+                padding: 0.875rem 1.5rem;
+            }
+            
+            .hero-visual {
+                min-height: 250px;
+                padding: 10px;
+            }
+            
+            .hero-visual svg {
+                max-width: 400px;
+                max-height: 300px;
             }
 
             .features-grid {
                 grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .hero-content h1 {
+                font-size: 2rem;
+            }
+            
+            .hero-content p {
+                font-size: 1rem;
+            }
+            
+            .hero-visual {
+                min-height: 200px;
+            }
+            
+            .hero-visual svg {
+                max-width: 350px;
+                max-height: 250px;
             }
         }
 
@@ -594,6 +838,7 @@
             <a href="#home">Home</a>
             <a href="#features">Features</a>
             <a href="#security">Security</a>
+            <a href="#location">Location</a>
             <a href="#contact">Contact</a>
         </div>
         <div class="auth-links">
@@ -606,18 +851,124 @@
 
     <!-- Hero Section -->
     <section class="hero" id="home">
-        <div class="hero-content">
-            <h1>Secure Academic Scheduling Platform</h1>
-            <p>Access your personalized academic schedule through DKU's secure platform. Accounts are managed by administrators for enhanced security and control.</p>
-            <div class="hero-buttons">
-                <a href="login.php" class="primary-btn">
-                    <i class="fas fa-sign-in-alt"></i>
-                    Access Your Account
-                </a>
-                <a href="#security" class="secondary-btn">
-                    <i class="fas fa-shield-alt"></i>
-                    Learn About Security
-                </a>
+        <div class="hero-container">
+            <div class="hero-content">
+                <h1>Secure Academic Scheduling Platform</h1>
+                <p>Access your personalized academic schedule through DKU's secure platform. Accounts are managed by administrators for enhanced security and control.</p>
+                <div class="hero-buttons">
+                    <a href="login.php" class="primary-btn">
+                        <i class="fas fa-sign-in-alt"></i>
+                        Access Your Account
+                    </a>
+                    <a href="#security" class="secondary-btn">
+                        <i class="fas fa-shield-alt"></i>
+                        Learn About Security
+                    </a>
+                </div>
+            </div>
+            <div class="hero-visual">
+                <svg viewBox="0 0 800 600" class="floating" preserveAspectRatio="xMidYMid meet">
+                    <!-- Background Shapes -->
+                    <circle cx="450" cy="150" r="70" fill="#3b82f6" opacity="0.1"/>
+                    <circle cx="550" cy="400" r="50" fill="#8b5cf6" opacity="0.1"/>
+                    <circle cx="350" cy="450" r="60" fill="#06b6d4" opacity="0.1"/>
+                    
+                    <!-- Abstract Calendar Shape - Centered -->
+                    <g transform="translate(400, 200)">
+                        <rect width="180" height="220" rx="15" fill="white" stroke="#e2e8f0" stroke-width="3"/>
+                        <rect x="10" y="10" width="160" height="35" rx="8" fill="#f1f5f9"/>
+                        <g transform="translate(20, 60)">
+                            <!-- Simple grid dots -->
+                            <circle cx="15" cy="15" r="3" fill="#3b82f6" opacity="0.3"/>
+                            <circle cx="50" cy="15" r="3" fill="#3b82f6" opacity="0.3"/>
+                            <circle cx="85" cy="15" r="3" fill="#3b82f6" opacity="0.3"/>
+                            <circle cx="120" cy="15" r="3" fill="#3b82f6" opacity="0.3"/>
+                            
+                            <circle cx="15" cy="50" r="3" fill="#8b5cf6" opacity="0.3"/>
+                            <circle cx="50" cy="50" r="3" fill="#8b5cf6" opacity="0.3"/>
+                            <circle cx="85" cy="50" r="3" fill="#8b5cf6" opacity="0.3"/>
+                            <circle cx="120" cy="50" r="3" fill="#8b5cf6" opacity="0.3"/>
+                            
+                            <circle cx="15" cy="85" r="3" fill="#06b6d4" opacity="0.3"/>
+                            <circle cx="50" cy="85" r="3" fill="#06b6d4" opacity="0.3"/>
+                            <circle cx="85" cy="85" r="3" fill="#06b6d4" opacity="0.3"/>
+                            <circle cx="120" cy="85" r="3" fill="#06b6d4" opacity="0.3"/>
+                        </g>
+                    </g>
+                    
+                    <!-- Floating Abstract Elements - Adjusted positions -->
+                    <!-- Floating Circle 1 -->
+                    <g class="float" transform="translate(550, 100)">
+                        <circle cx="0" cy="0" r="35" fill="#3b82f6" opacity="0.8">
+                            <animate attributeName="r" values="35;40;35" dur="4s" repeatCount="indefinite"/>
+                        </circle>
+                        <circle cx="0" cy="0" r="15" fill="white" opacity="0.5">
+                            <animate attributeName="r" values="15;20;15" dur="4s" repeatCount="indefinite" begin="0.5s"/>
+                        </circle>
+                    </g>
+                    
+                    <!-- Floating Circle 2 -->
+                    <g class="float-delayed" transform="translate(450, 320)">
+                        <circle cx="0" cy="0" r="30" fill="#8b5cf6" opacity="0.8">
+                            <animate attributeName="r" values="30;35;30" dur="3.5s" repeatCount="indefinite"/>
+                        </circle>
+                        <circle cx="0" cy="0" r="12" fill="white" opacity="0.5">
+                            <animate attributeName="r" values="12;17;12" dur="3.5s" repeatCount="indefinite" begin="0.3s"/>
+                        </circle>
+                    </g>
+                    
+                    <!-- Floating Circle 3 -->
+                    <g class="float" transform="translate(600, 380)">
+                        <circle cx="0" cy="0" r="25" fill="#06b6d4" opacity="0.8">
+                            <animate attributeName="r" values="25;30;25" dur="4.5s" repeatCount="indefinite"/>
+                        </circle>
+                        <circle cx="0" cy="0" r="10" fill="white" opacity="0.5">
+                            <animate attributeName="r" values="10;15;10" dur="4.5s" repeatCount="indefinite" begin="0.7s"/>
+                        </circle>
+                    </g>
+                    
+                    <!-- Floating Triangle -->
+                    <g class="float-delayed" transform="translate(300, 200)">
+                        <polygon points="0,-25 22,13 -22,13" fill="#10b981" opacity="0.8">
+                            <animateTransform attributeName="transform" type="rotate" values="0;360;0" dur="8s" repeatCount="indefinite"/>
+                        </polygon>
+                    </g>
+                    
+                    <!-- Floating Square -->
+                    <g class="float" transform="translate(350, 450)">
+                        <rect x="-20" y="-20" width="40" height="40" rx="8" fill="#f59e0b" opacity="0.8">
+                            <animateTransform attributeName="transform" type="rotate" values="0;45;0" dur="6s" repeatCount="indefinite"/>
+                        </rect>
+                    </g>
+                    
+                    <!-- Abstract Clock/Time Element - PROPERLY POSITIONED -->
+                    <g class="float-delayed" transform="translate(600, 250)">
+                        <circle cx="0" cy="0" r="40" fill="white" stroke="#3b82f6" stroke-width="3" opacity="0.9"/>
+                        <!-- Hour hand -->
+                        <line x1="0" y1="0" x2="0" y2="-22" stroke="#3b82f6" stroke-width="4" stroke-linecap="round">
+                            <animateTransform attributeName="transform" type="rotate" values="0;360;0" dur="12s" repeatCount="indefinite"/>
+                        </line>
+                        <!-- Minute hand -->
+                        <line x1="0" y1="0" x2="0" y2="-32" stroke="#8b5cf6" stroke-width="3" stroke-linecap="round">
+                            <animateTransform attributeName="transform" type="rotate" values="30;390;30" dur="8s" repeatCount="indefinite"/>
+                        </line>
+                        <circle cx="0" cy="0" r="6" fill="#3b82f6"/>
+                        
+                        <!-- Clock marks -->
+                        <circle cx="0" cy="-35" r="2" fill="#3b82f6" opacity="0.5"/>
+                        <circle cx="35" cy="0" r="2" fill="#3b82f6" opacity="0.5"/>
+                        <circle cx="0" cy="35" r="2" fill="#3b82f6" opacity="0.5"/>
+                        <circle cx="-35" cy="0" r="2" fill="#3b82f6" opacity="0.5"/>
+                    </g>
+                    
+                    <!-- Connection Lines (subtle) -->
+                    <line x1="400" y1="200" x2="450" y2="320" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="4,4" opacity="0.3"/>
+                    <line x1="600" y1="380" x2="550" y2="100" stroke="#8b5cf6" stroke-width="1.5" stroke-dasharray="4,4" opacity="0.3"/>
+                    <line x1="350" y1="450" x2="300" y2="200" stroke="#06b6d4" stroke-width="1.5" stroke-dasharray="4,4" opacity="0.3"/>
+                    
+                    <!-- Additional connection lines for the clock -->
+                    <line x1="600" y1="250" x2="400" y2="200" stroke="#10b981" stroke-width="1.5" stroke-dasharray="4,4" opacity="0.3"/>
+                </svg>
             </div>
         </div>
     </section>
@@ -740,6 +1091,65 @@
         </div>
     </section>
 
+    <!-- Location & Contact Section -->
+    <section class="location" id="location">
+        <div class="section-header">
+            <h2>Our Location</h2>
+            <p>Visit us at Debark University Campus</p>
+        </div>
+        <div class="location-container">
+            <div class="location-content fade-in">
+                <div class="location-info">
+                    <h3><i class="fas fa-map-marker-alt"></i> Campus Address</h3>
+                    <p>Debark University<br>Main Campus<br>Debark, Ethiopia</p>
+                    
+                    <div class="contact-details">
+                        <div class="contact-item">
+                            <i class="fas fa-phone"></i>
+                            <div>
+                                <h4>Phone</h4>
+                                <p>+251 900 000 000</p>
+                            </div>
+                        </div>
+                        <div class="contact-item">
+                            <i class="fas fa-envelope"></i>
+                            <div>
+                                <h4>Email</h4>
+                                <p>scheduler@dku.edu.et</p>
+                            </div>
+                        </div>
+                        <div class="contact-item">
+                            <i class="fas fa-clock"></i>
+                            <div>
+                                <h4>Support Hours</h4>
+                                <p>Mon-Fri: 8:00 AM - 5:00 PM<br>Sat: 9:00 AM - 1:00 PM</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <a href="https://maps.google.com/?q=Debark+University" target="_blank" class="map-btn">
+                        <i class="fas fa-directions"></i>
+                        Get Directions
+                    </a>
+                </div>
+            </div>
+            <div class="map-container fade-in">
+                <!-- Google Maps Embed -->
+                <div class="map-wrapper">
+                    <iframe 
+                        src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3940.692157192372!2d37.89337427486112!3d9.004099989696422!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x1644126757f8edfd%3A0xafad271bff01d83!2sDebark%20University!5e0!3m2!1sen!2set!4v1647000000000!5m2!1sen!2set"
+                        width="100%" 
+                        height="100%" 
+                        style="border:0;" 
+                        allowfullscreen="" 
+                        loading="lazy"
+                        title="Debark University Location">
+                    </iframe>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- CTA Section -->
     <section class="cta">
         <div class="cta-content">
@@ -771,6 +1181,7 @@
                     <li><a href="#home">Home</a></li>
                     <li><a href="#features">Features</a></li>
                     <li><a href="#security">Security</a></li>
+                    <li><a href="#location">Location</a></li>
                     <li><a href="#contact">Contact</a></li>
                 </ul>
             </div>
@@ -794,7 +1205,7 @@
             </div>
         </div>
         <div class="footer-bottom">
-            <p>&copy; <?php echo date('Y'); ?> DKU Scheduler. All rights reserved. | Account access by administrator invitation only.</p>
+            <p>&copy; 2024 DKU Scheduler. All rights reserved. | Account access by administrator invitation only.</p>
         </div>
     </footer>
 
@@ -837,6 +1248,8 @@
                 }
             });
         });
+
+        
     </script>
 </body>
 </html>

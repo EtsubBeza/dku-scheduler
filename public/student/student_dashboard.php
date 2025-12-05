@@ -16,15 +16,45 @@ $user_stmt = $pdo->prepare("SELECT username, profile_picture FROM users WHERE us
 $user_stmt->execute([$student_id]);
 $user = $user_stmt->fetch(PDO::FETCH_ASSOC);
 
+// Determine profile picture path - FIXED PATHS
+// First, let's define the base uploads directory
+$uploads_dir = __DIR__ . '/../uploads/';
+$assets_dir = __DIR__ . '/../assets/';
 
-// Fetch current user info for profile picture
-$user_stmt = $pdo->prepare("SELECT username, profile_picture FROM users WHERE user_id=?");
-$user_stmt->execute([$_SESSION['user_id']]);
-$current_user = $user_stmt->fetch();
+// Check if profile picture exists in uploads directory
+$profile_picture = $user['profile_picture'] ?? '';
+$default_profile = 'default_profile.png';
 
-$profile_img_path = !empty($current_user['profile_picture']) && file_exists(__DIR__ . '/uploads/' . $current_user['profile_picture'])
-    ? 'uploads/' . $current_user['profile_picture']
-    : 'assets/default_profile.png';
+// Check multiple possible locations
+if(!empty($profile_picture)) {
+    // Try absolute path first
+    if(file_exists($uploads_dir . $profile_picture)) {
+        $profile_img_path = '../uploads/' . $profile_picture;
+    }
+    // Try relative path from current directory
+    else if(file_exists('uploads/' . $profile_picture)) {
+        $profile_img_path = 'uploads/' . $profile_picture;
+    }
+    // Try direct uploads path
+    else if(file_exists('../uploads/' . $profile_picture)) {
+        $profile_img_path = '../uploads/' . $profile_picture;
+    }
+    // Try ../../uploads path
+    else if(file_exists('../../uploads/' . $profile_picture)) {
+        $profile_img_path = '../../uploads/' . $profile_picture;
+    }
+    else {
+        // Use default if file doesn't exist
+        $profile_img_path = '../assets/' . $default_profile;
+    }
+} else {
+    // Use default if no profile picture
+    $profile_img_path = '../assets/' . $default_profile;
+}
+
+// Debug: Check what path we're using (remove in production)
+// error_log("Profile picture path: " . $profile_img_path);
+// error_log("Profile picture name: " . $profile_picture);
 
 // Fetch student's schedule
 $schedules = $pdo->prepare("
@@ -88,6 +118,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 <title>Student Dashboard</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
+/* ... (keep all the CSS styles exactly as they were) ... */
 * { box-sizing: border-box; margin:0; padding:0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
 
 /* ================= Topbar for Hamburger ================= */
@@ -153,6 +184,15 @@ $current_page = basename($_SERVER['PHP_SELF']);
     font-weight: bold;
     margin: 0;
     font-size: 16px;
+}
+
+/* Sidebar title */
+.sidebar h2 {
+    text-align: center;
+    color: #ecf0f1;
+    margin-bottom: 25px;
+    font-size: 22px;
+    padding: 0 20px;
 }
 
 /* ================= Overlay ================= */
@@ -322,15 +362,57 @@ $current_page = basename($_SERVER['PHP_SELF']);
     padding: 20px;
     background: #f8fafc;
     border-radius: 12px;
+    border: 1px solid #e5e7eb;
 }
 
 .profile-picture {
-    width: 120px;
-    height: 120px;
+    width: 150px;
+    height: 150px;
     border-radius: 50%;
     object-fit: cover;
     border: 3px solid #3b82f6;
     margin-bottom: 15px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.profile-info {
+    margin-top: 15px;
+}
+
+.profile-info p {
+    color: #374151;
+    margin-bottom: 8px;
+    font-size: 1rem;
+}
+
+.profile-info strong {
+    color: #1f2937;
+    font-weight: 600;
+}
+
+/* Empty state for schedule */
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: #6b7280;
+}
+
+.empty-state i {
+    font-size: 3rem;
+    margin-bottom: 15px;
+    color: #d1d5db;
+}
+
+.empty-state h3 {
+    font-size: 1.5rem;
+    margin-bottom: 10px;
+    color: #374151;
+}
+
+.empty-state p {
+    color: #6b7280;
+    max-width: 400px;
+    margin: 0 auto;
 }
 
 /* ================= Responsive ================= */
@@ -344,8 +426,9 @@ $current_page = basename($_SERVER['PHP_SELF']);
     .header h1 { font-size: 1.8rem; }
     .stats-cards { flex-direction: column; }
     .stat-card { min-width: auto; }
-    .table-container { overflow-x: auto; }
+    .table-container { overflow-x auto; }
     .schedule-table { min-width: 600px; }
+    .profile-picture { width: 120px; height: 120px; }
 }
 </style>
 </head>
@@ -359,16 +442,17 @@ $current_page = basename($_SERVER['PHP_SELF']);
     <!-- Overlay for Mobile -->
     <div class="overlay" onclick="toggleSidebar()"></div>
 
-    <!-- Sidebar -->
+    <!-- Sidebar - FIXED DUPLICATE LINKS -->
     <div class="sidebar">
         <div class="sidebar-profile">
-            <img src="<?= htmlspecialchars($profile_src) ?>" alt="Profile Picture">
+            <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic">
             <p><?= htmlspecialchars($user['username'] ?? 'Student') ?></p>
         </div>
+        <h2>Student Panel</h2>
         <a href="student_dashboard.php" class="<?= $current_page=='student_dashboard.php'?'active':'' ?>">Dashboard</a>
         <a href="my_schedule.php" class="<?= $current_page=='my_schedule.php'?'active':'' ?>">My Schedule</a>
         <a href="view_exam_schedules.php" class="<?= $current_page=='view_exam_schedules.php'?'active':'' ?>">Exam Schedule</a>
-        <a href="my_schedule.php" class="<?= $current_page=='my_schedule.php'?'active':'' ?>">My Schedule</a>
+        <a href="view_announcements.php" class="<?= $current_page=='view_announcements.php'?'active':'' ?>">Announcements</a>
         <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">Edit Profile</a>
         <a href="../logout.php">Logout</a>
     </div>
@@ -382,7 +466,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <p>Here is your personal dashboard. Use the sidebar to navigate.</p>
                 </div>
                 <div class="user-info">
-                    <img src="<?= htmlspecialchars($profile_src) ?>" alt="Profile">
+                    <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile" id="headerProfilePic">
                     <div>
                         <div><?= htmlspecialchars($user['username'] ?? 'Student') ?></div>
                         <small>Student</small>
@@ -390,17 +474,68 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 </div>
             </div>
 
-<!-- Profile Picture -->
+           <!-- Profile Section -->
 <div class="profile-section">
     <?php 
-    $profile_pic_path = __DIR__ . '/../uploads/' . ($user['profile_picture'] ?? '');
-    if(!empty($user['profile_picture']) && file_exists($profile_pic_path)): 
+    // SIMPLIFIED and FIXED profile picture logic
+    $profile_pic_for_display = '../assets/default_profile.png';
+    
+    if(!empty($user['profile_picture'])) {
+        // First, let's check if we can get the absolute path
+        $uploads_base = __DIR__ . '/../uploads/';
+        $profile_file = $user['profile_picture'];
+        
+        // Remove any directory traversal from filename for security
+        $profile_file = basename($profile_file);
+        
+        // Check if file exists in uploads directory
+        if(file_exists($uploads_base . $profile_file)) {
+            // File exists - use relative path from current location
+            $profile_pic_for_display = '../uploads/' . $profile_file;
+        } else {
+            // File doesn't exist in uploads - try to see if it's a URL
+            if(filter_var($profile_file, FILTER_VALIDATE_URL)) {
+                $profile_pic_for_display = $profile_file;
+            } else {
+                // Check if it might be stored in a different format in database
+                // Sometimes the full path is stored, sometimes just filename
+                $possible_locations = [
+                    $profile_file, // Try as-is (might be full path)
+                    'uploads/' . $profile_file,
+                    '../uploads/' . $profile_file,
+                    '../../uploads/' . $profile_file,
+                    '/uploads/' . $profile_file,
+                    $_SERVER['DOCUMENT_ROOT'] . '/uploads/' . $profile_file
+                ];
+                
+                foreach($possible_locations as $location) {
+                    if(file_exists($location) || @getimagesize($location)) {
+                        $profile_pic_for_display = $location;
+                        break;
+                    }
+                }
+            }
+        }
+    }
     ?>
-        <img src="../uploads/<?= htmlspecialchars($user['profile_picture']) ?>" alt="Profile Picture" class="profile-picture">
-    <?php else: ?>
-        <img src="../assets/default_profile.png" alt="Profile Picture" class="profile-picture">
-    <?php endif; ?>
+    <img src="<?= htmlspecialchars($profile_pic_for_display) ?>" 
+         alt="Profile Picture" 
+         class="profile-picture" 
+         id="mainProfilePic"
+         onerror="this.onerror=null; this.src='../assets/default_profile.png';">
+    
+    <div class="profile-info">
+        <p><strong>Username:</strong> <?= htmlspecialchars($user['username'] ?? 'Student') ?></p>
+        <p><strong>Email:</strong> <?= htmlspecialchars($user['email'] ?? 'Not provided') ?></p>
+        <p><strong>Status:</strong> <span style="color: #10b981; font-weight: 600;">Active Student</span></p>
+        <p>
+            <a href="edit_profile.php" style="color: #3b82f6; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 5px;">
+                <i class="fas fa-edit"></i> Edit Profile
+            </a>
+        </p>
+    </div>
 </div>
+
             <!-- Quick Stats Cards -->
             <div class="stats-cards">
                 <div class="stat-card">
@@ -421,7 +556,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                             <?= htmlspecialchars($next_class['course_name']) ?>
                         </div>
                         <div style="color: #6b7280; font-size: 0.9rem;">
-                            at <?= date('H:i', strtotime($next_class['start_time'])) ?>
+                            <i class="fas fa-clock"></i> at <?= date('h:i A', strtotime($next_class['start_time'])) ?>
                         </div>
                         <div id="countdown" style="color: #ef4444; font-size: 0.8rem; margin-top: 5px;"></div>
                         <script>
@@ -445,7 +580,9 @@ $current_page = basename($_SERVER['PHP_SELF']);
                             const timerInterval = setInterval(updateCountdown,1000);
                         </script>
                     <?php else: ?>
-                        <div class="number" style="font-size: 1rem; color: #6b7280;">No more classes today</div>
+                        <div class="number" style="font-size: 1rem; color: #6b7280;">
+                            <i class="fas fa-check-circle"></i> No more classes today
+                        </div>
                     <?php endif; ?>
                 </div>
             </div>
@@ -454,6 +591,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <div class="schedule-section">
                 <h2 style="margin-bottom: 20px; color: #1f2937;">My Schedule</h2>
                 <div class="table-container">
+                    <?php if(!empty($my_schedule)): ?>
                     <table class="schedule-table">
                         <thead>
                             <tr>
@@ -468,21 +606,38 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         <tbody>
                         <?php 
                         $today = date('l'); // Current day name
+                        $hasTodayClass = false;
                         foreach($my_schedule as $s): 
                             $todayClass = ($s['day'] === $today) ? 'today-row' : '';
+                            if($s['day'] === $today) $hasTodayClass = true;
                         ?>
                             <tr class="<?= $todayClass ?>">
                                 <td><?= htmlspecialchars($s['course_name']) ?></td>
                                 <td><?= htmlspecialchars($s['instructor_name']) ?></td>
                                 <td><?= htmlspecialchars($s['room_name']) ?></td>
                                 <td><?= htmlspecialchars($s['day']) ?></td>
-                                <td><?= date('H:i', strtotime($s['start_time'])) ?></td>
-                                <td><?= date('H:i', strtotime($s['end_time'])) ?></td>
+                                <td><?= date('h:i A', strtotime($s['start_time'])) ?></td>
+                                <td><?= date('h:i A', strtotime($s['end_time'])) ?></td>
                             </tr>
                         <?php endforeach; ?>
                         </tbody>
                     </table>
+                    <?php else: ?>
+                        <div class="empty-state">
+                            <i class="fas fa-calendar-times"></i>
+                            <h3>No Classes Scheduled</h3>
+                            <p>You don't have any classes scheduled at the moment.</p>
+                        </div>
+                    <?php endif; ?>
                 </div>
+                
+                <?php if($hasTodayClass): ?>
+                <div style="margin-top: 15px; padding: 10px; background: #fff7ed; border-radius: 8px; border-left: 4px solid #f59e0b;">
+                    <small style="color: #92400e; font-weight: 600;">
+                        <i class="fas fa-info-circle"></i> Highlighted rows indicate today's classes
+                    </small>
+                </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -506,6 +661,35 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 link.classList.add('active');
             }
         });
+        
+        // Add animation to stats cards
+        const statCards = document.querySelectorAll('.stat-card');
+        statCards.forEach((card, index) => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            setTimeout(() => {
+                card.style.transition = 'all 0.5s ease';
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, index * 200);
+        });
+        
+        // Add animation to table rows
+        const tableRows = document.querySelectorAll('.schedule-table tbody tr');
+        tableRows.forEach((row, index) => {
+            row.style.opacity = '0';
+            row.style.transform = 'translateX(-20px)';
+            setTimeout(() => {
+                row.style.transition = 'all 0.5s ease';
+                row.style.opacity = '1';
+                row.style.transform = 'translateX(0)';
+            }, index * 50);
+        });
+        
+        // Debug: Log profile picture paths
+        console.log('Sidebar profile pic src:', document.getElementById('sidebarProfilePic').src);
+        console.log('Header profile pic src:', document.getElementById('headerProfilePic').src);
+        console.log('Main profile pic src:', document.getElementById('mainProfilePic').src);
     });
 
     // Confirm logout
@@ -514,6 +698,13 @@ $current_page = basename($_SERVER['PHP_SELF']);
             e.preventDefault();
         }
     });
+    
+    // Fallback for broken profile pictures
+    function handleImageError(img) {
+        img.onerror = null;
+        img.src = '../assets/default_profile.png';
+        return true;
+    }
     </script>
 </body>
 </html>
