@@ -7,6 +7,9 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'student'){
     exit;
 }
 
+// Include dark mode
+include __DIR__ . '/../includes/darkmode.php';
+
 $student_id = $_SESSION['user_id'];
 
 // Fetch current user info - INCLUDING EMAIL
@@ -171,11 +174,13 @@ if($_SERVER['REQUEST_METHOD'] == 'POST'){
 $current_page = basename($_SERVER['PHP_SELF']);
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="<?= $darkMode ? 'dark' : 'light' ?>">
 <head>
 <meta charset="UTF-8">
 <title>Edit Profile | Student Dashboard</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<!-- Include Dark Mode CSS -->
+<link rel="stylesheet" href="../../assets/css/darkmode.css">
 <style>
 * { box-sizing: border-box; margin:0; padding:0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
 
@@ -183,7 +188,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .topbar {
     display: none;
     position: fixed; top:0; left:0; width:100%;
-    background:#2c3e50; color:#fff;
+    background:var(--bg-sidebar); color:var(--text-sidebar);
     padding:15px 20px;
     z-index:1200;
     justify-content:space-between; align-items:center;
@@ -191,7 +196,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .menu-btn {
     font-size:26px;
     background:#1abc9c;
-    border:none; color:#fff;
+    border:none; color:var(--text-sidebar);
     cursor:pointer;
     padding:10px 14px;
     border-radius:8px;
@@ -204,7 +209,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .sidebar {
     position: fixed; top:0; left:0;
     width:250px; height:100%;
-    background:#1f2937; color:#fff;
+    background:var(--bg-sidebar); color:var(--text-sidebar);
     z-index:1100;
     transition: transform 0.3s ease;
     padding: 20px 0;
@@ -213,12 +218,12 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .sidebar a { 
     display:block; 
     padding:12px 20px; 
-    color:#fff; 
+    color:var(--text-sidebar); 
     text-decoration:none; 
     transition: background 0.3s; 
     border-bottom: 1px solid rgba(255,255,255,0.1);
 }
-.sidebar a:hover, .sidebar a.active { background:#1abc9c; }
+.sidebar a:hover, .sidebar a.active { background:#1abc9c; color:white; }
 
 .sidebar-profile {
     text-align: center;
@@ -238,7 +243,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 }
 
 .sidebar-profile p {
-    color: #fff;
+    color: var(--text-sidebar);
     font-weight: bold;
     margin: 0;
     font-size: 16px;
@@ -247,7 +252,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 /* Sidebar title */
 .sidebar h2 {
     text-align: center;
-    color: #ecf0f1;
+    color: var(--text-sidebar);
     margin-bottom: 25px;
     font-size: 22px;
     padding: 0 20px;
@@ -266,16 +271,16 @@ $current_page = basename($_SERVER['PHP_SELF']);
     margin-left: 250px;
     padding:20px;
     min-height:100vh;
-    background: #f8fafc;
+    background: var(--bg-primary);
     transition: all 0.3s ease;
 }
 
 /* Content Wrapper */
 .content-wrapper {
-    background: white;
+    background: var(--bg-card);
     border-radius: 15px;
     padding: 30px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 4px 6px var(--shadow-color);
     min-height: calc(100vh - 40px);
 }
 
@@ -286,12 +291,12 @@ $current_page = basename($_SERVER['PHP_SELF']);
     align-items: center;
     margin-bottom: 30px;
     padding-bottom: 20px;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid var(--border-color);
 }
 
 .header h1 {
     font-size: 2.2rem;
-    color: #1f2937;
+    color: var(--text-primary);
     font-weight: 700;
 }
 
@@ -299,10 +304,10 @@ $current_page = basename($_SERVER['PHP_SELF']);
     display: flex;
     align-items: center;
     gap: 12px;
-    background: #f8fafc;
+    background: var(--bg-secondary);
     padding: 12px 18px;
     border-radius: 12px;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--border-color);
 }
 
 .user-info img {
@@ -312,13 +317,32 @@ $current_page = basename($_SERVER['PHP_SELF']);
     object-fit: cover;
 }
 
+.user-info div div {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.user-info small {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
 /* Welcome Section */
 .welcome-section {
     margin-bottom: 30px;
 }
 
+.welcome-section h1 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #6366f1, #3b82f6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0.5rem;
+}
+
 .welcome-section p {
-    color: #6b7280;
+    color: var(--text-secondary);
     font-size: 1.1rem;
     margin-top: 10px;
 }
@@ -339,29 +363,29 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
 /* Form Cards */
 .form-card {
-    background: white;
+    background: var(--bg-card);
     border-radius: 12px;
     padding: 30px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-    border: 1px solid #e5e7eb;
+    box-shadow: 0 4px 6px var(--shadow-color);
+    border: 1px solid var(--border-color);
     transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 .form-card:hover {
     transform: translateY(-3px);
-    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 8px 15px var(--shadow-lg);
 }
 
 .form-card h2 {
     font-size: 1.5rem;
-    color: #1f2937;
+    color: var(--text-primary);
     margin-bottom: 25px;
     font-weight: 600;
     display: flex;
     align-items: center;
     gap: 10px;
     padding-bottom: 15px;
-    border-bottom: 2px solid #e5e7eb;
+    border-bottom: 2px solid var(--border-color);
 }
 
 .form-card h2 i {
@@ -377,30 +401,30 @@ $current_page = basename($_SERVER['PHP_SELF']);
     display: block;
     margin-bottom: 8px;
     font-weight: 600;
-    color: #374151;
+    color: var(--text-primary);
     font-size: 0.95rem;
 }
 
 .form-control {
     width: 100%;
     padding: 12px 15px;
-    border: 1px solid #d1d5db;
+    border: 1px solid var(--border-color);
     border-radius: 8px;
     font-size: 1rem;
-    color: #374151;
+    color: var(--text-primary);
     transition: all 0.3s;
-    background: #f9fafb;
+    background: var(--bg-secondary);
 }
 
 .form-control:focus {
     outline: none;
     border-color: #3b82f6;
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-    background: white;
+    background: var(--bg-card);
 }
 
 .form-control::placeholder {
-    color: #9ca3af;
+    color: var(--text-secondary);
 }
 
 /* Profile Picture Section */
@@ -416,7 +440,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
     object-fit: cover;
     border: 3px solid #3b82f6;
     margin-bottom: 15px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 12px var(--shadow-color);
 }
 
 .file-input-wrapper {
@@ -460,7 +484,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .file-name {
     margin-top: 8px;
     font-size: 0.85rem;
-    color: #6b7280;
+    color: var(--text-secondary);
     text-align: center;
 }
 
@@ -491,7 +515,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
 /* Password Requirements */
 .password-requirements {
-    background: #f8fafc;
+    background: var(--bg-secondary);
     padding: 15px;
     border-radius: 8px;
     margin-bottom: 20px;
@@ -500,7 +524,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
 .password-requirements h4 {
     font-size: 0.95rem;
-    color: #374151;
+    color: var(--text-primary);
     margin-bottom: 8px;
     font-weight: 600;
 }
@@ -508,7 +532,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .password-requirements ul {
     margin: 0;
     padding-left: 20px;
-    color: #6b7280;
+    color: var(--text-secondary);
     font-size: 0.85rem;
 }
 
@@ -527,7 +551,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
     align-items: center;
     gap: 12px;
     animation: slideIn 0.3s ease;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 4px 6px var(--shadow-color);
 }
 
 @keyframes slideIn {
@@ -542,21 +566,21 @@ $current_page = basename($_SERVER['PHP_SELF']);
 }
 
 .message.success {
-    background: linear-gradient(135deg, #dcfce7, #bbf7d0);
-    color: #166534;
-    border-left: 4px solid #10b981;
+    background: linear-gradient(135deg, var(--success-bg), #bbf7d0);
+    color: var(--success-text);
+    border-left: 4px solid var(--success-border);
 }
 
 .message.error {
-    background: linear-gradient(135deg, #fee2e2, #fecaca);
-    color: #991b1b;
-    border-left: 4px solid #ef4444;
+    background: linear-gradient(135deg, var(--error-bg), #fecaca);
+    color: var(--error-text);
+    border-left: 4px solid var(--error-border);
 }
 
 .message.warning {
-    background: linear-gradient(135deg, #fef3c7, #fde68a);
-    color: #92400e;
-    border-left: 4px solid #f59e0b;
+    background: linear-gradient(135deg, var(--warning-bg), #fde68a);
+    color: var(--warning-text);
+    border-left: 4px solid var(--warning-border);
 }
 
 .message i {
@@ -573,21 +597,50 @@ $current_page = basename($_SERVER['PHP_SELF']);
 }
 
 .password-match.valid {
-    background: #dcfce7;
-    color: #166534;
+    background: var(--success-bg);
+    color: var(--success-text);
 }
 
 .password-match.invalid {
-    background: #fee2e2;
-    color: #991b1b;
+    background: var(--error-bg);
+    color: var(--error-text);
 }
 
 /* Form Tips */
 .form-tip {
     font-size: 0.85rem;
-    color: #6b7280;
+    color: var(--text-secondary);
     margin-top: 5px;
     font-style: italic;
+}
+
+/* Dark mode specific adjustments */
+[data-theme="dark"] .btn-submit {
+    background: linear-gradient(135deg, #059669, #047857);
+}
+
+[data-theme="dark"] .btn-submit:hover {
+    background: linear-gradient(135deg, #047857, #065f46);
+}
+
+[data-theme="dark"] .file-input-wrapper label {
+    background: #2563eb;
+}
+
+[data-theme="dark"] .file-input-wrapper label:hover {
+    background: #1d4ed8;
+}
+
+[data-theme="dark"] .current-profile-pic {
+    border-color: #3b82f6;
+}
+
+[data-theme="dark"] .form-card h2 {
+    border-bottom-color: var(--border-color);
+}
+
+[data-theme="dark"] .password-requirements {
+    border-left-color: #3b82f6;
 }
 
 /* ================= Responsive ================= */
@@ -618,16 +671,29 @@ $current_page = basename($_SERVER['PHP_SELF']);
     <!-- Sidebar - SAME AS OTHER PAGES -->
     <div class="sidebar">
         <div class="sidebar-profile">
-            <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" onerror="this.onerror=null; this.src='../assets/default_profile.png';">
+            <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic"
+                 onerror="this.onerror=null; this.src='../assets/default_profile.png';">
             <p><?= htmlspecialchars($user['username'] ?? 'Student') ?></p>
         </div>
-        <h2>Student Panel</h2>
-        <a href="student_dashboard.php" class="<?= $current_page=='student_dashboard.php'?'active':'' ?>">Dashboard</a>
-        <a href="my_schedule.php" class="<?= $current_page=='my_schedule.php'?'active':'' ?>">My Schedule</a>
-        <a href="view_exam_schedules.php" class="<?= $current_page=='view_exam_schedules.php'?'active':'' ?>">Exam Schedule</a>
-        <a href="view_announcements.php" class="<?= $current_page=='view_announcements.php'?'active':'' ?>">Announcements</a>
-        <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">Edit Profile</a>
-        <a href="../logout.php">Logout</a>
+        <h2>Student Dashboard</h2>
+        <a href="student_dashboard.php" class="<?= $current_page=='student_dashboard.php'?'active':'' ?>">
+            <i class="fas fa-home"></i> Dashboard
+        </a>
+        <a href="my_schedule.php" class="<?= $current_page=='my_schedule.php'?'active':'' ?>">
+            <i class="fas fa-calendar-alt"></i> My Schedule
+        </a>
+        <a href="view_exam_schedules.php" class="<?= $current_page=='view_exam_schedules.php'?'active':'' ?>">
+            <i class="fas fa-clipboard-list"></i> Exam Schedule
+        </a>
+        <a href="view_announcements.php" class="<?= $current_page=='view_announcements.php'?'active':'' ?>">
+            <i class="fas fa-bullhorn"></i> Announcements
+        </a>
+        <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
+            <i class="fas fa-user-edit"></i> Edit Profile
+        </a>
+        <a href="../logout.php">
+            <i class="fas fa-sign-out-alt"></i> Logout
+        </a>
     </div>
 
     <!-- Main Content -->
@@ -639,7 +705,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <p>Update your personal information and manage your account settings</p>
                 </div>
                 <div class="user-info">
-                    <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile" onerror="this.onerror=null; this.src='../assets/default_profile.png';">
+                    <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile" id="headerProfilePic"
+                         onerror="this.onerror=null; this.src='../assets/default_profile.png';">
                     <div>
                         <div><?= htmlspecialchars($user['username'] ?? 'Student') ?></div>
                         <small>Student</small>
@@ -745,6 +812,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
         </div>
     </div>
 
+    <!-- Include darkmode.js -->
+    <script src="../../assets/js/darkmode.js"></script>
     <script>
     function toggleSidebar() {
         const sidebar = document.querySelector('.sidebar');
@@ -764,6 +833,23 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 link.classList.add('active');
             }
         });
+        
+        // Add animation to form cards
+        const formCards = document.querySelectorAll('.form-card');
+        formCards.forEach((card, index) => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            setTimeout(() => {
+                card.style.transition = 'all 0.5s ease';
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, index * 200);
+        });
+        
+        // Debug: Log profile picture paths
+        console.log('Sidebar profile pic src:', document.getElementById('sidebarProfilePic').src);
+        console.log('Header profile pic src:', document.getElementById('headerProfilePic').src);
+        console.log('Profile preview src:', document.getElementById('profilePreview').src);
     });
 
     // Confirm logout
@@ -846,6 +932,14 @@ $current_page = basename($_SERVER['PHP_SELF']);
             alert('Please fill in all required fields');
             return false;
         }
+        
+        // Email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            e.preventDefault();
+            alert('Please enter a valid email address');
+            return false;
+        }
     });
 
     document.getElementById('passwordForm').addEventListener('submit', function(e) {
@@ -870,6 +964,30 @@ $current_page = basename($_SERVER['PHP_SELF']);
             alert('New password must be at least 6 characters long');
             return false;
         }
+        
+        // Check if new password is same as current (optional but recommended)
+        if (newPass === currentPass) {
+            e.preventDefault();
+            alert('New password must be different from current password');
+            return false;
+        }
+    });
+    
+    // Fallback for broken profile pictures
+    function handleImageError(img) {
+        img.onerror = null;
+        img.src = '../assets/default_profile.png';
+        return true;
+    }
+    
+    // Set profile picture fallbacks
+    document.addEventListener('DOMContentLoaded', function() {
+        const profileImages = document.querySelectorAll('img[src*="profile"], img[alt*="Profile"]');
+        profileImages.forEach(img => {
+            img.onerror = function() {
+                this.src = '../assets/default_profile.png';
+            };
+        });
     });
     </script>
 </body>

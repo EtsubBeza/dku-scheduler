@@ -7,6 +7,9 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'student'){
     exit;
 }
 
+// Include dark mode
+include __DIR__ . '/../includes/darkmode.php';
+
 $student_id = $_SESSION['user_id'];
 
 // Fetch current user info - MATCHING DASHBOARD
@@ -108,11 +111,13 @@ $my_schedule = $schedules->fetchAll();
 $current_page = basename($_SERVER['PHP_SELF']);
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="<?= $darkMode ? 'dark' : 'light' ?>">
 <head>
 <meta charset="UTF-8">
 <title>My Schedule | Student Dashboard</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<!-- Include Dark Mode CSS -->
+<link rel="stylesheet" href="../../assets/css/darkmode.css">
 <style>
 * { box-sizing: border-box; margin:0; padding:0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
 
@@ -120,7 +125,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .topbar {
     display: none;
     position: fixed; top:0; left:0; width:100%;
-    background:#2c3e50; color:#fff;
+    background:var(--bg-sidebar); color:var(--text-sidebar);
     padding:15px 20px;
     z-index:1200;
     justify-content:space-between; align-items:center;
@@ -128,7 +133,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .menu-btn {
     font-size:26px;
     background:#1abc9c;
-    border:none; color:#fff;
+    border:none; color:var(--text-sidebar);
     cursor:pointer;
     padding:10px 14px;
     border-radius:8px;
@@ -141,7 +146,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .sidebar {
     position: fixed; top:0; left:0;
     width:250px; height:100%;
-    background:#1f2937; color:#fff;
+    background:var(--bg-sidebar); color:var(--text-sidebar);
     z-index:1100;
     transition: transform 0.3s ease;
     padding: 20px 0;
@@ -150,12 +155,12 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .sidebar a { 
     display:block; 
     padding:12px 20px; 
-    color:#fff; 
+    color:var(--text-sidebar); 
     text-decoration:none; 
     transition: background 0.3s; 
     border-bottom: 1px solid rgba(255,255,255,0.1);
 }
-.sidebar a:hover, .sidebar a.active { background:#1abc9c; }
+.sidebar a:hover, .sidebar a.active { background:#1abc9c; color:white; }
 
 .sidebar-profile {
     text-align: center;
@@ -175,7 +180,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 }
 
 .sidebar-profile p {
-    color: #fff;
+    color: var(--text-sidebar);
     font-weight: bold;
     margin: 0;
     font-size: 16px;
@@ -184,7 +189,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 /* Sidebar title */
 .sidebar h2 {
     text-align: center;
-    color: #ecf0f1;
+    color: var(--text-sidebar);
     margin-bottom: 25px;
     font-size: 22px;
     padding: 0 20px;
@@ -203,16 +208,16 @@ $current_page = basename($_SERVER['PHP_SELF']);
     margin-left: 250px;
     padding:20px;
     min-height:100vh;
-    background: #f8fafc;
+    background: var(--bg-primary);
     transition: all 0.3s ease;
 }
 
 /* Content Wrapper */
 .content-wrapper {
-    background: white;
+    background: var(--bg-card);
     border-radius: 15px;
     padding: 30px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 4px 6px var(--shadow-color);
     min-height: calc(100vh - 40px);
 }
 
@@ -223,12 +228,12 @@ $current_page = basename($_SERVER['PHP_SELF']);
     align-items: center;
     margin-bottom: 30px;
     padding-bottom: 20px;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid var(--border-color);
 }
 
 .header h1 {
     font-size: 2.2rem;
-    color: #1f2937;
+    color: var(--text-primary);
     font-weight: 700;
 }
 
@@ -236,10 +241,10 @@ $current_page = basename($_SERVER['PHP_SELF']);
     display: flex;
     align-items: center;
     gap: 12px;
-    background: #f8fafc;
+    background: var(--bg-secondary);
     padding: 12px 18px;
     border-radius: 12px;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--border-color);
 }
 
 .user-info img {
@@ -249,13 +254,32 @@ $current_page = basename($_SERVER['PHP_SELF']);
     object-fit: cover;
 }
 
+.user-info div div {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.user-info small {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
 /* Welcome Section */
 .welcome-section {
     margin-bottom: 30px;
 }
 
+.welcome-section h1 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #6366f1, #3b82f6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0.5rem;
+}
+
 .welcome-section p {
-    color: #6b7280;
+    color: var(--text-secondary);
     font-size: 1.1rem;
     margin-top: 10px;
 }
@@ -280,12 +304,12 @@ $current_page = basename($_SERVER['PHP_SELF']);
     cursor: pointer;
     transition: all 0.3s ease;
     text-decoration: none;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 4px 6px var(--shadow-color);
 }
 
 .export-btn:hover {
     transform: translateY(-3px);
-    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 6px 12px var(--shadow-lg);
 }
 
 .export-btn.pdf {
@@ -307,17 +331,36 @@ $current_page = basename($_SERVER['PHP_SELF']);
     font-size: 1.1rem;
 }
 
+[data-theme="dark"] .export-btn.pdf {
+    background: linear-gradient(135deg, #f87171, #dc2626);
+}
+
+[data-theme="dark"] .export-btn.excel {
+    background: linear-gradient(135deg, #34d399, #059669);
+}
+
+[data-theme="dark"] .export-btn.print {
+    background: linear-gradient(135deg, #60a5fa, #3b82f6);
+}
+
 /* ================= Schedule Table ================= */
 .schedule-section {
     margin-top: 30px;
 }
 
+.schedule-section h2 {
+    margin-bottom: 20px;
+    color: var(--text-primary);
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
 .table-container {
-    background: white;
+    background: var(--bg-card);
     border-radius: 12px;
     overflow: hidden;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-    border: 1px solid #e5e7eb;
+    box-shadow: 0 4px 6px var(--shadow-color);
+    border: 1px solid var(--border-color);
 }
 
 .schedule-table {
@@ -326,17 +369,17 @@ $current_page = basename($_SERVER['PHP_SELF']);
 }
 
 .schedule-table th {
-    background: #f8fafc;
+    background: var(--table-header);
     padding: 15px;
     text-align: left;
     font-weight: 600;
-    color: #374151;
-    border-bottom: 1px solid #e5e7eb;
+    color: var(--text-sidebar);
+    border-bottom: 1px solid var(--border-color);
 }
 
 .schedule-table td {
     padding: 15px;
-    border-bottom: 1px solid #f3f4f6;
+    border-bottom: 1px solid var(--border-color);
 }
 
 .schedule-table tr:last-child td {
@@ -344,17 +387,21 @@ $current_page = basename($_SERVER['PHP_SELF']);
 }
 
 .schedule-table tr:hover {
-    background: #f9fafb;
+    background: var(--hover-color);
 }
 
 .schedule-table .today-row {
-    background: #fff7ed !important;
+    background: var(--today-bg) !important;
     border-left: 4px solid #f59e0b;
+}
+
+[data-theme="dark"] .schedule-table .today-row {
+    background: rgba(245, 158, 11, 0.1) !important;
 }
 
 .course-code {
     font-size: 0.85rem;
-    color: #6b7280;
+    color: var(--text-secondary);
     margin-top: 4px;
     font-weight: 500;
 }
@@ -363,25 +410,47 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .empty-state {
     text-align: center;
     padding: 40px 20px;
-    color: #6b7280;
+    color: var(--text-secondary);
 }
 
 .empty-state i {
     font-size: 3rem;
     margin-bottom: 15px;
-    color: #d1d5db;
+    color: var(--border-color);
 }
 
 .empty-state h3 {
     font-size: 1.5rem;
     margin-bottom: 10px;
-    color: #374151;
+    color: var(--text-primary);
 }
 
 .empty-state p {
-    color: #6b7280;
+    color: var(--text-secondary);
     max-width: 400px;
     margin: 0 auto;
+}
+
+/* Today's classes info box */
+.table-container + div {
+    margin-top: 15px;
+    padding: 10px;
+    background: var(--info-bg);
+    border-radius: 8px;
+    border-left: 4px solid #f59e0b;
+}
+
+.table-container + div small {
+    color: var(--info-text);
+    font-weight: 600;
+}
+
+[data-theme="dark"] .table-container + div {
+    background: rgba(245, 158, 11, 0.1);
+}
+
+[data-theme="dark"] .table-container + div small {
+    color: #fcd34d;
 }
 
 /* ================= Print Styles ================= */
@@ -428,6 +497,32 @@ $current_page = basename($_SERVER['PHP_SELF']);
     .table-container { overflow-x: auto; }
     .schedule-table { min-width: 600px; }
 }
+
+/* Dark mode specific table adjustments */
+[data-theme="dark"] .schedule-table th {
+    color: var(--text-sidebar);
+}
+
+[data-theme="dark"] .schedule-table td {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .schedule-table tr:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+/* Improved sidebar icons */
+.sidebar a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.sidebar a i {
+    width: 20px;
+    text-align: center;
+    font-size: 1.1rem;
+}
 </style>
 </head>
 <body>
@@ -447,12 +542,24 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <p><?= htmlspecialchars($user['username'] ?? 'Student') ?></p>
         </div>
         <h2>Student Panel</h2>
-        <a href="student_dashboard.php" class="<?= $current_page=='student_dashboard.php'?'active':'' ?>">Dashboard</a>
-        <a href="my_schedule.php" class="<?= $current_page=='my_schedule.php'?'active':'' ?>">My Schedule</a>
-        <a href="view_exam_schedules.php" class="<?= $current_page=='view_exam_schedules.php'?'active':'' ?>">Exam Schedule</a>
-        <a href="view_announcements.php" class="<?= $current_page=='view_announcements.php'?'active':'' ?>">Announcements</a>
-        <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">Edit Profile</a>
-        <a href="../logout.php">Logout</a>
+        <a href="student_dashboard.php" class="<?= $current_page=='student_dashboard.php'?'active':'' ?>">
+            <i class="fas fa-home"></i> Dashboard
+        </a>
+        <a href="my_schedule.php" class="<?= $current_page=='my_schedule.php'?'active':'' ?>">
+            <i class="fas fa-calendar-alt"></i> My Schedule
+        </a>
+        <a href="view_exam_schedules.php" class="<?= $current_page=='view_exam_schedules.php'?'active':'' ?>">
+            <i class="fas fa-clipboard-list"></i> Exam Schedule
+        </a>
+        <a href="view_announcements.php" class="<?= $current_page=='view_announcements.php'?'active':'' ?>">
+            <i class="fas fa-bullhorn"></i> Announcements
+        </a>
+        <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
+            <i class="fas fa-user-edit"></i> Edit Profile
+        </a>
+        <a href="../logout.php">
+            <i class="fas fa-sign-out-alt"></i> Logout
+        </a>
     </div>
 
     <!-- Main Content -->
@@ -487,7 +594,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
             <!-- Schedule Table -->
             <div class="schedule-section">
-                <h2 style="margin-bottom: 20px; color: #1f2937;">Class Timetable</h2>
+                <h2 style="margin-bottom: 20px; color: var(--text-primary);">Class Timetable</h2>
                 <div class="table-container">
                     <table class="schedule-table">
                         <thead>
@@ -536,8 +643,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 </div>
                 
                 <?php if($hasTodayClass): ?>
-                <div style="margin-top: 15px; padding: 10px; background: #fff7ed; border-radius: 8px; border-left: 4px solid #f59e0b;">
-                    <small style="color: #92400e; font-weight: 600;">
+                <div style="margin-top: 15px; padding: 10px; background: var(--info-bg); border-radius: 8px; border-left: 4px solid #f59e0b;">
+                    <small style="color: var(--info-text); font-weight: 600;">
                         <i class="fas fa-info-circle"></i> Highlighted rows indicate today's classes
                     </small>
                 </div>
@@ -546,6 +653,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
         </div>
     </div>
 
+    <!-- Include darkmode.js -->
+    <script src="../../assets/js/darkmode.js"></script>
     <script>
     function toggleSidebar() {
         const sidebar = document.querySelector('.sidebar');

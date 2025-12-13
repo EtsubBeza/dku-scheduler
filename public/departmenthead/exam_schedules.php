@@ -8,6 +8,9 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'department_head'){
     exit;
 }
 
+// Include dark mode
+include __DIR__ . '/../includes/darkmode.php';
+
 $dept_id = $_SESSION['department_id'] ?? 0;
 $user_id = $_SESSION['user_id'];
 $message = "";
@@ -113,7 +116,7 @@ if(isset($_POST['save_exam'])){
     $academic_year = $_POST['academic_year'];
     $semester = $_POST['semester'];
     $max_students = (int)$_POST['max_students'];
-    $is_published = isset($_POST['is_published']) ? 1 : 0; // ADDED: Publish status
+    $is_published = isset($_POST['is_published']) ? 1 : 0;
     
     // Validate time
     if(strtotime($end_time) <= strtotime($start_time)) {
@@ -315,7 +318,7 @@ $default_semester = date('n') <= 6 ? 'Spring' : 'Fall';
 ?>
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="<?= $darkMode ? 'dark' : 'light' ?>">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -323,111 +326,98 @@ $default_semester = date('n') <= 6 ? 'Spring' : 'Fall';
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <!-- FullCalendar CSS -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css">
+<!-- Include Dark Mode CSS -->
+<link rel="stylesheet" href="../../assets/css/darkmode.css">
 <style>
-:root {
-    --primary: #6366f1;
-    --primary-dark: #4f46e5;
-    --secondary: #8b5cf6;
-    --success: #10b981;
-    --warning: #f59e0b;
-    --danger: #ef4444;
-    --info: #06b6d4;
-    --light: #f8fafc;
-    --dark: #1f2937;
-    --gray: #6b7280;
-    --gray-light: #e5e7eb;
-    --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-    --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-    --radius: 12px;
-    --radius-lg: 20px;
-    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+* { 
+    box-sizing: border-box; 
+    margin:0; 
+    padding:0; 
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
 }
 
 body {
-    background: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%);
+    background: var(--bg-primary);
     min-height: 100vh;
-    color: #374151;
+    color: var(--text-primary);
     line-height: 1.6;
 }
 
-/* ================= Topbar ================= */
+/* ================= Topbar for Hamburger ================= */
 .topbar {
     display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    background: white;
-    padding: 1rem 1.5rem;
-    box-shadow: var(--shadow);
-    z-index: 1000;
-    align-items: center;
-    justify-content: space-between;
-    backdrop-filter: blur(10px);
-    background: rgba(255, 255, 255, 0.95);
+    position: fixed; 
+    top:0; 
+    left:0; 
+    width:100%;
+    background:var(--bg-sidebar); 
+    color:var(--text-sidebar);
+    padding:15px 20px;
+    z-index:1200;
+    justify-content:space-between; 
+    align-items:center;
 }
 
 .menu-btn {
-    background: var(--primary);
-    color: white;
-    border: none;
-    width: 48px;
-    height: 48px;
-    border-radius: var(--radius);
-    font-size: 1.5rem;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: var(--transition);
+    font-size:26px;
+    background:#1abc9c;
+    border:none; 
+    color:var(--text-sidebar);
+    cursor:pointer;
+    padding:10px 14px;
+    border-radius:8px;
+    font-weight:600;
+    transition: background 0.3s, transform 0.2s;
 }
 
-.menu-btn:hover {
-    background: var(--primary-dark);
-    transform: translateY(-2px);
+.menu-btn:hover { 
+    background:#159b81; 
+    transform:translateY(-2px); 
 }
 
 .topbar h2 {
     font-size: 1.25rem;
     font-weight: 600;
-    color: var(--dark);
-    background: linear-gradient(135deg, var(--primary), var(--secondary));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    color: var(--text-sidebar);
 }
 
 /* ================= Sidebar ================= */
 .sidebar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    width: 280px;
-    background: linear-gradient(180deg, #1f2937 0%, #111827 100%);
-    color: white;
-    z-index: 1000;
-    transition: var(--transition);
-    overflow-y: auto;
-    box-shadow: var(--shadow-lg);
-    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    position: fixed; 
+    top:0; 
+    left:0;
+    width:250px; 
+    height:100%;
+    background:var(--bg-sidebar); 
+    color:var(--text-sidebar);
+    z-index:1100;
+    transition: transform 0.3s ease;
+    padding: 20px 0;
 }
 
-.sidebar.hidden {
-    transform: translateX(-100%);
+.sidebar.hidden { 
+    transform:translateX(-260px); 
+}
+
+.sidebar a { 
+    display:block; 
+    padding:12px 20px; 
+    color:var(--text-sidebar); 
+    text-decoration:none; 
+    transition: background 0.3s; 
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.sidebar a:hover, .sidebar a.active { 
+    background:#1abc9c; 
+    color:white; 
 }
 
 .sidebar-profile {
-    padding: 2.5rem 1.5rem 1.5rem;
     text-align: center;
-    background: linear-gradient(180deg, rgba(99, 102, 241, 0.1) 0%, transparent 100%);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 20px;
+    padding: 0 20px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.2);
 }
 
 .sidebar-profile img {
@@ -435,91 +425,52 @@ body {
     height: 100px;
     border-radius: 50%;
     object-fit: cover;
-    border: 3px solid var(--primary);
-    box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
-    margin-bottom: 1rem;
-    transition: var(--transition);
-}
-
-.sidebar-profile img:hover {
-    transform: scale(1.05);
+    margin-bottom: 10px;
+    border: 2px solid #1abc9c;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
 }
 
 .sidebar-profile p {
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: white;
+    color: var(--text-sidebar);
+    font-weight: bold;
     margin: 0;
-}
-
-.sidebar nav {
-    padding: 1rem 0;
-}
-
-.sidebar a {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 1rem 1.5rem;
-    color: rgba(255, 255, 255, 0.8);
-    text-decoration: none;
-    transition: var(--transition);
-    border-left: 3px solid transparent;
-    font-weight: 500;
-}
-
-.sidebar a i {
-    width: 20px;
-    font-size: 1.1rem;
-}
-
-.sidebar a:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: white;
-    border-left-color: var(--primary);
-}
-
-.sidebar a.active {
-    background: linear-gradient(90deg, rgba(99, 102, 241, 0.2) 0%, transparent 100%);
-    color: white;
-    border-left-color: var(--primary);
+    font-size: 16px;
 }
 
 /* ================= Overlay ================= */
 .overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    z-index: 999;
-    display: none;
-    backdrop-filter: blur(4px);
+    position: fixed; 
+    top:0; 
+    left:0; 
+    width:100%; 
+    height:100%;
+    background: rgba(0,0,0,0.4); 
+    z-index:1050;
+    display:none; 
+    opacity:0; 
+    transition: opacity 0.3s ease;
 }
 
-.overlay.active {
-    display: block;
-    animation: fadeIn 0.3s ease;
+.overlay.active { 
+    display:block; 
+    opacity:1; 
 }
 
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-/* ================= Main Content ================= */
+/* ================= Main content ================= */
 .main-content {
-    margin-left: 280px;
-    padding: 2rem;
-    min-height: 100vh;
-    transition: var(--transition);
+    margin-left: 250px;
+    padding:30px 50px;
+    min-height:100vh;
+    background:var(--bg-primary);
+    color:var(--text-primary);
+    transition: all 0.3s ease;
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 768px) {
     .main-content {
         margin-left: 0;
         padding-top: 80px;
+        padding: 20px;
     }
 }
 
@@ -535,7 +486,7 @@ body {
 .header h1 {
     font-size: 2.5rem;
     font-weight: 700;
-    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    background: linear-gradient(135deg, #6366f1, #3b82f6);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     line-height: 1.2;
@@ -545,16 +496,16 @@ body {
     display: flex;
     align-items: center;
     gap: 1rem;
-    background: white;
+    background: var(--bg-card);
     padding: 0.75rem 1.25rem;
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow);
-    transition: var(--transition);
+    border-radius: 15px;
+    box-shadow: 0 6px 20px var(--shadow-color);
+    transition: all 0.3s ease;
 }
 
 .user-info:hover {
     transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
+    box-shadow: 0 10px 28px var(--shadow-color);
 }
 
 .user-info img {
@@ -562,7 +513,7 @@ body {
     height: 50px;
     border-radius: 50%;
     object-fit: cover;
-    border: 2px solid var(--primary);
+    border: 2px solid #1abc9c;
 }
 
 .user-info div {
@@ -572,316 +523,229 @@ body {
 
 .user-info div div {
     font-weight: 600;
-    color: var(--dark);
+    color: var(--text-primary);
 }
 
 .user-info small {
-    color: var(--gray);
+    color: var(--text-secondary);
     font-size: 0.875rem;
 }
 
-/* ================= Message ================= */
-.message {
-    padding: 1.25rem 1.5rem;
-    border-radius: var(--radius);
-    margin-bottom: 2rem;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    font-weight: 500;
-    animation: slideIn 0.3s ease;
-    box-shadow: var(--shadow);
+/* ================= Welcome Section ================= */
+.welcome-section {
+    background: linear-gradient(135deg,#6366f1,#3b82f6);
+    color:white;
+    padding:30px 25px;
+    border-radius:15px;
+    margin-bottom:30px;
+    box-shadow:0 6px 18px var(--shadow-color);
 }
 
-@keyframes slideIn {
-    from {
-        transform: translateY(-10px);
-        opacity: 0;
-    }
-    to {
-        transform: translateY(0);
-        opacity: 1;
-    }
+.welcome-section h1 { 
+    font-size:28px; 
+    font-weight:600; 
+    margin-bottom:8px; 
 }
 
-.message.success {
-    background: linear-gradient(135deg, #dcfce7, #bbf7d0);
-    color: #166534;
-    border-left: 4px solid var(--success);
-}
-
-.message.error {
-    background: linear-gradient(135deg, #fee2e2, #fecaca);
-    color: #991b1b;
-    border-left: 4px solid var(--danger);
-}
-
-.message.warning {
-    background: linear-gradient(135deg, #fef3c7, #fde68a);
-    color: #92400e;
-    border-left: 4px solid var(--warning);
-}
-
-.message.info {
-    background: linear-gradient(135deg, #dbeafe, #bfdbfe);
-    color: #1e40af;
-    border-left: 4px solid var(--info);
+.welcome-section p { 
+    font-size:16px; 
+    opacity:0.9; 
 }
 
 /* ================= Stats Cards ================= */
-.stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 1.5rem;
-    margin-bottom: 2.5rem;
+.stats-cards { 
+    display:flex; 
+    flex-wrap:wrap; 
+    gap:20px; 
+    margin-bottom:30px; 
 }
 
-.stat-card {
-    background: white;
-    border-radius: var(--radius-lg);
-    padding: 1.75rem;
-    box-shadow: var(--shadow);
-    transition: var(--transition);
-    border: 1px solid var(--gray-light);
-    position: relative;
-    overflow: hidden;
+.stats-cards .card {
+    flex:1 1 220px;
+    background:var(--bg-card);
+    border-radius:15px;
+    padding:25px 20px;
+    box-shadow:0 6px 20px var(--shadow-color);
+    display:flex; 
+    flex-direction:column; 
+    justify-content:space-between;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
-.stat-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 4px;
-    background: linear-gradient(90deg, var(--primary), var(--secondary));
+.stats-cards .card:hover { 
+    transform:translateY(-6px); 
+    box-shadow:0 10px 28px var(--shadow-color); 
 }
 
-.stat-card:hover {
-    transform: translateY(-5px);
-    box-shadow: var(--shadow-lg);
+.card-icon { 
+    font-size:40px; 
+    margin-bottom:15px; 
+    padding:15px; 
+    width:60px; 
+    height:60px; 
+    display:flex; 
+    align-items:center; 
+    justify-content:center; 
+    border-radius:50%; 
+    background:#e0e7ff; 
+    color:#4f46e5; 
 }
 
-.stat-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 1rem;
+.stats-cards .card h3 { 
+    font-size:18px; 
+    margin-bottom:8px; 
+    color:var(--text-primary); 
+    font-weight:600; 
 }
 
-.stat-icon {
-    width: 56px;
-    height: 56px;
-    border-radius: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+.stats-cards .card p { 
+    font-size:24px; 
+    font-weight:bold; 
+    color:var(--text-primary); 
+    margin-bottom:15px; 
+}
+
+/* Update card icons for dark mode */
+[data-theme="dark"] .card-icon {
+    background: #1e40af;
+    color: #93c5fd;
+}
+
+/* ================= Table Section ================= */
+.table-section { 
+    background-color: var(--bg-card); 
+    padding: 25px; 
+    border-radius: 15px; 
+    box-shadow: 0 6px 18px var(--shadow-color); 
+    margin-bottom: 30px; 
+}
+
+.table-section h2 { 
+    margin-bottom: 20px; 
+    color: var(--text-primary); 
     font-size: 1.5rem;
-    background: linear-gradient(135deg, var(--primary), var(--secondary));
-    color: white;
-    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-}
-
-.stat-content h3 {
-    font-size: 0.875rem;
     font-weight: 600;
-    color: var(--gray);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 0.5rem;
 }
 
-.stat-content .stat-value {
-    font-size: 2rem;
-    font-weight: 700;
-    color: var(--dark);
-    line-height: 1;
-    margin-bottom: 0.5rem;
+.exam-table { 
+    width: 100%; 
+    border-collapse: collapse; 
 }
 
-.stat-content .stat-desc {
-    font-size: 0.875rem;
-    color: var(--gray);
+.exam-table th, .exam-table td {
+    padding: 15px; 
+    text-align: left; 
+    border-bottom: 1px solid var(--border-color);
 }
 
-/* ================= Type Distribution ================= */
-.distribution-card {
-    background: white;
-    border-radius: var(--radius-lg);
-    padding: 1.75rem;
-    box-shadow: var(--shadow);
-    margin-bottom: 2rem;
-    border: 1px solid var(--gray-light);
+.exam-table th { 
+    background-color: var(--table-header); 
+    color: var(--text-sidebar); 
+    font-weight: 600; 
 }
 
-.distribution-card .card-header {
+.exam-table tr:hover { 
+    background-color: var(--hover-color); 
+}
+
+/* ================= Message Styles ================= */
+.message {
+    padding: 16px;
+    border-radius: 10px;
+    margin-bottom: 20px;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    margin-bottom: 1.5rem;
-}
-
-.distribution-card h3 {
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: var(--dark);
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.type-distribution {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-}
-
-.type-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.625rem 1.25rem;
-    border-radius: 50px;
-    background: linear-gradient(135deg, #f3f4f6, #e5e7eb);
-    color: var(--dark);
+    gap: 12px;
     font-weight: 500;
-    transition: var(--transition);
-    border: 1px solid var(--gray-light);
 }
 
-.type-badge:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow);
+.message.success {
+    background: var(--success-bg);
+    color: var(--success-text);
+    border: 1px solid var(--success-text);
 }
 
-.type-badge .count {
-    background: linear-gradient(135deg, var(--primary), var(--secondary));
-    color: white;
-    padding: 0.25rem 0.75rem;
-    border-radius: 20px;
-    font-size: 0.75rem;
-    font-weight: 600;
+.message.error {
+    background: var(--error-bg);
+    color: var(--error-text);
+    border: 1px solid var(--error-text);
 }
 
-/* ================= Calendar Card ================= */
-.calendar-card {
-    background: white;
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-    box-shadow: var(--shadow);
-    margin-bottom: 2rem;
-    border: 1px solid var(--gray-light);
+.message.warning {
+    background: var(--warning-bg);
+    color: var(--warning-text);
+    border: 1px solid var(--warning-text);
 }
 
-.calendar-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 1.5rem 1.75rem;
-    background: linear-gradient(135deg, var(--primary), var(--secondary));
-    color: white;
-}
-
-.calendar-header h3 {
-    font-size: 1.25rem;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.schedule-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1.5rem;
-    background: rgba(255, 255, 255, 0.2);
-    color: white;
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: var(--radius);
+/* ================= Button Styles ================= */
+.btn {
+    padding: 12px 20px;
+    border: none;
+    border-radius: 10px;
+    font-size: 1rem;
     font-weight: 600;
     cursor: pointer;
-    transition: var(--transition);
-    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
 }
 
-.schedule-btn:hover {
-    background: rgba(255, 255, 255, 0.3);
+.btn-primary {
+    background: #6366f1;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #4f46e5;
     transform: translateY(-2px);
 }
 
-#examCalendar {
-    padding: 1.5rem;
-    background: white;
+.btn-warning {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: white;
 }
 
-/* ================= Table Card ================= */
-.table-card {
-    background: white;
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-    box-shadow: var(--shadow);
-    border: 1px solid var(--gray-light);
+.btn-warning:hover {
+    background: linear-gradient(135deg, #d97706, #b45309);
+    transform: translateY(-2px);
 }
 
-.table-card .card-header {
-    padding: 1.5rem 1.75rem;
-    background: linear-gradient(135deg, #f8fafc, #f1f5f9);
-    border-bottom: 1px solid var(--gray-light);
+.btn-danger {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: white;
 }
 
-.table-card h3 {
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: var(--dark);
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
+.btn-danger:hover {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+    transform: translateY(-2px);
 }
 
-.table-container {
-    overflow-x: auto;
-    padding: 0.5rem;
+.btn-success {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
 }
 
-.exam-table {
-    width: 100%;
-    border-collapse: collapse;
-    min-width: 800px;
+.btn-success:hover {
+    background: linear-gradient(135deg, #059669, #047857);
+    transform: translateY(-2px);
 }
 
-.exam-table thead {
-    background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+.btn-secondary {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
 }
 
-.exam-table th {
-    padding: 1rem 1.25rem;
-    text-align: left;
-    font-weight: 600;
-    color: var(--dark);
+.btn-sm {
+    padding: 8px 15px;
     font-size: 0.875rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    border-bottom: 2px solid var(--gray-light);
 }
 
-.exam-table td {
-    padding: 1.25rem;
-    border-bottom: 1px solid var(--gray-light);
-    transition: var(--transition);
-}
-
-.exam-table tbody tr {
-    transition: var(--transition);
-}
-
-.exam-table tbody tr:hover {
-    background: linear-gradient(90deg, rgba(99, 102, 241, 0.05) 0%, transparent 100%);
-    transform: translateX(4px);
-}
-
-.exam-table tbody tr:last-child td {
-    border-bottom: none;
+.btn-group {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
 }
 
 /* ================= Badges ================= */
@@ -897,91 +761,202 @@ body {
 }
 
 .badge-primary {
-    background: linear-gradient(135deg, #e0e7ff, #c7d2fe);
-    color: var(--primary-dark);
+    background: rgba(99, 102, 241, 0.1);
+    color: #6366f1;
+    border: 1px solid rgba(99, 102, 241, 0.2);
 }
 
 .badge-success {
-    background: linear-gradient(135deg, #dcfce7, #bbf7d0);
-    color: #166534;
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.2);
 }
 
 .badge-warning {
-    background: linear-gradient(135deg, #fef3c7, #fde68a);
-    color: #92400e;
+    background: rgba(245, 158, 11, 0.1);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.2);
 }
 
 .badge-danger {
-    background: linear-gradient(135deg, #fee2e2, #fecaca);
-    color: #991b1b;
-}
-
-.badge-info {
-    background: linear-gradient(135deg, #dbeafe, #bfdbfe);
-    color: #1e40af;
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.2);
 }
 
 .badge-secondary {
-    background: linear-gradient(135deg, #f3f4f6, #e5e7eb);
-    color: var(--gray);
+    background: rgba(156, 163, 175, 0.1);
+    color: #9ca3af;
+    border: 1px solid rgba(156, 163, 175, 0.2);
 }
 
-/* ================= Buttons ================= */
-.btn {
+/* ================= Distribution Cards ================= */
+.distribution-card {
+    background: var(--bg-card);
+    border-radius: 15px;
+    padding: 25px;
+    box-shadow: 0 6px 20px var(--shadow-color);
+    margin-bottom: 30px;
+}
+
+.distribution-card h3 {
+    margin-bottom: 20px;
+    color: var(--text-primary);
+    font-size: 1.5rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.type-distribution {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.type-badge {
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
     padding: 0.625rem 1.25rem;
-    border: none;
-    border-radius: var(--radius);
-    font-weight: 600;
-    font-size: 0.875rem;
-    cursor: pointer;
-    transition: var(--transition);
-    text-decoration: none;
+    border-radius: 50px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-weight: 500;
+    transition: all 0.3s ease;
+    border: 1px solid var(--border-color);
 }
 
-.btn-sm {
-    padding: 0.5rem 1rem;
+.type-badge:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px var(--shadow-color);
+}
+
+.type-badge .count {
+    background: linear-gradient(135deg, #6366f1, #3b82f6);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
     font-size: 0.75rem;
+    font-weight: 600;
 }
 
-.btn-primary {
-    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-    color: white;
-    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+/* ================= Calendar Card ================= */
+.calendar-card {
+    background: var(--bg-card);
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 6px 20px var(--shadow-color);
+    margin-bottom: 30px;
 }
 
-.btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
-}
-
-.btn-warning {
-    background: linear-gradient(135deg, var(--warning), #d97706);
-    color: white;
-    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
-}
-
-.btn-warning:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(245, 158, 11, 0.4);
-}
-
-.btn-danger {
-    background: linear-gradient(135deg, var(--danger), #dc2626);
-    color: white;
-    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
-}
-
-.btn-danger:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4);
-}
-
-.btn-group {
+.calendar-header {
     display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 25px;
+    background: linear-gradient(135deg, #6366f1, #3b82f6);
+    color: white;
+    border-radius: 15px 15px 0 0;
+}
+
+.calendar-header h3 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.schedule-btn {
+    display: inline-flex;
+    align-items: center;
     gap: 0.5rem;
+    padding: 12px 20px;
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.schedule-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-2px);
+}
+
+#examCalendar {
+    padding: 20px;
+    background: var(--bg-card);
+}
+
+/* ================= Table Card ================= */
+.table-card {
+    background: var(--bg-card);
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 6px 20px var(--shadow-color);
+}
+
+.table-card .card-header {
+    padding: 20px 25px;
+    background: var(--table-header);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.table-card h3 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.table-container {
+    overflow-x: auto;
+    padding: 0.5rem;
+}
+
+.exam-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 800px;
+}
+
+.exam-table thead {
+    background: var(--table-header);
+}
+
+.exam-table th {
+    padding: 15px;
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-sidebar);
+    border-bottom: 2px solid var(--border-color);
+}
+
+.exam-table td {
+    padding: 15px;
+    border-bottom: 1px solid var(--border-color);
+    transition: all 0.3s ease;
+    color: var(--text-primary);
+}
+
+.exam-table tbody tr {
+    transition: all 0.3s ease;
+}
+
+.exam-table tbody tr:hover {
+    background: var(--hover-color);
+    transform: translateX(4px);
+}
+
+.exam-table tbody tr:last-child td {
+    border-bottom: none;
 }
 
 /* ================= Progress Bar ================= */
@@ -992,7 +967,7 @@ body {
 .progress-bar {
     width: 100%;
     height: 8px;
-    background: var(--gray-light);
+    background: var(--progress-bg);
     border-radius: 4px;
     overflow: hidden;
     margin-top: 0.5rem;
@@ -1000,7 +975,7 @@ body {
 
 .progress-fill {
     height: 100%;
-    background: linear-gradient(90deg, var(--success), #059669);
+    background: linear-gradient(90deg, #10b981, #059669);
     border-radius: 4px;
     transition: width 0.6s ease;
 }
@@ -1008,26 +983,26 @@ body {
 /* ================= Empty State ================= */
 .empty-state {
     text-align: center;
-    padding: 3rem 1rem;
-    color: var(--gray);
+    padding: 40px 20px;
+    color: var(--text-light);
 }
 
 .empty-state i {
-    font-size: 4rem;
-    margin-bottom: 1.5rem;
-    color: var(--gray-light);
-    opacity: 0.5;
+    font-size: 3rem;
+    margin-bottom: 20px;
+    display: block;
+    color: var(--border-color);
 }
 
 .empty-state h3 {
     font-size: 1.5rem;
     font-weight: 600;
-    color: var(--dark);
+    color: var(--text-primary);
     margin-bottom: 0.75rem;
 }
 
 .empty-state p {
-    color: var(--gray);
+    color: var(--text-secondary);
     max-width: 400px;
     margin: 0 auto;
 }
@@ -1040,12 +1015,11 @@ body {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: var(--overlay-bg);
     z-index: 1100;
     align-items: center;
     justify-content: center;
     padding: 1rem;
-    backdrop-filter: blur(8px);
 }
 
 .modal.active {
@@ -1065,13 +1039,13 @@ body {
 }
 
 .modal-content {
-    background: white;
-    border-radius: var(--radius-lg);
+    background: var(--bg-card);
+    border-radius: 15px;
     width: 100%;
     max-width: 800px;
     max-height: 90vh;
     overflow-y: auto;
-    box-shadow: var(--shadow-lg);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
     animation: modalSlideIn 0.3s ease;
 }
 
@@ -1087,10 +1061,10 @@ body {
 }
 
 .modal-header {
-    padding: 1.5rem 2rem;
-    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    padding: 20px 25px;
+    background: linear-gradient(135deg, #6366f1, #3b82f6);
     color: white;
-    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    border-radius: 15px 15px 0 0;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -1104,7 +1078,7 @@ body {
     font-weight: 600;
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 10px;
 }
 
 .modal-close {
@@ -1113,12 +1087,12 @@ body {
     color: white;
     width: 40px;
     height: 40px;
-    border-radius: var(--radius);
+    border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: var(--transition);
+    transition: all 0.3s ease;
     font-size: 1.25rem;
 }
 
@@ -1128,7 +1102,7 @@ body {
 }
 
 .modal-body {
-    padding: 2rem;
+    padding: 25px;
 }
 
 /* ================= Form Styles ================= */
@@ -1140,32 +1114,33 @@ body {
     display: block;
     margin-bottom: 0.5rem;
     font-weight: 600;
-    color: var(--dark);
+    color: var(--text-primary);
     font-size: 0.875rem;
 }
 
 .form-group label span {
-    color: var(--danger);
+    color: #ef4444;
 }
 
 .form-control {
     width: 100%;
-    padding: 0.875rem 1rem;
-    border: 2px solid var(--gray-light);
-    border-radius: var(--radius);
+    padding: 14px 16px;
+    border: 2px solid var(--border-color);
+    border-radius: 10px;
     font-size: 1rem;
-    transition: var(--transition);
-    background: white;
+    transition: all 0.3s ease;
+    background: var(--bg-input);
+    color: var(--text-primary);
 }
 
 .form-control:focus {
     outline: none;
-    border-color: var(--primary);
+    border-color: #6366f1;
     box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
 }
 
 .form-control:disabled {
-    background: var(--light);
+    background: var(--bg-secondary);
     cursor: not-allowed;
 }
 
@@ -1181,7 +1156,7 @@ body {
     gap: 1rem;
     margin-top: 2rem;
     padding-top: 1.5rem;
-    border-top: 1px solid var(--gray-light);
+    border-top: 1px solid var(--border-color);
 }
 
 /* ================= Checkbox Styles ================= */
@@ -1201,6 +1176,7 @@ body {
 .checkbox-group label {
     margin-bottom: 0;
     cursor: pointer;
+    color: var(--text-primary);
 }
 
 /* ================= Responsive Design ================= */
@@ -1227,8 +1203,8 @@ body {
         font-size: 2rem;
     }
     
-    .stats-grid {
-        grid-template-columns: 1fr;
+    .stats-cards {
+        flex-direction: column;
     }
     
     .form-row {
@@ -1242,35 +1218,171 @@ body {
     .modal-content {
         margin: 1rem;
     }
+    
+    .welcome-section h1 {
+        font-size: 24px;
+    }
 }
 
-/* ================= Custom Scrollbar ================= */
-::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+/* ================= FullCalendar Styles ================= */
+#examCalendar {
+    padding: 20px;
+    background: var(--bg-card);
 }
 
-::-webkit-scrollbar-track {
-    background: var(--gray-light);
-    border-radius: 4px;
+/* Light mode (default) */
+.fc .fc-view-harness,
+.fc .fc-daygrid-body,
+.fc .fc-scrollgrid-section-body,
+.fc .fc-scrollgrid-section {
+    color: var(--text-primary);
 }
 
-::-webkit-scrollbar-thumb {
-    background: linear-gradient(135deg, var(--primary), var(--secondary));
-    border-radius: 4px;
+.fc .fc-daygrid-day-number,
+.fc .fc-col-header-cell-cushion,
+.fc .fc-event-time,
+.fc .fc-event-title,
+.fc .fc-toolbar-title {
+    color: var(--text-primary);
 }
 
-::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(135deg, var(--primary-dark), var(--secondary));
+.fc .fc-button {
+    color: var(--text-primary);
+}
+
+.fc .fc-col-header-cell {
+    background: var(--table-header);
+    border-color: var(--border-color);
+}
+
+.fc .fc-daygrid-day {
+    border-color: var(--border-color);
+}
+
+.fc .fc-day-other .fc-daygrid-day-top {
+    opacity: 0.5;
+}
+
+.fc .fc-event {
+    border-radius: 6px;
+    border: none;
+    box-shadow: 0 2px 4px var(--shadow-color);
+}
+
+/* ================= FullCalendar Dark Mode Overrides ================= */
+[data-theme="dark"] .fc {
+    --fc-border-color: var(--border-color);
+    --fc-button-bg-color: #6366f1;
+    --fc-button-border-color: #6366f1;
+    --fc-button-hover-bg-color: #4f46e5;
+    --fc-button-hover-border-color: #4f46e5;
+    --fc-button-active-bg-color: #4f46e5;
+    --fc-button-active-border-color: #4f46e5;
+    --fc-neutral-bg-color: var(--bg-secondary);
+    --fc-neutral-text-color: var(--text-primary);
+    --fc-page-bg-color: var(--bg-card);
+    --fc-event-bg-color: #6366f1;
+    --fc-event-border-color: #6366f1;
+    --fc-event-text-color: white;
+}
+
+[data-theme="dark"] .fc-theme-standard .fc-scrollgrid,
+[data-theme="dark"] .fc-theme-standard td,
+[data-theme="dark"] .fc-theme-standard th {
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .fc .fc-daygrid-day.fc-day-today {
+    background-color: rgba(99, 102, 241, 0.1);
+}
+
+[data-theme="dark"] .fc .fc-button-primary:not(:disabled).fc-button-active,
+[data-theme="dark"] .fc .fc-button-primary:not(:disabled):active {
+    background-color: #4f46e5;
+    border-color: #4f46e5;
+}
+
+[data-theme="dark"] .fc .fc-button-primary:disabled {
+    background-color: var(--border-color);
+    border-color: var(--border-color);
+}
+
+/* Dark mode specific text colors - WHITE TEXT */
+[data-theme="dark"] .fc .fc-view-harness,
+[data-theme="dark"] .fc .fc-daygrid-body,
+[data-theme="dark"] .fc .fc-scrollgrid-section-body,
+[data-theme="dark"] .fc .fc-scrollgrid-section {
+    color: white;
+}
+
+[data-theme="dark"] .fc .fc-daygrid-day-number,
+[data-theme="dark"] .fc .fc-col-header-cell-cushion,
+[data-theme="dark"] .fc .fc-event-time,
+[data-theme="dark"] .fc .fc-event-title,
+[data-theme="dark"] .fc .fc-toolbar-title {
+    color: white;
+}
+
+[data-theme="dark"] .fc .fc-button {
+    color: white;
+}
+
+[data-theme="dark"] .fc .fc-col-header-cell {
+    background: rgba(99, 102, 241, 0.2);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .fc .fc-col-header-cell-cushion {
+    font-weight: 600;
+}
+
+[data-theme="dark"] .fc .fc-daygrid-day {
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .fc .fc-day-other .fc-daygrid-day-top {
+    opacity: 0.5;
+}
+
+[data-theme="dark"] .fc .fc-daygrid-day-number {
+    font-weight: 500;
+}
+
+[data-theme="dark"] .fc .fc-event {
+    border-radius: 6px;
+    border: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .fc .fc-event:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+    transition: all 0.2s ease;
+}
+
+[data-theme="dark"] .fc .fc-toolbar-title {
+    font-weight: 600;
+}
+
+[data-theme="dark"] .fc .fc-button {
+    font-weight: 500;
+    border-radius: 8px;
+    padding: 8px 16px;
+}
+
+[data-theme="dark"] .fc .fc-button:hover {
+    transform: translateY(-1px);
+}
+
+[data-theme="dark"] .fc .fc-button-primary:not(:disabled):focus {
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3);
 }
 </style>
 </head>
 <body>
     <!-- Topbar for Mobile -->
     <div class="topbar">
-        <button class="menu-btn" onclick="toggleSidebar()">
-            <i class="fas fa-bars"></i>
-        </button>
+        <button class="menu-btn" onclick="toggleSidebar()">☰</button>
         <h2>Exam Schedules</h2>
     </div>
 
@@ -1318,10 +1430,7 @@ body {
     <div class="main-content">
         <!-- Header -->
         <div class="header">
-            <div>
-                <h1>Exam Schedule Management</h1>
-                <p style="color: var(--gray); margin-top: 0.5rem;">Schedule and manage all department exams</p>
-            </div>
+            <h1>Exam Schedule Management</h1>
             <div class="user-info">
                 <img src="<?= htmlspecialchars($profile_src) ?>" alt="Profile">
                 <div>
@@ -1329,6 +1438,12 @@ body {
                     <small>Department Head</small>
                 </div>
             </div>
+        </div>
+
+        <!-- Welcome Section -->
+        <div class="welcome-section">
+            <h1>Welcome, <?= htmlspecialchars($user['username'] ?? 'User'); ?> 👋</h1>
+            <p>Schedule and manage all department exams. Use the calendar to view and schedule exams.</p>
         </div>
 
         <!-- Messages -->
@@ -1340,83 +1455,59 @@ body {
         <?php endif; ?>
 
         <!-- Statistics Cards -->
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-header">
-                    <div class="stat-icon">
-                        <i class="fas fa-calendar-alt"></i>
-                    </div>
+        <div class="stats-cards">
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-calendar-alt"></i>
                 </div>
-                <div class="stat-content">
-                    <h3>Total Exams</h3>
-                    <div class="stat-value"><?= $stats['total_exams'] ?? 0 ?></div>
-                    <p class="stat-desc">Scheduled in your department</p>
-                </div>
+                <h3>Total Exams</h3>
+                <p><?= $stats['total_exams'] ?? 0 ?></p>
             </div>
             
-            <div class="stat-card">
-                <div class="stat-header">
-                    <div class="stat-icon" style="background: linear-gradient(135deg, var(--success), #059669);">
-                        <i class="fas fa-calendar-check"></i>
-                    </div>
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-calendar-check"></i>
                 </div>
-                <div class="stat-content">
-                    <h3>Upcoming Exams</h3>
-                    <div class="stat-value"><?= $stats['upcoming_exams'] ?? 0 ?></div>
-                    <p class="stat-desc">Future scheduled exams</p>
-                </div>
+                <h3>Upcoming Exams</h3>
+                <p><?= $stats['upcoming_exams'] ?? 0 ?></p>
             </div>
             
-            <div class="stat-card">
-                <div class="stat-header">
-                    <div class="stat-icon" style="background: linear-gradient(135deg, var(--warning), #d97706);">
-                        <i class="fas fa-bullhorn"></i>
-                    </div>
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-bullhorn"></i>
                 </div>
-                <div class="stat-content">
-                    <h3>Published</h3>
-                    <div class="stat-value"><?= $stats['published_exams'] ?? 0 ?></div>
-                    <p class="stat-desc">Visible to students</p>
-                </div>
+                <h3>Published</h3>
+                <p><?= $stats['published_exams'] ?? 0 ?></p>
             </div>
             
-            <div class="stat-card">
-                <div class="stat-header">
-                    <div class="stat-icon" style="background: linear-gradient(135deg, var(--secondary), #7c3aed);">
-                        <i class="fas fa-chart-pie"></i>
-                    </div>
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-chart-pie"></i>
                 </div>
-                <div class="stat-content">
-                    <h3>Exam Types</h3>
-                    <div class="stat-value"><?= $stats['exam_types_count'] ?? 0 ?></div>
-                    <p class="stat-desc">Different exam formats</p>
-                </div>
+                <h3>Exam Types</h3>
+                <p><?= $stats['exam_types_count'] ?? 0 ?></p>
             </div>
         </div>
 
         <!-- Exam Type Distribution -->
-        <div class="distribution-card">
-            <div class="card-header">
-                <h3><i class="fas fa-chart-bar"></i> Exam Type Distribution</h3>
-            </div>
-            <div class="card-body">
-                <div class="type-distribution">
-                    <?php if(!empty($type_distribution)): ?>
-                        <?php foreach($type_distribution as $type): ?>
-                            <div class="type-badge">
-                                <span><?= htmlspecialchars($type['exam_type']) ?></span>
-                                <span class="count"><?= $type['count'] ?></span>
-                            </div>
-                        <?php endforeach; ?>
-                    <?php else: ?>
-                        <p class="empty-state">No exams scheduled yet</p>
-                    <?php endif; ?>
-                </div>
+        <div class="table-section">
+            <h2><i class="fas fa-chart-bar"></i> Exam Type Distribution</h2>
+            <div class="type-distribution">
+                <?php if(!empty($type_distribution)): ?>
+                    <?php foreach($type_distribution as $type): ?>
+                        <div class="type-badge">
+                            <span><?= htmlspecialchars($type['exam_type']) ?></span>
+                            <span class="count"><?= $type['count'] ?></span>
+                        </div>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <p class="empty-state">No exams scheduled yet</p>
+                <?php endif; ?>
             </div>
         </div>
 
         <!-- Calendar View -->
-        <div class="calendar-card">
+        <div class="table-section">
             <div class="calendar-header">
                 <h3><i class="fas fa-calendar"></i> Exam Calendar View</h3>
                 <button class="schedule-btn" onclick="openExamModal()">
@@ -1427,10 +1518,8 @@ body {
         </div>
 
         <!-- Exam Schedule Table -->
-        <div class="table-card">
-            <div class="card-header">
-                <h3><i class="fas fa-table"></i> All Exam Schedules</h3>
-            </div>
+        <div class="table-section">
+            <h2><i class="fas fa-table"></i> All Exam Schedules</h2>
             <div class="table-container">
                 <table class="exam-table">
                     <thead>
@@ -1456,31 +1545,31 @@ body {
                                 ?>
                                 <tr>
                                     <td>
-                                        <strong style="color: var(--dark); display: block; margin-bottom: 0.25rem;">
+                                        <strong style="color: var(--text-primary); display: block; margin-bottom: 0.25rem;">
                                             <?= htmlspecialchars($exam['course_code']) ?>
                                         </strong>
-                                        <small style="color: var(--gray);"><?= htmlspecialchars($exam['course_name']) ?></small>
+                                        <small style="color: var(--text-secondary);"><?= htmlspecialchars($exam['course_name']) ?></small>
                                     </td>
                                     <td>
                                         <span class="badge badge-primary"><?= htmlspecialchars($exam['exam_type']) ?></span>
                                     </td>
                                     <td>
-                                        <strong style="color: var(--dark); display: block; margin-bottom: 0.25rem;">
+                                        <strong style="color: var(--text-primary); display: block; margin-bottom: 0.25rem;">
                                             <?= date('M d, Y', strtotime($exam['exam_date'])) ?>
                                         </strong>
-                                        <small style="color: var(--gray);">
+                                        <small style="color: var(--text-secondary);">
                                             <?= date('h:i A', strtotime($exam['start_time'])) ?> - <?= date('h:i A', strtotime($exam['end_time'])) ?>
                                         </small>
                                     </td>
                                     <td>
-                                        <strong style="color: var(--dark); display: block; margin-bottom: 0.25rem;">
+                                        <strong style="color: var(--text-primary); display: block; margin-bottom: 0.25rem;">
                                             <?= htmlspecialchars($exam['room_name']) ?>
                                         </strong>
-                                        <small style="color: var(--gray);">Capacity: <?= $exam['capacity'] ?></small>
+                                        <small style="color: var(--text-secondary);">Capacity: <?= $exam['capacity'] ?></small>
                                     </td>
                                     <td>
                                         <?php if($exam['supervisor_name']): ?>
-                                            <div style="color: var(--dark); font-weight: 500;">
+                                            <div style="color: var(--text-primary); font-weight: 500;">
                                                 <?= htmlspecialchars($exam['supervisor_name']) ?>
                                             </div>
                                         <?php else: ?>
@@ -1488,7 +1577,7 @@ body {
                                         <?php endif; ?>
                                     </td>
                                     <td>
-                                        <div style="font-weight: 600; color: var(--dark);">
+                                        <div style="font-weight: 600; color: var(--text-primary);">
                                             <?= $exam['max_students'] ?> max
                                         </div>
                                         <div class="progress-container">
@@ -1643,7 +1732,7 @@ body {
                                     </option>
                                 <?php endwhile; ?>
                             </select>
-                            <small id="roomCapacity" style="display:block; margin-top:0.5rem; color: var(--gray); font-size: 0.875rem;"></small>
+                            <small id="roomCapacity" style="display:block; margin-top:0.5rem; color: var(--text-secondary); font-size: 0.875rem;"></small>
                         </div>
                         
                         <div class="form-group">
@@ -1671,7 +1760,7 @@ body {
                             </select>
                             
                             <?php if($instructor_count > 0): ?>
-                                <small style="display: block; margin-top: 5px; color: #6b7280; font-size: 0.85em;">
+                                <small style="display: block; margin-top: 5px; color: var(--text-secondary); font-size: 0.85em;">
                                     <i class="fas fa-info-circle"></i> Found <?= $instructor_count ?> instructor(s) in system
                                 </small>
                             <?php else: ?>
@@ -1715,7 +1804,7 @@ body {
                                 Publish this exam (make visible to students)
                             </label>
                         </div>
-                        <small style="color: var(--gray); font-size: 0.875rem;">
+                        <small style="color: var(--text-secondary); font-size: 0.875rem;">
                             <i class="fas fa-info-circle"></i> When published, students can see this exam in their schedules.
                         </small>
                     </div>
@@ -1724,7 +1813,7 @@ body {
                         <button type="submit" name="save_exam" class="btn btn-primary">
                             <i class="fas fa-save"></i> <?= $edit_exam ? 'Update Exam' : 'Create Exam Schedule' ?>
                         </button>
-                        <button type="button" class="btn" onclick="closeExamModal()" style="background: var(--gray-light); color: var(--dark);">
+                        <button type="button" class="btn btn-secondary" onclick="closeExamModal()">
                             <i class="fas fa-times"></i> Cancel
                         </button>
                     </div>
@@ -1734,19 +1823,15 @@ body {
     </div>
 
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
+<!-- Include darkmode.js -->
+<script src="../../assets/js/darkmode.js"></script>
 <script>
     // Sidebar Toggle
     function toggleSidebar() {
         const sidebar = document.querySelector('.sidebar');
         const overlay = document.querySelector('.overlay');
-        const mainContent = document.querySelector('.main-content');
-        
         sidebar.classList.toggle('active');
         overlay.classList.toggle('active');
-        
-        if(window.innerWidth <= 1024) {
-            mainContent.style.marginLeft = sidebar.classList.contains('active') ? '280px' : '0';
-        }
     }
 
     // Modal Functions
@@ -1780,104 +1865,103 @@ body {
         }
     });
 
-    // Initialize FullCalendar
-    document.addEventListener('DOMContentLoaded', function() {
-        const calendarEl = document.getElementById('examCalendar');
+  // Initialize FullCalendar
+document.addEventListener('DOMContentLoaded', function() {
+    const calendarEl = document.getElementById('examCalendar');
+    
+    // Prepare events from PHP data
+    const calendarEvents = <?= json_encode(array_map(function($exam) {
+        $colorMap = [
+            'Midterm' => '#6366f1',
+            'Final' => '#ef4444',
+            'Quiz' => '#10b981',
+            'Practical' => '#f59e0b',
+            'Project Defense' => '#8b5cf6'
+        ];
         
-        // Prepare events from PHP data
-        const calendarEvents = <?= json_encode(array_map(function($exam) {
-            $colorMap = [
-                'Midterm' => '#6366f1',
-                'Final' => '#ef4444',
-                'Quiz' => '#10b981',
-                'Practical' => '#f59e0b',
-                'Project Defense' => '#8b5cf6'
-            ];
+        return [
+            'id' => $exam['exam_id'],
+            'title' => $exam['course_code'] . ' - ' . $exam['exam_type'],
+            'start' => $exam['exam_date'] . 'T' . $exam['start_time'],
+            'end' => $exam['exam_date'] . 'T' . $exam['end_time'],
+            'backgroundColor' => $colorMap[$exam['exam_type']] ?? '#6b7280',
+            'borderColor' => $colorMap[$exam['exam_type']] ?? '#6b7280',
+            'textColor' => '#ffffff',
+            'extendedProps' => [
+                'course' => $exam['course_name'],
+                'room' => $exam['room_name'],
+                'supervisor' => $exam['supervisor_name'] || 'Not Assigned',
+                'published' => $exam['is_published'] == 1
+            ]
+        ];
+    }, $exams)) ?>;
+    
+    const calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth',
+        headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,timeGridWeek,timeGridDay'
+        },
+        events: calendarEvents,
+        eventClick: function(info) {
+            // When event is clicked, open edit modal
+            window.location.href = '?edit=' + info.event.id;
+        },
+        eventDidMount: function(info) {
+            // Add tooltip
+            const title = info.event.title;
+            const course = info.event.extendedProps.course;
+            const room = info.event.extendedProps.room;
+            const supervisor = info.event.extendedProps.supervisor;
+            const published = info.event.extendedProps.published;
             
-            return [
-                'id' => $exam['exam_id'],
-                'title' => $exam['course_code'] . ' - ' . $exam['exam_type'],
-                'start' => $exam['exam_date'] . 'T' . $exam['start_time'],
-                'end' => $exam['exam_date'] . 'T' . $exam['end_time'],
-                'backgroundColor' => $colorMap[$exam['exam_type']] ?? '#6b7280',
-                'borderColor' => $colorMap[$exam['exam_type']] ?? '#6b7280',
-                'textColor' => '#ffffff',
-                'extendedProps' => [
-                    'course' => $exam['course_name'],
-                    'room' => $exam['room_name'],
-                    'supervisor' => $exam['supervisor_name'] || 'Not Assigned',
-                    'published' => $exam['is_published'] == 1
-                ]
-            ];
-        }, $exams)) ?>;
-        
-        const calendar = new FullCalendar.Calendar(calendarEl, {
-            initialView: 'dayGridMonth',
-            headerToolbar: {
-                left: 'prev,next today',
-                center: 'title',
-                right: 'dayGridMonth,timeGridWeek,timeGridDay'
-            },
-            events: calendarEvents,
-            eventClick: function(info) {
-                // When event is clicked, open edit modal
-                window.location.href = '?edit=' + info.event.id;
-            },
-            eventDidMount: function(info) {
-                // Add tooltip
-                const title = info.event.title;
-                const course = info.event.extendedProps.course;
-                const room = info.event.extendedProps.room;
-                const supervisor = info.event.extendedProps.supervisor;
-                const published = info.event.extendedProps.published;
-                
-                const status = published ? 'Published' : 'Not Published';
-                info.el.title = `${title}\nCourse: ${course}\nRoom: ${room}\nSupervisor: ${supervisor}\nStatus: ${status}`;
-                
-                // Add custom styling
-                info.el.style.borderRadius = '6px';
-                info.el.style.boxShadow = '0 2px 6px rgba(0,0,0,0.1)';
-                info.el.style.padding = '4px 8px';
-                info.el.style.fontSize = '0.85rem';
-                
-                // Add unpublished indicator (gray border)
-                if(!info.event.extendedProps.published) {
-                    info.el.style.opacity = '0.7';
-                    info.el.style.border = '2px dashed #9ca3af';
-                }
-            },
-            editable: false,
-            selectable: false,
-            height: 'auto',
-            contentHeight: 500,
-            dayMaxEvents: 3,
-            eventTimeFormat: {
-                hour: '2-digit',
-                minute: '2-digit',
-                meridiem: 'short'
-            },
-            themeSystem: 'bootstrap5',
-            buttonText: {
-                today: 'Today',
-                month: 'Month',
-                week: 'Week',
-                day: 'Day'
+            const status = published ? 'Published' : 'Not Published';
+            info.el.title = `${title}\nCourse: ${course}\nRoom: ${room}\nSupervisor: ${supervisor}\nStatus: ${status}`;
+            
+            // Add custom styling
+            info.el.style.borderRadius = '6px';
+            info.el.style.boxShadow = '0 2px 6px rgba(0,0,0,0.1)';
+            info.el.style.padding = '4px 8px';
+            info.el.style.fontSize = '0.85rem';
+            
+            // Add unpublished indicator (gray border)
+            if(!info.event.extendedProps.published) {
+                info.el.style.opacity = '0.7';
+                info.el.style.border = '2px dashed #9ca3af';
             }
-        });
-        
-        calendar.render();
-        
-        // If edit parameter exists, open modal automatically
-        <?php if(isset($_GET['edit'])): ?>
-            setTimeout(() => openExamModal(), 100);
-        <?php endif; ?>
-        
-        // Initialize room capacity display
-        const roomSelect = document.getElementById('room_id');
-        if(roomSelect.value) {
-            roomSelect.dispatchEvent(new Event('change'));
+        },
+        editable: false,
+        selectable: false,
+        height: 'auto',
+        contentHeight: 500,
+        dayMaxEvents: 3,
+        eventTimeFormat: {
+            hour: '2-digit',
+            minute: '2-digit',
+            meridiem: 'short'
+        },
+        buttonText: {
+            today: 'Today',
+            month: 'Month',
+            week: 'Week',
+            day: 'Day'
         }
     });
+    
+    calendar.render();
+    
+    // If edit parameter exists, open modal automatically
+    <?php if(isset($_GET['edit'])): ?>
+        setTimeout(() => openExamModal(), 100);
+    <?php endif; ?>
+    
+    // Initialize room capacity display
+    const roomSelect = document.getElementById('room_id');
+    if(roomSelect.value) {
+        roomSelect.dispatchEvent(new Event('change'));
+    }
+});
     
     // Form validation
     document.getElementById('examForm').addEventListener('submit', function(e) {
@@ -1944,17 +2028,16 @@ body {
         });
     }, 5000);
     
-    // Add animation to table rows on page load
+    // Simple script for sidebar active state
     document.addEventListener('DOMContentLoaded', function() {
-        const rows = document.querySelectorAll('.exam-table tbody tr');
-        rows.forEach((row, index) => {
-            row.style.opacity = '0';
-            row.style.transform = 'translateX(-20px)';
-            setTimeout(() => {
-                row.style.transition = 'all 0.5s ease';
-                row.style.opacity = '1';
-                row.style.transform = 'translateX(0)';
-            }, index * 50);
+        const currentPage = window.location.pathname.split('/').pop();
+        const navLinks = document.querySelectorAll('.sidebar a');
+        
+        navLinks.forEach(link => {
+            const linkPage = link.getAttribute('href');
+            if (linkPage === currentPage) {
+                link.classList.add('active');
+            }
         });
     });
 </script>

@@ -9,10 +9,13 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'student'){
 
 require __DIR__ . '/../../includes/db.php';
 
+// Include dark mode
+include __DIR__ . '/../includes/darkmode.php';
+
 $student_id = $_SESSION['user_id'];
 
 // Fetch student's info (username & profile picture)
-$user_stmt = $pdo->prepare("SELECT username, profile_picture FROM users WHERE user_id = ?");
+$user_stmt = $pdo->prepare("SELECT username, profile_picture, email FROM users WHERE user_id = ?");
 $user_stmt->execute([$student_id]);
 $user = $user_stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -51,10 +54,6 @@ if(!empty($profile_picture)) {
     // Use default if no profile picture
     $profile_img_path = '../assets/' . $default_profile;
 }
-
-// Debug: Check what path we're using (remove in production)
-// error_log("Profile picture path: " . $profile_img_path);
-// error_log("Profile picture name: " . $profile_picture);
 
 // Fetch student's schedule
 $schedules = $pdo->prepare("
@@ -112,20 +111,21 @@ $next_class = $next_class_stmt->fetch(PDO::FETCH_ASSOC);
 $current_page = basename($_SERVER['PHP_SELF']);
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="<?= $darkMode ? 'dark' : 'light' ?>">
 <head>
 <meta charset="UTF-8">
 <title>Student Dashboard</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<!-- Include Dark Mode CSS -->
+<link rel="stylesheet" href="../../assets/css/darkmode.css">
 <style>
-/* ... (keep all the CSS styles exactly as they were) ... */
 * { box-sizing: border-box; margin:0; padding:0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
 
 /* ================= Topbar for Hamburger ================= */
 .topbar {
     display: none;
     position: fixed; top:0; left:0; width:100%;
-    background:#2c3e50; color:#fff;
+    background:var(--bg-sidebar); color:var(--text-sidebar);
     padding:15px 20px;
     z-index:1200;
     justify-content:space-between; align-items:center;
@@ -133,7 +133,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .menu-btn {
     font-size:26px;
     background:#1abc9c;
-    border:none; color:#fff;
+    border:none; color:var(--text-sidebar);
     cursor:pointer;
     padding:10px 14px;
     border-radius:8px;
@@ -146,7 +146,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .sidebar {
     position: fixed; top:0; left:0;
     width:250px; height:100%;
-    background:#1f2937; color:#fff;
+    background:var(--bg-sidebar); color:var(--text-sidebar);
     z-index:1100;
     transition: transform 0.3s ease;
     padding: 20px 0;
@@ -155,12 +155,12 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .sidebar a { 
     display:block; 
     padding:12px 20px; 
-    color:#fff; 
+    color:var(--text-sidebar); 
     text-decoration:none; 
     transition: background 0.3s; 
     border-bottom: 1px solid rgba(255,255,255,0.1);
 }
-.sidebar a:hover, .sidebar a.active { background:#1abc9c; }
+.sidebar a:hover, .sidebar a.active { background:#1abc9c; color:white; }
 
 .sidebar-profile {
     text-align: center;
@@ -180,7 +180,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 }
 
 .sidebar-profile p {
-    color: #fff;
+    color: var(--text-sidebar);
     font-weight: bold;
     margin: 0;
     font-size: 16px;
@@ -189,7 +189,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 /* Sidebar title */
 .sidebar h2 {
     text-align: center;
-    color: #ecf0f1;
+    color: var(--text-sidebar);
     margin-bottom: 25px;
     font-size: 22px;
     padding: 0 20px;
@@ -208,16 +208,16 @@ $current_page = basename($_SERVER['PHP_SELF']);
     margin-left: 250px;
     padding:20px;
     min-height:100vh;
-    background: #f8fafc;
+    background: var(--bg-primary);
     transition: all 0.3s ease;
 }
 
 /* Content Wrapper */
 .content-wrapper {
-    background: white;
+    background: var(--bg-card);
     border-radius: 15px;
     padding: 30px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 4px 6px var(--shadow-color);
     min-height: calc(100vh - 40px);
 }
 
@@ -228,12 +228,12 @@ $current_page = basename($_SERVER['PHP_SELF']);
     align-items: center;
     margin-bottom: 30px;
     padding-bottom: 20px;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid var(--border-color);
 }
 
 .header h1 {
     font-size: 2.2rem;
-    color: #1f2937;
+    color: var(--text-primary);
     font-weight: 700;
 }
 
@@ -241,10 +241,10 @@ $current_page = basename($_SERVER['PHP_SELF']);
     display: flex;
     align-items: center;
     gap: 12px;
-    background: #f8fafc;
+    background: var(--bg-secondary);
     padding: 12px 18px;
     border-radius: 12px;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--border-color);
 }
 
 .user-info img {
@@ -254,13 +254,32 @@ $current_page = basename($_SERVER['PHP_SELF']);
     object-fit: cover;
 }
 
+.user-info div div {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.user-info small {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
 /* Welcome Section */
 .welcome-section {
     margin-bottom: 30px;
 }
 
+.welcome-section h1 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #6366f1, #3b82f6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0.5rem;
+}
+
 .welcome-section p {
-    color: #6b7280;
+    color: var(--text-secondary);
     font-size: 1.1rem;
     margin-top: 10px;
 }
@@ -276,23 +295,23 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .stat-card {
     flex: 1;
     min-width: 200px;
-    background: white;
+    background: var(--bg-card);
     padding: 25px;
     border-radius: 12px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-    border: 1px solid #e5e7eb;
+    box-shadow: 0 4px 6px var(--shadow-color);
+    border: 1px solid var(--border-color);
     text-align: center;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 .stat-card:hover {
     transform: translateY(-5px);
-    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 8px 15px var(--shadow-lg);
 }
 
 .stat-card h3 {
     font-size: 1rem;
-    color: #6b7280;
+    color: var(--text-secondary);
     margin-bottom: 10px;
     font-weight: 600;
 }
@@ -300,7 +319,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .stat-card .number {
     font-size: 2rem;
     font-weight: bold;
-    color: #1f2937;
+    color: var(--text-primary);
     margin-bottom: 10px;
 }
 
@@ -310,17 +329,48 @@ $current_page = basename($_SERVER['PHP_SELF']);
     display: block;
 }
 
+/* Course icon color */
+.stat-card .fa-book.icon {
+    color: #3b82f6;
+}
+
+.stat-card .fa-calendar-alt.icon {
+    color: #10b981;
+}
+
+.stat-card .fa-clock.icon {
+    color: #f59e0b;
+}
+
+/* Countdown text */
+.stat-card #countdown {
+    color: var(--danger);
+    font-size: 0.8rem;
+    margin-top: 5px;
+}
+
+[data-theme="dark"] .stat-card #countdown {
+    color: #fca5a5;
+}
+
 /* ================= Schedule Table ================= */
 .schedule-section {
     margin-top: 30px;
 }
 
+.schedule-section h2 {
+    margin-bottom: 20px;
+    color: var(--text-primary);
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
 .table-container {
-    background: white;
+    background: var(--bg-card);
     border-radius: 12px;
     overflow: hidden;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-    border: 1px solid #e5e7eb;
+    box-shadow: 0 4px 6px var(--shadow-color);
+    border: 1px solid var(--border-color);
 }
 
 .schedule-table {
@@ -329,17 +379,17 @@ $current_page = basename($_SERVER['PHP_SELF']);
 }
 
 .schedule-table th {
-    background: #f8fafc;
+    background: var(--table-header);
     padding: 15px;
     text-align: left;
     font-weight: 600;
-    color: #374151;
-    border-bottom: 1px solid #e5e7eb;
+    color: var(--text-sidebar);
+    border-bottom: 1px solid var(--border-color);
 }
 
 .schedule-table td {
     padding: 15px;
-    border-bottom: 1px solid #f3f4f6;
+    border-bottom: 1px solid var(--border-color);
 }
 
 .schedule-table tr:last-child td {
@@ -347,12 +397,38 @@ $current_page = basename($_SERVER['PHP_SELF']);
 }
 
 .schedule-table tr:hover {
-    background: #f9fafb;
+    background: var(--hover-color);
 }
 
 .schedule-table .today-row {
-    background: #fff7ed !important;
+    background: var(--today-bg) !important;
     border-left: 4px solid #f59e0b;
+}
+
+[data-theme="dark"] .schedule-table .today-row {
+    background: rgba(245, 158, 11, 0.1) !important;
+}
+
+/* Today's classes info box */
+.table-container > div {
+    margin-top: 15px;
+    padding: 10px;
+    background: var(--info-bg);
+    border-radius: 8px;
+    border-left: 4px solid #f59e0b;
+}
+
+.table-container > div small {
+    color: var(--info-text);
+    font-weight: 600;
+}
+
+[data-theme="dark"] .table-container > div {
+    background: rgba(245, 158, 11, 0.1);
+}
+
+[data-theme="dark"] .table-container > div small {
+    color: #fcd34d;
 }
 
 /* Profile Section */
@@ -360,9 +436,9 @@ $current_page = basename($_SERVER['PHP_SELF']);
     text-align: center;
     margin: 30px 0;
     padding: 20px;
-    background: #f8fafc;
+    background: var(--bg-secondary);
     border-radius: 12px;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--border-color);
 }
 
 .profile-picture {
@@ -372,7 +448,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
     object-fit: cover;
     border: 3px solid #3b82f6;
     margin-bottom: 15px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 12px var(--shadow-color);
 }
 
 .profile-info {
@@ -380,39 +456,104 @@ $current_page = basename($_SERVER['PHP_SELF']);
 }
 
 .profile-info p {
-    color: #374151;
+    color: var(--text-primary);
     margin-bottom: 8px;
     font-size: 1rem;
 }
 
 .profile-info strong {
-    color: #1f2937;
+    color: var(--text-primary);
     font-weight: 600;
+}
+
+.profile-info a {
+    color: #3b82f6;
+    text-decoration: none;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: color 0.3s ease;
+}
+
+.profile-info a:hover {
+    color: #2563eb;
+}
+
+[data-theme="dark"] .profile-info a {
+    color: #60a5fa;
+}
+
+[data-theme="dark"] .profile-info a:hover {
+    color: #93c5fd;
 }
 
 /* Empty state for schedule */
 .empty-state {
     text-align: center;
     padding: 40px 20px;
-    color: #6b7280;
+    color: var(--text-secondary);
 }
 
 .empty-state i {
     font-size: 3rem;
     margin-bottom: 15px;
-    color: #d1d5db;
+    color: var(--border-color);
 }
 
 .empty-state h3 {
     font-size: 1.5rem;
     margin-bottom: 10px;
-    color: #374151;
+    color: var(--text-primary);
 }
 
 .empty-state p {
-    color: #6b7280;
+    color: var(--text-secondary);
     max-width: 400px;
     margin: 0 auto;
+}
+
+/* Dark mode specific adjustments */
+[data-theme="dark"] .stat-card .number {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .stat-card h3 {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .schedule-table th {
+    color: var(--text-sidebar);
+}
+
+[data-theme="dark"] .schedule-table td {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .schedule-table tr:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+/* Next class countdown styling */
+.next-class-info {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.next-class-info i {
+    color: var(--text-secondary);
+}
+
+/* Status text */
+[data-theme="dark"] .profile-info span {
+    color: #10b981;
+}
+
+/* Edit profile link styling in dark mode */
+[data-theme="dark"] .profile-info a {
+    background: linear-gradient(135deg, #60a5fa, #3b82f6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
 }
 
 /* ================= Responsive ================= */
@@ -449,12 +590,24 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <p><?= htmlspecialchars($user['username'] ?? 'Student') ?></p>
         </div>
         <h2>Student Panel</h2>
-        <a href="student_dashboard.php" class="<?= $current_page=='student_dashboard.php'?'active':'' ?>">Dashboard</a>
-        <a href="my_schedule.php" class="<?= $current_page=='my_schedule.php'?'active':'' ?>">My Schedule</a>
-        <a href="view_exam_schedules.php" class="<?= $current_page=='view_exam_schedules.php'?'active':'' ?>">Exam Schedule</a>
-        <a href="view_announcements.php" class="<?= $current_page=='view_announcements.php'?'active':'' ?>">Announcements</a>
-        <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">Edit Profile</a>
-        <a href="../logout.php">Logout</a>
+        <a href="student_dashboard.php" class="<?= $current_page=='student_dashboard.php'?'active':'' ?>">
+            <i class="fas fa-home"></i> Dashboard
+        </a>
+        <a href="my_schedule.php" class="<?= $current_page=='my_schedule.php'?'active':'' ?>">
+            <i class="fas fa-calendar-alt"></i> My Schedule
+        </a>
+        <a href="view_exam_schedules.php" class="<?= $current_page=='view_exam_schedules.php'?'active':'' ?>">
+            <i class="fas fa-clipboard-list"></i> Exam Schedule
+        </a>
+        <a href="view_announcements.php" class="<?= $current_page=='view_announcements.php'?'active':'' ?>">
+            <i class="fas fa-bullhorn"></i> Announcements
+        </a>
+        <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
+            <i class="fas fa-user-edit"></i> Edit Profile
+        </a>
+        <a href="../logout.php">
+            <i class="fas fa-sign-out-alt"></i> Logout
+        </a>
     </div>
 
     <!-- Main Content -->
@@ -526,10 +679,12 @@ $current_page = basename($_SERVER['PHP_SELF']);
     
     <div class="profile-info">
         <p><strong>Username:</strong> <?= htmlspecialchars($user['username'] ?? 'Student') ?></p>
-        <p><strong>Email:</strong> <?= htmlspecialchars($user['email'] ?? 'Not provided') ?></p>
+        <?php if(isset($user['email'])): ?>
+            <p><strong>Email:</strong> <?= htmlspecialchars($user['email']) ?></p>
+        <?php endif; ?>
         <p><strong>Status:</strong> <span style="color: #10b981; font-weight: 600;">Active Student</span></p>
         <p>
-            <a href="edit_profile.php" style="color: #3b82f6; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 5px;">
+            <a href="edit_profile.php">
                 <i class="fas fa-edit"></i> Edit Profile
             </a>
         </p>
@@ -555,7 +710,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         <div class="number" style="font-size: 1.2rem;">
                             <?= htmlspecialchars($next_class['course_name']) ?>
                         </div>
-                        <div style="color: #6b7280; font-size: 0.9rem;">
+                        <div style="color: var(--text-secondary); font-size: 0.9rem;" class="next-class-info">
                             <i class="fas fa-clock"></i> at <?= date('h:i A', strtotime($next_class['start_time'])) ?>
                         </div>
                         <div id="countdown" style="color: #ef4444; font-size: 0.8rem; margin-top: 5px;"></div>
@@ -580,68 +735,71 @@ $current_page = basename($_SERVER['PHP_SELF']);
                             const timerInterval = setInterval(updateCountdown,1000);
                         </script>
                     <?php else: ?>
-                        <div class="number" style="font-size: 1rem; color: #6b7280;">
+                        <div class="number" style="font-size: 1rem; color: var(--text-secondary);">
                             <i class="fas fa-check-circle"></i> No more classes today
                         </div>
                     <?php endif; ?>
                 </div>
             </div>
 
-            <!-- Schedule Table -->
-            <div class="schedule-section">
-                <h2 style="margin-bottom: 20px; color: #1f2937;">My Schedule</h2>
-                <div class="table-container">
-                    <?php if(!empty($my_schedule)): ?>
-                    <table class="schedule-table">
-                        <thead>
-                            <tr>
-                                <th>Course</th>
-                                <th>Instructor</th>
-                                <th>Room</th>
-                                <th>Day</th>
-                                <th>Start</th>
-                                <th>End</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                        <?php 
-                        $today = date('l'); // Current day name
-                        $hasTodayClass = false;
-                        foreach($my_schedule as $s): 
-                            $todayClass = ($s['day'] === $today) ? 'today-row' : '';
-                            if($s['day'] === $today) $hasTodayClass = true;
-                        ?>
-                            <tr class="<?= $todayClass ?>">
-                                <td><?= htmlspecialchars($s['course_name']) ?></td>
-                                <td><?= htmlspecialchars($s['instructor_name']) ?></td>
-                                <td><?= htmlspecialchars($s['room_name']) ?></td>
-                                <td><?= htmlspecialchars($s['day']) ?></td>
-                                <td><?= date('h:i A', strtotime($s['start_time'])) ?></td>
-                                <td><?= date('h:i A', strtotime($s['end_time'])) ?></td>
-                            </tr>
-                        <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                    <?php else: ?>
-                        <div class="empty-state">
-                            <i class="fas fa-calendar-times"></i>
-                            <h3>No Classes Scheduled</h3>
-                            <p>You don't have any classes scheduled at the moment.</p>
-                        </div>
-                    <?php endif; ?>
-                </div>
-                
-                <?php if($hasTodayClass): ?>
-                <div style="margin-top: 15px; padding: 10px; background: #fff7ed; border-radius: 8px; border-left: 4px solid #f59e0b;">
-                    <small style="color: #92400e; font-weight: 600;">
-                        <i class="fas fa-info-circle"></i> Highlighted rows indicate today's classes
-                    </small>
-                </div>
-                <?php endif; ?>
+         <!-- Schedule Table -->
+<div class="schedule-section">
+    <h2 style="margin-bottom: 20px; color: var(--text-primary);">My Schedule</h2>
+    <div class="table-container">
+        <?php 
+        $hasTodayClass = false; // Initialize here
+        $today = date('l'); // Current day name
+        
+        if(!empty($my_schedule)): 
+        ?>
+            <table class="schedule-table">
+                <thead>
+                    <tr>
+                        <th>Course</th>
+                        <th>Instructor</th>
+                        <th>Room</th>
+                        <th>Day</th>
+                        <th>Start</th>
+                        <th>End</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php foreach($my_schedule as $s): 
+                    $todayClass = ($s['day'] === $today) ? 'today-row' : '';
+                    if($s['day'] === $today) $hasTodayClass = true;
+                ?>
+                    <tr class="<?= $todayClass ?>">
+                        <td><?= htmlspecialchars($s['course_name']) ?></td>
+                        <td><?= htmlspecialchars($s['instructor_name']) ?></td>
+                        <td><?= htmlspecialchars($s['room_name']) ?></td>
+                        <td><?= htmlspecialchars($s['day']) ?></td>
+                        <td><?= date('h:i A', strtotime($s['start_time'])) ?></td>
+                        <td><?= date('h:i A', strtotime($s['end_time'])) ?></td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+            
+            <?php if($hasTodayClass): ?>
+            <div style="margin-top: 15px; padding: 10px; background: var(--info-bg); border-radius: 8px; border-left: 4px solid #f59e0b;">
+                <small style="color: var(--info-text); font-weight: 600;">
+                    <i class="fas fa-info-circle"></i> Highlighted rows indicate today's classes
+                </small>
             </div>
-        </div>
+            <?php endif; ?>
+            
+        <?php else: ?>
+            <div class="empty-state">
+                <i class="fas fa-calendar-times"></i>
+                <h3>No Classes Scheduled</h3>
+                <p>You don't have any classes scheduled at the moment.</p>
+            </div>
+        <?php endif; ?>
     </div>
+</div>
 
+    <!-- Include darkmode.js -->
+    <script src="../../assets/js/darkmode.js"></script>
     <script>
     function toggleSidebar() {
         const sidebar = document.querySelector('.sidebar');

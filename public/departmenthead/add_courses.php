@@ -8,6 +8,9 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'department_head'){
     exit;
 }
 
+// Include dark mode
+include __DIR__ . '/../includes/darkmode.php';
+
 $dept_id = $_SESSION['department_id'] ?? 0;
 $message = '';
 
@@ -129,11 +132,13 @@ $courses = $courses_stmt->fetchAll();
 ?>
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="<?= $darkMode ? 'dark' : 'light' ?>">
 <head>
 <meta charset="UTF-8">
 <title>Add Courses | Department Head Portal</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<!-- Include Dark Mode CSS -->
+<link rel="stylesheet" href="../../assets/css/darkmode.css">
 <style>
 * { box-sizing: border-box; margin:0; padding:0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
 
@@ -141,7 +146,7 @@ $courses = $courses_stmt->fetchAll();
 .topbar {
     display: none;
     position: fixed; top:0; left:0; width:100%;
-    background:#2c3e50; color:#fff;
+    background:var(--bg-sidebar); color:var(--text-sidebar);
     padding:15px 20px;
     z-index:1200;
     justify-content:space-between; align-items:center;
@@ -149,7 +154,7 @@ $courses = $courses_stmt->fetchAll();
 .menu-btn {
     font-size:26px;
     background:#1abc9c;
-    border:none; color:#fff;
+    border:none; color:var(--text-sidebar);
     cursor:pointer;
     padding:10px 14px;
     border-radius:8px;
@@ -162,7 +167,7 @@ $courses = $courses_stmt->fetchAll();
 .sidebar {
     position: fixed; top:0; left:0;
     width:250px; height:100%;
-    background:#1f2937; color:#fff;
+    background:var(--bg-sidebar); color:var(--text-sidebar);
     z-index:1100;
     transition: transform 0.3s ease;
     padding: 20px 0;
@@ -171,12 +176,12 @@ $courses = $courses_stmt->fetchAll();
 .sidebar a { 
     display:block; 
     padding:12px 20px; 
-    color:#fff; 
+    color:var(--text-sidebar); 
     text-decoration:none; 
     transition: background 0.3s; 
     border-bottom: 1px solid rgba(255,255,255,0.1);
 }
-.sidebar a:hover, .sidebar a.active { background:#1abc9c; }
+.sidebar a:hover, .sidebar a.active { background:#1abc9c; color:white; }
 
 .sidebar-profile {
     text-align: center;
@@ -196,7 +201,7 @@ $courses = $courses_stmt->fetchAll();
 }
 
 .sidebar-profile p {
-    color: #fff;
+    color: var(--text-sidebar);
     font-weight: bold;
     margin: 0;
     font-size: 16px;
@@ -215,7 +220,8 @@ $courses = $courses_stmt->fetchAll();
     margin-left: 250px;
     padding:30px 50px;
     min-height:100vh;
-    background:#ffffff;
+    background:var(--bg-primary);
+    color:var(--text-primary);
     transition: all 0.3s ease;
 }
 
@@ -230,7 +236,7 @@ $courses = $courses_stmt->fetchAll();
 
 .header h1 {
     font-size: 2.2rem;
-    color: #1f2937;
+    color: var(--text-primary);
     font-weight: 700;
 }
 
@@ -238,10 +244,10 @@ $courses = $courses_stmt->fetchAll();
     display: flex;
     align-items: center;
     gap: 12px;
-    background: white;
+    background: var(--bg-card);
     padding: 12px 18px;
     border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    box-shadow: 0 4px 12px var(--shadow-color);
 }
 
 .user-info img {
@@ -253,9 +259,9 @@ $courses = $courses_stmt->fetchAll();
 
 /* Card Styles */
 .card {
-    background: white;
+    background: var(--bg-card);
     border-radius: 15px;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.1);
+    box-shadow: 0 6px 18px var(--shadow-color);
     margin-bottom: 25px;
     overflow: hidden;
 }
@@ -288,16 +294,18 @@ $courses = $courses_stmt->fetchAll();
     display: block;
     margin-bottom: 8px;
     font-weight: 600;
-    color: #374151;
+    color: var(--text-primary);
 }
 
 .form-control {
     width: 100%;
     padding: 14px 16px;
-    border: 1px solid #d1d5db;
+    border: 1px solid var(--border-color);
     border-radius: 10px;
     font-size: 1rem;
     transition: all 0.3s ease;
+    background: var(--bg-input);
+    color: var(--text-primary);
 }
 
 .form-control:focus {
@@ -378,47 +386,48 @@ $courses = $courses_stmt->fetchAll();
 }
 
 .message.success {
-    background: #dcfce7;
-    color: #166534;
-    border: 1px solid #bbf7d0;
+    background: var(--success-bg);
+    color: var(--success-text);
+    border: 1px solid var(--success-border);
 }
 
 .message.error {
-    background: #fee2e2;
-    color: #991b1b;
-    border: 1px solid #fecaca;
+    background: var(--error-bg);
+    color: var(--error-text);
+    border: 1px solid var(--error-border);
 }
 
 .message.warning {
-    background: #fef3c7;
-    color: #92400e;
-    border: 1px solid #fde68a;
+    background: var(--warning-bg);
+    color: var(--warning-text);
+    border: 1px solid var(--warning-border);
 }
 
 /* Table Styles */
 .table-container {
     overflow-x: auto;
     border-radius: 15px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 12px var(--shadow-color);
     margin-top: 20px;
 }
 
 .courses-table {
     width: 100%;
     border-collapse: collapse;
-    background: white;
+    background: var(--bg-card);
 }
 
 .courses-table th,
 .courses-table td {
     padding: 16px;
     text-align: left;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-primary);
 }
 
 .courses-table th {
-    background: #f8fafc;
-    color: #374151;
+    background: var(--table-header);
+    color: var(--text-primary);
     font-weight: 600;
 }
 
@@ -427,7 +436,7 @@ $courses = $courses_stmt->fetchAll();
 }
 
 .courses-table tr:hover {
-    background: #f9fafb;
+    background: var(--hover-color);
 }
 
 /* Badge Styles */
@@ -441,42 +450,42 @@ $courses = $courses_stmt->fetchAll();
 }
 
 .badge-compulsory {
-    background: #dc2626;
+    background: var(--badge-compulsory);
     color: white;
 }
 
 .badge-elective {
-    background: #2563eb;
+    background: var(--badge-elective);
     color: white;
 }
 
 .badge-optional {
-    background: #059669;
+    background: var(--badge-optional);
     color: white;
 }
 
 .hours-info {
     font-size: 0.85rem;
-    color: #6b7280;
+    color: var(--text-secondary);
     margin-top: 4px;
 }
 
 .empty-state {
     text-align: center;
     padding: 50px;
-    color: #6b7280;
+    color: var(--text-secondary);
 }
 
 .empty-state i {
     font-size: 3.5rem;
     margin-bottom: 20px;
-    color: #d1d5db;
+    color: var(--border-color);
 }
 
 .empty-state h3 {
     font-size: 1.5rem;
     margin-bottom: 10px;
-    color: #374151;
+    color: var(--text-primary);
 }
 
 /* Action Buttons */
@@ -783,5 +792,8 @@ $courses = $courses_stmt->fetchAll();
             });
         });
     </script>
+    
+    <!-- Include darkmode.js -->
+    <script src="../../assets/js/darkmode.js"></script>
 </body>
 </html>

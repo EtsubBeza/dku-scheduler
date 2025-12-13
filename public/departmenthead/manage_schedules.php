@@ -625,6 +625,8 @@ $courses_with_instructors = fetchAllSafe($courses_with_instructors_stmt);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Schedule Management | Department Head Portal</title>
+    <!-- Include Dark Mode -->
+    <?php include __DIR__ . '/../includes/darkmode.php'; ?>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * { box-sizing: border-box; margin:0; padding:0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
@@ -633,7 +635,7 @@ $courses_with_instructors = fetchAllSafe($courses_with_instructors_stmt);
         .topbar {
             display: none;
             position: fixed; top:0; left:0; width:100%;
-            background:#2c3e50; color:#fff;
+            background:var(--bg-sidebar); color:var(--text-sidebar);
             padding:15px 20px;
             z-index:1200;
             justify-content:space-between; align-items:center;
@@ -641,7 +643,7 @@ $courses_with_instructors = fetchAllSafe($courses_with_instructors_stmt);
         .menu-btn {
             font-size:26px;
             background:#1abc9c;
-            border:none; color:#fff;
+            border:none; color:var(--text-sidebar);
             cursor:pointer;
             padding:10px 14px;
             border-radius:8px;
@@ -654,7 +656,7 @@ $courses_with_instructors = fetchAllSafe($courses_with_instructors_stmt);
         .sidebar {
             position: fixed; top:0; left:0;
             width:250px; height:100%;
-            background:#1f2937; color:#fff;
+            background:var(--bg-sidebar); color:var(--text-sidebar);
             z-index:1100;
             transition: transform 0.3s ease;
             padding: 20px 0;
@@ -663,12 +665,12 @@ $courses_with_instructors = fetchAllSafe($courses_with_instructors_stmt);
         .sidebar a { 
             display:block; 
             padding:12px 20px; 
-            color:#fff; 
+            color:var(--text-sidebar); 
             text-decoration:none; 
             transition: background 0.3s; 
             border-bottom: 1px solid rgba(255,255,255,0.1);
         }
-        .sidebar a:hover, .sidebar a.active { background:#1abc9c; }
+        .sidebar a:hover, .sidebar a.active { background:#1abc9c; color:white; }
 
         .sidebar-profile {
             text-align: center;
@@ -688,7 +690,7 @@ $courses_with_instructors = fetchAllSafe($courses_with_instructors_stmt);
         }
 
         .sidebar-profile p {
-            color: #fff;
+            color: var(--text-sidebar);
             font-weight: bold;
             margin: 0;
             font-size: 16px;
@@ -707,7 +709,8 @@ $courses_with_instructors = fetchAllSafe($courses_with_instructors_stmt);
             margin-left: 250px;
             padding:30px 50px;
             min-height:100vh;
-            background:#ffffff;
+            background:var(--bg-primary);
+            color:var(--text-primary);
             transition: all 0.3s ease;
         }
 
@@ -722,7 +725,7 @@ $courses_with_instructors = fetchAllSafe($courses_with_instructors_stmt);
 
         .header h1 {
             font-size: 2.2rem;
-            color: #1f2937;
+            color: var(--text-primary);
             font-weight: 700;
         }
 
@@ -730,10 +733,10 @@ $courses_with_instructors = fetchAllSafe($courses_with_instructors_stmt);
             display: flex;
             align-items: center;
             gap: 12px;
-            background: white;
+            background: var(--bg-card);
             padding: 12px 18px;
             border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            box-shadow: 0 4px 12px var(--shadow-color);
         }
 
         .user-info img {
@@ -745,9 +748,9 @@ $courses_with_instructors = fetchAllSafe($courses_with_instructors_stmt);
 
         /* Card Styles */
         .card {
-            background: white;
+            background: var(--bg-card);
             border-radius: 15px;
-            box-shadow: 0 6px 18px rgba(0,0,0,0.1);
+            box-shadow: 0 6px 18px var(--shadow-color);
             margin-bottom: 25px;
             overflow: hidden;
         }
@@ -788,17 +791,17 @@ $courses_with_instructors = fetchAllSafe($courses_with_instructors_stmt);
 
         .stat-card {
             flex: 1;
-            background: white;
+            background: var(--bg-card);
             padding: 25px;
             border-radius: 15px;
-            box-shadow: 0 6px 18px rgba(0,0,0,0.1);
+            box-shadow: 0 6px 18px var(--shadow-color);
             text-align: center;
             transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
 
         .stat-card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            box-shadow: 0 10px 25px var(--shadow-color);
         }
 
         .stat-card i {
@@ -810,11 +813,11 @@ $courses_with_instructors = fetchAllSafe($courses_with_instructors_stmt);
         .stat-card h3 {
             font-size: 2rem;
             margin-bottom: 8px;
-            color: #1f2937;
+            color: var(--text-primary);
         }
 
         .stat-card p {
-            color: #6b7280;
+            color: var(--text-light);
             font-weight: 500;
         }
 
@@ -827,16 +830,18 @@ $courses_with_instructors = fetchAllSafe($courses_with_instructors_stmt);
             display: block;
             margin-bottom: 8px;
             font-weight: 600;
-            color: #374151;
+            color: var(--text-primary);
         }
 
         .form-control {
             width: 100%;
             padding: 14px 16px;
-            border: 1px solid #d1d5db;
+            border: 1px solid var(--border-color);
             border-radius: 10px;
             font-size: 1rem;
             transition: all 0.3s ease;
+            background: var(--bg-input);
+            color: var(--text-primary);
         }
 
         .form-control:focus {
@@ -921,46 +926,46 @@ $courses_with_instructors = fetchAllSafe($courses_with_instructors_stmt);
         }
 
         .message.success {
-            background: #dcfce7;
-            color: #166534;
-            border: 1px solid #bbf7d0;
+            background: var(--success-bg);
+            color: var(--success-text);
+            border: 1px solid var(--success-text);
         }
 
         .message.error {
-            background: #fee2e2;
-            color: #991b1b;
-            border: 1px solid #fecaca;
+            background: var(--error-bg);
+            color: var(--error-text);
+            border: 1px solid var(--error-text);
         }
 
         .message.warning {
-            background: #fef3c7;
-            color: #92400e;
-            border: 1px solid #fde68a;
+            background: var(--warning-bg);
+            color: var(--warning-text);
+            border: 1px solid var(--warning-text);
         }
 
         /* Table Styles */
         .table-container {
             overflow-x: auto;
             border-radius: 15px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 12px var(--shadow-color);
         }
 
         .schedule-table {
             width: 100%;
             border-collapse: collapse;
-            background: white;
+            background: var(--bg-card);
         }
 
         .schedule-table th,
         .schedule-table td {
             padding: 16px;
             text-align: left;
-            border-bottom: 1px solid #e5e7eb;
+            border-bottom: 1px solid var(--border-color);
         }
 
         .schedule-table th {
-            background: #f8fafc;
-            color: #374151;
+            background: var(--table-header);
+            color: var(--text-primary);
             font-weight: 600;
         }
 
@@ -969,11 +974,11 @@ $courses_with_instructors = fetchAllSafe($courses_with_instructors_stmt);
         }
 
         .schedule-table tr:hover {
-            background: #f9fafb;
+            background: var(--hover-color);
         }
 
         .schedule-table tr.selected {
-            background-color: #e0e7ff;
+            background-color: rgba(99, 102, 241, 0.1);
         }
 
         .checkbox-cell {
@@ -994,10 +999,10 @@ $courses_with_instructors = fetchAllSafe($courses_with_instructors_stmt);
         }
 
         .preview-day {
-            background: white;
+            background: var(--bg-card);
             border-radius: 12px;
             padding: 20px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 12px var(--shadow-color);
             min-height: 280px;
         }
 
@@ -1005,18 +1010,19 @@ $courses_with_instructors = fetchAllSafe($courses_with_instructors_stmt);
             text-align: center;
             margin-bottom: 15px;
             color: #6366f1;
-            border-bottom: 2px solid #e5e7eb;
+            border-bottom: 2px solid var(--border-color);
             padding-bottom: 10px;
             font-weight: 600;
         }
 
         .time-slot {
-            background: #f8fafc;
+            background: var(--bg-secondary);
             padding: 12px;
             margin-bottom: 10px;
             border-radius: 8px;
             font-size: 0.9rem;
             border-left: 4px solid #6366f1;
+            color: var(--text-primary);
         }
 
         .time-slot.morning {
@@ -1034,31 +1040,32 @@ $courses_with_instructors = fetchAllSafe($courses_with_instructors_stmt);
         .empty-state {
             text-align: center;
             padding: 50px;
-            color: #6b7280;
+            color: var(--text-light);
         }
 
         .empty-state i {
             font-size: 3.5rem;
             margin-bottom: 20px;
-            color: #d1d5db;
+            color: var(--border-color);
         }
 
         .empty-state h3 {
             font-size: 1.5rem;
             margin-bottom: 10px;
-            color: #374151;
+            color: var(--text-primary);
         }
 
         .course-info {
-            background: #e0e7ff;
+            background: rgba(99, 102, 241, 0.1);
             padding: 20px;
             border-radius: 12px;
             margin-bottom: 25px;
             border-left: 5px solid #6366f1;
+            color: var(--text-primary);
         }
 
         .course-info h4 {
-            color: #374151;
+            color: var(--text-primary);
             margin-bottom: 15px;
             font-size: 1.3rem;
         }
@@ -1069,26 +1076,45 @@ $courses_with_instructors = fetchAllSafe($courses_with_instructors_stmt);
 
         .course-list li {
             padding: 8px 0;
-            border-bottom: 1px solid #c7d2fe;
+            border-bottom: 1px solid rgba(99, 102, 241, 0.2);
+            color: var(--text-primary);
         }
 
         .course-list li:last-child {
             border-bottom: none;
         }
 
+        .course-list li strong {
+            color: var(--text-primary);
+        }
+
+        .course-list li span {
+            color: var(--text-light);
+        }
+
         .time-slot-info {
-            background: #f8fafc;
+            background: rgba(16, 185, 129, 0.1);
             padding: 20px;
             border-radius: 12px;
             margin-bottom: 25px;
             font-size: 1rem;
             border-left: 5px solid #10b981;
+            color: var(--text-primary);
         }
 
         .time-slot-info h5 {
-            color: #374151;
+            color: var(--text-primary);
             margin-bottom: 10px;
             font-size: 1.2rem;
+        }
+
+        .time-slot-info div {
+            margin-bottom: 8px;
+        }
+
+        .time-slot-info small {
+            color: var(--text-light);
+            font-size: 0.9rem;
         }
 
         /* ================= Responsive ================= */
@@ -1121,7 +1147,7 @@ $courses_with_instructors = fetchAllSafe($courses_with_instructors_stmt);
     <!-- Overlay for Mobile -->
     <div class="overlay" onclick="toggleSidebar()"></div>
 
- <div class="sidebar">
+    <div class="sidebar">
         <div class="sidebar-profile">
             <img src="<?= htmlspecialchars($profile_src) ?>" alt="Profile Picture">
             <p><?= htmlspecialchars($user['username'] ?? 'User') ?></p>
@@ -1288,7 +1314,7 @@ $courses_with_instructors = fetchAllSafe($courses_with_instructors_stmt);
                                     </option>
                                 <?php endforeach; ?>
                             </select>
-                            <small>Hold Ctrl/Cmd to select multiple courses. ALL selected courses will be guaranteed in the schedule.</small>
+                            <small style="color: var(--text-light);">Hold Ctrl/Cmd to select multiple courses. ALL selected courses will be guaranteed in the schedule.</small>
                         </div>
                         
                         <div class="form-group">
@@ -1355,7 +1381,7 @@ $courses_with_instructors = fetchAllSafe($courses_with_instructors_stmt);
                                     </div>
                                 <?php endforeach; ?>
                             <?php else: ?>
-                                <p style="text-align:center; color:#6b7280; font-style:italic; margin-top: 20px;">No classes</p>
+                                <p style="text-align:center; color:var(--text-light); font-style:italic; margin-top: 20px;">No classes</p>
                             <?php endif; ?>
                         </div>
                     <?php endforeach; ?>
@@ -1407,7 +1433,7 @@ $courses_with_instructors = fetchAllSafe($courses_with_instructors_stmt);
                                         </td>
                                         <td>
                                             <strong><?= htmlspecialchars($s['course_name']) ?></strong><br>
-                                            <small><?= htmlspecialchars($s['course_code']) ?></small>
+                                            <small style="color: var(--text-light);"><?= htmlspecialchars($s['course_code']) ?></small>
                                         </td>
                                         <td><?= htmlspecialchars($s['instructor_name']) ?></td>
                                         <td><?= htmlspecialchars($s['room_name']) ?></td>
@@ -1501,5 +1527,8 @@ $courses_with_instructors = fetchAllSafe($courses_with_instructors_stmt);
             });
         });
     </script>
+    
+    <!-- Optional: Add Font Awesome JS if not already loaded -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
 </body>
 </html>

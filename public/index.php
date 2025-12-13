@@ -21,6 +21,13 @@
             --shadow-lg: 0 20px 50px -12px rgba(0, 0, 0, 0.25);
             --gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             --gradient-primary: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            
+            /* Dark mode variables */
+            --dark-bg: #0f172a;
+            --dark-card: #1e293b;
+            --dark-text: #f1f5f9;
+            --dark-gray: #94a3b8;
+            --dark-border: #334155;
         }
 
         * {
@@ -39,6 +46,45 @@
             line-height: 1.7;
             background: var(--light);
             overflow-x: hidden;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        body.dark-mode {
+            background: var(--dark-bg);
+            color: var(--dark-text);
+        }
+
+        /* ================= Dark Mode Toggle ================= */
+        .theme-toggle {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            z-index: 1000;
+        }
+
+        .theme-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: var(--gradient-primary);
+            border: none;
+            color: white;
+            font-size: 1.25rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--shadow);
+            transition: all 0.3s ease;
+        }
+
+        .theme-btn:hover {
+            transform: translateY(-3px) rotate(15deg);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .dark-mode .theme-btn {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
         }
 
         /* Modern Navbar */
@@ -59,10 +105,20 @@
             transition: all 0.3s ease;
         }
 
+        body.dark-mode nav {
+            background: rgba(30, 41, 59, 0.95);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
         nav.scrolled {
             background: rgba(255, 255, 255, 0.98);
             box-shadow: var(--shadow);
             padding: 0.8rem 5%;
+        }
+
+        body.dark-mode nav.scrolled {
+            background: rgba(30, 41, 59, 0.98);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
         }
 
         .logo {
@@ -73,6 +129,10 @@
             font-size: 1.5rem;
             color: var(--primary);
             text-decoration: none;
+        }
+
+        body.dark-mode .logo {
+            color: #60a5fa;
         }
 
         .logo i {
@@ -93,8 +153,16 @@
             transition: color 0.3s ease;
         }
 
+        body.dark-mode .nav-links a {
+            color: var(--dark-text);
+        }
+
         .nav-links a:hover {
             color: var(--primary);
+        }
+
+        body.dark-mode .nav-links a:hover {
+            color: #60a5fa;
         }
 
         .nav-links a::after {
@@ -106,6 +174,10 @@
             height: 2px;
             background: var(--primary);
             transition: width 0.3s ease;
+        }
+
+        body.dark-mode .nav-links a::after {
+            background: #60a5fa;
         }
 
         .nav-links a:hover::after {
@@ -143,6 +215,10 @@
             padding: 100px 5% 40px;
         }
 
+        body.dark-mode .hero {
+            background: linear-gradient(135deg, #0c4a6e 0%, #1e40af 50%, #3730a3 100%);
+        }
+
         .hero-container {
             max-width: 1400px;
             margin: 0 auto;
@@ -177,11 +253,21 @@
             background-clip: text;
         }
 
+        body.dark-mode .hero-content h1 {
+            background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
         .hero-content p {
             font-size: 1.2rem;
             color: var(--gray);
             margin-bottom: 2.5rem;
             line-height: 1.6;
+        }
+
+        body.dark-mode .hero-content p {
+            color: #cbd5e1;
         }
 
         .hero-buttons {
@@ -219,9 +305,19 @@
             box-shadow: var(--shadow);
         }
 
+        body.dark-mode .secondary-btn {
+            background: var(--dark-card);
+            color: #60a5fa;
+            border-color: #60a5fa;
+        }
+
         .secondary-btn:hover {
             background: var(--primary-light);
             transform: translateY(-3px);
+        }
+
+        body.dark-mode .secondary-btn:hover {
+            background: rgba(96, 165, 250, 0.1);
         }
 
         /* ================= Hero Visual ================= */
@@ -276,12 +372,20 @@
             gap: 2rem;
         }
 
+        body.dark-mode .stats {
+            background: var(--dark-bg);
+        }
+
         .stat-card {
             text-align: center;
             padding: 2rem;
             border-radius: 1rem;
             background: var(--light);
             transition: transform 0.3s ease;
+        }
+
+        body.dark-mode .stat-card {
+            background: var(--dark-card);
         }
 
         .stat-card:hover {
@@ -308,15 +412,27 @@
             margin-bottom: 0.5rem;
         }
 
+        body.dark-mode .stat-number {
+            color: #60a5fa;
+        }
+
         .stat-label {
             color: var(--gray);
             font-weight: 500;
+        }
+
+        body.dark-mode .stat-label {
+            color: var(--dark-gray);
         }
 
         /* Features Section */
         .features {
             padding: 6rem 5%;
             background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        }
+
+        body.dark-mode .features {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
         }
 
         .section-header {
@@ -332,9 +448,17 @@
             color: var(--dark);
         }
 
+        body.dark-mode .section-header h2 {
+            color: var(--dark-text);
+        }
+
         .section-header p {
             color: var(--gray);
             font-size: 1.125rem;
+        }
+
+        body.dark-mode .section-header p {
+            color: var(--dark-gray);
         }
 
         .features-grid {
@@ -351,6 +475,10 @@
             transition: all 0.3s ease;
             position: relative;
             overflow: hidden;
+        }
+
+        body.dark-mode .feature-card {
+            background: var(--dark-card);
         }
 
         .feature-card::before {
@@ -386,6 +514,11 @@
             font-size: 1.5rem;
         }
 
+        body.dark-mode .feature-icon {
+            background: rgba(96, 165, 250, 0.1);
+            color: #60a5fa;
+        }
+
         .feature-card h3 {
             font-size: 1.375rem;
             font-weight: 600;
@@ -393,15 +526,27 @@
             color: var(--dark);
         }
 
+        body.dark-mode .feature-card h3 {
+            color: var(--dark-text);
+        }
+
         .feature-card p {
             color: var(--gray);
             line-height: 1.6;
+        }
+
+        body.dark-mode .feature-card p {
+            color: var(--dark-gray);
         }
 
         /* Security Section */
         .security {
             padding: 6rem 5%;
             background: white;
+        }
+
+        body.dark-mode .security {
+            background: var(--dark-bg);
         }
 
         .security-content {
@@ -430,11 +575,19 @@
             color: var(--dark);
         }
 
+        body.dark-mode .security h2 {
+            color: var(--dark-text);
+        }
+
         .security p {
             color: var(--gray);
             font-size: 1.125rem;
             margin-bottom: 2rem;
             line-height: 1.8;
+        }
+
+        body.dark-mode .security p {
+            color: var(--dark-gray);
         }
 
         .security-features {
@@ -455,6 +608,10 @@
             margin-bottom: 1rem;
         }
 
+        body.dark-mode .security-feature i {
+            color: #60a5fa;
+        }
+
         .security-feature h4 {
             font-size: 1.125rem;
             font-weight: 600;
@@ -462,15 +619,27 @@
             color: var(--dark);
         }
 
+        body.dark-mode .security-feature h4 {
+            color: var(--dark-text);
+        }
+
         .security-feature p {
             font-size: 0.875rem;
             color: var(--gray);
+        }
+
+        body.dark-mode .security-feature p {
+            color: var(--dark-gray);
         }
 
         /* Location Section */
         .location {
             padding: 6rem 5%;
             background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        }
+
+        body.dark-mode .location {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
         }
 
         .location-container {
@@ -496,6 +665,10 @@
             box-shadow: var(--shadow);
         }
 
+        body.dark-mode .location-info {
+            background: var(--dark-card);
+        }
+
         .location-info h3 {
             font-size: 1.5rem;
             font-weight: 600;
@@ -506,14 +679,26 @@
             gap: 0.75rem;
         }
 
+        body.dark-mode .location-info h3 {
+            color: var(--dark-text);
+        }
+
         .location-info h3 i {
             color: var(--primary);
+        }
+
+        body.dark-mode .location-info h3 i {
+            color: #60a5fa;
         }
 
         .location-info p {
             color: var(--gray);
             margin-bottom: 2rem;
             line-height: 1.6;
+        }
+
+        body.dark-mode .location-info p {
+            color: var(--dark-gray);
         }
 
         .contact-details {
@@ -529,6 +714,10 @@
             background: var(--primary-light);
             border-radius: 0.75rem;
             transition: transform 0.3s ease;
+        }
+
+        body.dark-mode .contact-item {
+            background: rgba(96, 165, 250, 0.1);
         }
 
         .contact-item:hover {
@@ -547,6 +736,11 @@
             justify-content: center;
         }
 
+        body.dark-mode .contact-item i {
+            color: #60a5fa;
+            background: var(--dark-bg);
+        }
+
         .contact-item h4 {
             font-size: 0.875rem;
             font-weight: 600;
@@ -554,10 +748,18 @@
             margin-bottom: 0.25rem;
         }
 
+        body.dark-mode .contact-item h4 {
+            color: var(--dark-gray);
+        }
+
         .contact-item p {
             margin: 0;
             color: var(--dark);
             font-weight: 500;
+        }
+
+        body.dark-mode .contact-item p {
+            color: var(--dark-text);
         }
 
         .map-btn {
@@ -596,6 +798,11 @@
             width: 100%;
             height: 100%;
             border: none;
+            filter: brightness(0.95);
+        }
+
+        body.dark-mode .map-wrapper iframe {
+            filter: brightness(0.8) contrast(1.1);
         }
 
         /* CTA Section */
@@ -606,6 +813,10 @@
             text-align: center;
             position: relative;
             overflow: hidden;
+        }
+
+        body.dark-mode .cta {
+            background: linear-gradient(135deg, #1e40af 0%, #3730a3 100%);
         }
 
         .cta::before {
@@ -660,6 +871,10 @@
             background: var(--dark);
             color: white;
             padding: 4rem 5% 2rem;
+        }
+
+        body.dark-mode footer {
+            background: #0f172a;
         }
 
         .footer-content {
@@ -793,6 +1008,11 @@
             .features-grid {
                 grid-template-columns: 1fr;
             }
+
+            .theme-toggle {
+                bottom: 20px;
+                right: 20px;
+            }
         }
 
         @media (max-width: 480px) {
@@ -812,6 +1032,11 @@
                 max-width: 350px;
                 max-height: 250px;
             }
+
+            .theme-toggle {
+                bottom: 15px;
+                right: 15px;
+            }
         }
 
         /* Animation Classes */
@@ -828,6 +1053,13 @@
     </style>
 </head>
 <body>
+    <!-- Dark Mode Toggle -->
+    <div class="theme-toggle">
+        <button class="theme-btn" id="themeToggle">
+            <i class="fas fa-moon"></i>
+        </button>
+    </div>
+
     <!-- Navigation -->
     <nav id="navbar">
         <a href="#" class="logo">
@@ -1210,6 +1442,30 @@
     </footer>
 
     <script>
+        // Dark Mode Toggle
+        const themeToggle = document.getElementById('themeToggle');
+        const body = document.body;
+        const themeIcon = themeToggle.querySelector('i');
+
+        // Check for saved theme preference
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark') {
+            body.classList.add('dark-mode');
+            themeIcon.className = 'fas fa-sun';
+        }
+
+        themeToggle.addEventListener('click', () => {
+            body.classList.toggle('dark-mode');
+            
+            if (body.classList.contains('dark-mode')) {
+                themeIcon.className = 'fas fa-sun';
+                localStorage.setItem('theme', 'dark');
+            } else {
+                themeIcon.className = 'fas fa-moon';
+                localStorage.setItem('theme', 'light');
+            }
+        });
+
         // Navbar scroll effect
         window.addEventListener('scroll', function() { 
             const navbar = document.getElementById('navbar');
@@ -1248,8 +1504,6 @@
                 }
             });
         });
-
-        
     </script>
 </body>
 </html>

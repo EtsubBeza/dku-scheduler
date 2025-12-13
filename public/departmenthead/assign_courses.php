@@ -8,6 +8,9 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'department_head'){
     exit;
 }
 
+// Include dark mode
+include __DIR__ . '/../includes/darkmode.php';
+
 $dept_id = $_SESSION['department_id'] ?? 0;
 $message = "";
 
@@ -238,13 +241,15 @@ foreach($instructor_workloads as $iw) {
 ?>
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="<?= $darkMode ? 'dark' : 'light' ?>">
 <head>
 <meta charset="UTF-8">
 <title>Assign Courses | Department Head Portal</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <!-- Chart.js for workload visualization -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- Include Dark Mode CSS -->
+<link rel="stylesheet" href="../../assets/css/darkmode.css">
 <style>
 * { box-sizing: border-box; margin:0; padding:0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
 
@@ -252,7 +257,7 @@ foreach($instructor_workloads as $iw) {
 .topbar {
     display: none;
     position: fixed; top:0; left:0; width:100%;
-    background:#2c3e50; color:#fff;
+    background:var(--bg-sidebar); color:var(--text-sidebar);
     padding:15px 20px;
     z-index:1200;
     justify-content:space-between; align-items:center;
@@ -260,7 +265,7 @@ foreach($instructor_workloads as $iw) {
 .menu-btn {
     font-size:26px;
     background:#1abc9c;
-    border:none; color:#fff;
+    border:none; color:var(--text-sidebar);
     cursor:pointer;
     padding:10px 14px;
     border-radius:8px;
@@ -273,7 +278,7 @@ foreach($instructor_workloads as $iw) {
 .sidebar {
     position: fixed; top:0; left:0;
     width:250px; height:100%;
-    background:#1f2937; color:#fff;
+    background:var(--bg-sidebar); color:var(--text-sidebar);
     z-index:1100;
     transition: transform 0.3s ease;
     padding: 20px 0;
@@ -282,12 +287,12 @@ foreach($instructor_workloads as $iw) {
 .sidebar a { 
     display:block; 
     padding:12px 20px; 
-    color:#fff; 
+    color:var(--text-sidebar); 
     text-decoration:none; 
     transition: background 0.3s; 
     border-bottom: 1px solid rgba(255,255,255,0.1);
 }
-.sidebar a:hover, .sidebar a.active { background:#1abc9c; }
+.sidebar a:hover, .sidebar a.active { background:#1abc9c; color:white; }
 
 .sidebar-profile {
     text-align: center;
@@ -307,7 +312,7 @@ foreach($instructor_workloads as $iw) {
 }
 
 .sidebar-profile p {
-    color: #fff;
+    color: var(--text-sidebar);
     font-weight: bold;
     margin: 0;
     font-size: 16px;
@@ -326,7 +331,8 @@ foreach($instructor_workloads as $iw) {
     margin-left: 250px;
     padding:30px 50px;
     min-height:100vh;
-    background:#ffffff;
+    background:var(--bg-primary);
+    color:var(--text-primary);
     transition: all 0.3s ease;
 }
 
@@ -341,7 +347,7 @@ foreach($instructor_workloads as $iw) {
 
 .header h1 {
     font-size: 2.2rem;
-    color: #1f2937;
+    color: var(--text-primary);
     font-weight: 700;
 }
 
@@ -349,10 +355,10 @@ foreach($instructor_workloads as $iw) {
     display: flex;
     align-items: center;
     gap: 12px;
-    background: white;
+    background: var(--bg-card);
     padding: 12px 18px;
     border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    box-shadow: 0 4px 12px var(--shadow-color);
 }
 
 .user-info img {
@@ -364,9 +370,9 @@ foreach($instructor_workloads as $iw) {
 
 /* Card Styles */
 .card {
-    background: white;
+    background: var(--bg-card);
     border-radius: 15px;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.1);
+    box-shadow: 0 6px 18px var(--shadow-color);
     margin-bottom: 25px;
     overflow: hidden;
 }
@@ -401,7 +407,7 @@ foreach($instructor_workloads as $iw) {
 .stat-card {
     flex: 1;
     min-width: 150px;
-    background: #f8fafc;
+    background: var(--bg-secondary);
     padding: 15px;
     border-radius: 10px;
     border-left: 4px solid #6366f1;
@@ -419,19 +425,19 @@ foreach($instructor_workloads as $iw) {
 
 .stat-card h4 {
     font-size: 0.9rem;
-    color: #6b7280;
+    color: var(--text-secondary);
     margin-bottom: 5px;
 }
 
 .stat-card .value {
     font-size: 1.8rem;
     font-weight: 700;
-    color: #1f2937;
+    color: var(--text-primary);
 }
 
 .stat-card .subtext {
     font-size: 0.8rem;
-    color: #9ca3af;
+    color: var(--text-secondary);
     margin-top: 5px;
 }
 
@@ -446,15 +452,15 @@ foreach($instructor_workloads as $iw) {
 .chart-box {
     flex: 1;
     min-width: 300px;
-    background: white;
+    background: var(--bg-card);
     padding: 20px;
     border-radius: 10px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 8px var(--shadow-color);
 }
 
 .chart-box h4 {
     margin-bottom: 15px;
-    color: #1f2937;
+    color: var(--text-primary);
     font-size: 1rem;
 }
 
@@ -462,14 +468,14 @@ foreach($instructor_workloads as $iw) {
 .workload-preview {
     margin-top: 25px;
     padding: 15px;
-    background: #f8fafc;
+    background: var(--bg-secondary);
     border-radius: 10px;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--border-color);
 }
 
 .workload-preview h4 {
     margin-bottom: 15px;
-    color: #1f2937;
+    color: var(--text-primary);
 }
 
 .instructor-workload-item {
@@ -477,7 +483,7 @@ foreach($instructor_workloads as $iw) {
     justify-content: space-between;
     align-items: center;
     padding: 10px;
-    background: white;
+    background: var(--bg-card);
     margin-bottom: 8px;
     border-radius: 6px;
     border-left: 4px solid #10b981;
@@ -493,7 +499,7 @@ foreach($instructor_workloads as $iw) {
 
 .progress-bar {
     height: 8px;
-    background: #e5e7eb;
+    background: var(--progress-bg);
     border-radius: 4px;
     flex-grow: 1;
     margin: 0 15px;
@@ -545,16 +551,18 @@ foreach($instructor_workloads as $iw) {
     display: block;
     margin-bottom: 8px;
     font-weight: 600;
-    color: #374151;
+    color: var(--text-primary);
 }
 
 .form-control {
     width: 100%;
     padding: 14px 16px;
-    border: 1px solid #d1d5db;
+    border: 1px solid var(--border-color);
     border-radius: 10px;
     font-size: 1rem;
     transition: all 0.3s ease;
+    background: var(--bg-input);
+    color: var(--text-primary);
 }
 
 .form-control:focus {
@@ -620,53 +628,54 @@ foreach($instructor_workloads as $iw) {
 }
 
 .message.success {
-    background: #dcfce7;
-    color: #166534;
-    border: 1px solid #bbf7d0;
+    background: var(--success-bg);
+    color: var(--success-text);
+    border: 1px solid var(--success-border);
 }
 
 .message.error {
-    background: #fee2e2;
-    color: #991b1b;
-    border: 1px solid #fecaca;
+    background: var(--error-bg);
+    color: var(--error-text);
+    border: 1px solid var(--error-border);
 }
 
 .message.warning {
-    background: #fef3c7;
-    color: #92400e;
-    border: 1px solid #fde68a;
+    background: var(--warning-bg);
+    color: var(--warning-text);
+    border: 1px solid var(--warning-border);
 }
 
 .message.info {
-    background: #dbeafe;
-    color: #1e40af;
-    border: 1px solid #bfdbfe;
+    background: var(--info-bg);
+    color: var(--info-text);
+    border: 1px solid var(--info-border);
 }
 
 /* Table Styles */
 .table-container {
     overflow-x: auto;
     border-radius: 15px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 12px var(--shadow-color);
     margin-top: 20px;
 }
 
 .assignment-table {
     width: 100%;
     border-collapse: collapse;
-    background: white;
+    background: var(--bg-card);
 }
 
 .assignment-table th,
 .assignment-table td {
     padding: 16px;
     text-align: left;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-primary);
 }
 
 .assignment-table th {
-    background: #f8fafc;
-    color: #374151;
+    background: var(--table-header);
+    color: var(--text-primary);
     font-weight: 600;
 }
 
@@ -675,7 +684,7 @@ foreach($instructor_workloads as $iw) {
 }
 
 .assignment-table tr:hover {
-    background: #f9fafb;
+    background: var(--hover-color);
 }
 
 .action-btn {
@@ -705,19 +714,19 @@ foreach($instructor_workloads as $iw) {
 .empty-state {
     text-align: center;
     padding: 50px;
-    color: #6b7280;
+    color: var(--text-secondary);
 }
 
 .empty-state i {
     font-size: 3.5rem;
     margin-bottom: 20px;
-    color: #d1d5db;
+    color: var(--border-color);
 }
 
 .empty-state h3 {
     font-size: 1.5rem;
     margin-bottom: 10px;
-    color: #374151;
+    color: var(--text-primary);
 }
 
 /* Badge styles */
@@ -730,18 +739,24 @@ foreach($instructor_workloads as $iw) {
 }
 
 .badge-success {
-    background: #dcfce7;
-    color: #166534;
+    background: var(--success-bg);
+    color: var(--success-text);
 }
 
 .badge-warning {
-    background: #fef3c7;
-    color: #92400e;
+    background: var(--warning-bg);
+    color: var(--warning-text);
 }
 
 .badge-danger {
-    background: #fee2e2;
-    color: #991b1b;
+    background: var(--error-bg);
+    color: var(--error-text);
+}
+
+/* Workload Preview Dark Mode Adjustments */
+#workloadPreview {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
 }
 
 /* ================= Responsive ================= */
@@ -769,7 +784,7 @@ foreach($instructor_workloads as $iw) {
     <!-- Overlay for Mobile -->
     <div class="overlay" onclick="toggleSidebar()"></div>
 
-  <div class="sidebar">
+    <div class="sidebar">
         <div class="sidebar-profile">
             <img src="<?= htmlspecialchars($profile_src) ?>" alt="Profile Picture">
             <p><?= htmlspecialchars($user['username'] ?? 'User') ?></p>
@@ -951,18 +966,18 @@ foreach($instructor_workloads as $iw) {
                             <div class="instructor-workload-item <?= $item_class ?>">
                                 <!-- Left: Instructor Info -->
                                 <div style="min-width: 200px;">
-                                    <div style="font-weight: bold; font-size: 1rem; margin-bottom: 5px; color: #1f2937;">
+                                    <div style="font-weight: bold; font-size: 1rem; margin-bottom: 5px; color: var(--text-primary);">
                                         <?= htmlspecialchars($display_name) ?>
                                     </div>
                                     
-                                    <div style="font-size: 0.85rem; color: #6b7280;">
+                                    <div style="font-size: 0.85rem; color: var(--text-secondary);">
                                         <div style="margin-bottom: 3px;">
                                             <i class="fas fa-book" style="margin-right: 5px;"></i>
                                             <?= $iw['total_courses'] ?? 0 ?> course(s)
                                         </div>
                                         
                                         <?php if(!empty($iw['assigned_courses'])): ?>
-                                            <div style="font-size: 0.8rem; color: #4b5563; margin-top: 3px;">
+                                            <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 3px;">
                                                 <i class="fas fa-list" style="margin-right: 5px;"></i>
                                                 <?= htmlspecialchars($iw['assigned_courses']) ?>
                                             </div>
@@ -972,9 +987,9 @@ foreach($instructor_workloads as $iw) {
                                 
                                 <!-- Middle: Workload Status -->
                                 <div style="min-width: 100px; text-align: center;">
-                                    <div style="font-size: 1.3rem; font-weight: bold; color: #1f2937;">
+                                    <div style="font-size: 1.3rem; font-weight: bold; color: var(--text-primary);">
                                         <?= $credits ?>/12
-                                        <div style="font-size: 0.8rem; color: #6b7280; margin-top: 2px;">
+                                        <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 2px;">
                                             (<?= round($percentage) ?>%)
                                         </div>
                                     </div>
@@ -991,7 +1006,7 @@ foreach($instructor_workloads as $iw) {
                             </div>
                         <?php endforeach; ?>
                     <?php else: ?>
-                        <div style="text-align: center; padding: 30px; color: #6b7280;">
+                        <div style="text-align: center; padding: 30px; color: var(--text-secondary);">
                             <i class="fas fa-user-graduate" style="font-size: 2.5rem; margin-bottom: 15px; opacity: 0.5;"></i>
                             <p>No instructor workload data available for current semester.</p>
                         </div>
@@ -1071,28 +1086,28 @@ foreach($instructor_workloads as $iw) {
                     </div>
 
                     <!-- Workload Preview -->
-                    <div id="workloadPreview" style="display: none; margin: 20px 0; padding: 15px; background: #f8fafc; border-radius: 8px;">
-                        <h4 style="margin-bottom: 10px;">Workload Impact Preview</h4>
+                    <div id="workloadPreview" style="display: none; margin: 20px 0; padding: 15px; background: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border-color);">
+                        <h4 style="margin-bottom: 10px; color: var(--text-primary);">Workload Impact Preview</h4>
                         <div style="display: flex; align-items: center; gap: 15px;">
                             <div style="flex: 1;">
-                                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: var(--text-secondary);">
                                     <span>Current Load:</span>
-                                    <strong id="currentLoad">0</strong>
+                                    <strong id="currentLoad" style="color: var(--text-primary);">0</strong>
                                 </div>
-                                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: var(--text-secondary);">
                                     <span>Course Credits:</span>
-                                    <strong id="courseCredits">0</strong>
+                                    <strong id="courseCredits" style="color: var(--text-primary);">0</strong>
                                 </div>
-                                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: var(--text-secondary);">
                                     <span>New Total:</span>
-                                    <strong id="newTotal">0</strong>
+                                    <strong id="newTotal" style="color: var(--text-primary);">0</strong>
                                 </div>
                             </div>
                             <div style="flex: 2;">
-                                <div style="height: 10px; background: #e5e7eb; border-radius: 5px; overflow: hidden; margin: 5px 0;">
+                                <div style="height: 10px; background: var(--border-color); border-radius: 5px; overflow: hidden; margin: 5px 0;">
                                     <div id="workloadProgress" style="height: 100%; width: 0%; background: #10b981; transition: width 0.3s;"></div>
                                 </div>
-                                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #6b7280;">
+                                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-secondary);">
                                     <span>0</span>
                                     <span>6 (50%)</span>
                                     <span>9 (75%)</span>
@@ -1280,7 +1295,19 @@ foreach($instructor_workloads as $iw) {
                         y: {
                             beginAtZero: true,
                             ticks: {
-                                stepSize: 1
+                                stepSize: 1,
+                                color: 'var(--text-secondary)'
+                            },
+                            grid: {
+                                color: 'var(--border-color)'
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                color: 'var(--text-secondary)'
+                            },
+                            grid: {
+                                color: 'var(--border-color)'
                             }
                         }
                     }
@@ -1296,7 +1323,10 @@ foreach($instructor_workloads as $iw) {
                     responsive: true,
                     plugins: {
                         legend: {
-                            position: 'bottom'
+                            position: 'bottom',
+                            labels: {
+                                color: 'var(--text-primary)'
+                            }
                         }
                     }
                 }
@@ -1392,5 +1422,8 @@ foreach($instructor_workloads as $iw) {
             return true;
         });
     </script>
+    
+    <!-- Include darkmode.js -->
+    <script src="../../assets/js/darkmode.js"></script>
 </body>
 </html>

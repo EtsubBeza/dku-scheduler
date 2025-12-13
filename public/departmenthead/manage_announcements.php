@@ -8,6 +8,9 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'department_head'){
     exit;
 }
 
+// Include dark mode
+include __DIR__ . '/../includes/darkmode.php';
+
 $dept_id = $_SESSION['department_id'] ?? 0;
 $user_id = $_SESSION['user_id'];
 
@@ -105,11 +108,13 @@ $announcements = $announcements_stmt->fetchAll(PDO::FETCH_ASSOC);
 $current_page = basename($_SERVER['PHP_SELF']);
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="<?= $darkMode ? 'dark' : 'light' ?>">
 <head>
 <meta charset="UTF-8">
 <title>Manage Announcements</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<!-- Include Dark Mode CSS -->
+<link rel="stylesheet" href="../../assets/css/darkmode.css">
 <style>
 * { box-sizing: border-box; margin:0; padding:0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
 
@@ -117,7 +122,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .topbar {
     display: none;
     position: fixed; top:0; left:0; width:100%;
-    background:#2c3e50; color:#fff;
+    background:var(--bg-sidebar); color:var(--text-sidebar);
     padding:15px 20px;
     z-index:1200;
     justify-content:space-between; align-items:center;
@@ -125,7 +130,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .menu-btn {
     font-size:26px;
     background:#1abc9c;
-    border:none; color:#fff;
+    border:none; color:var(--text-sidebar);
     cursor:pointer;
     padding:10px 14px;
     border-radius:8px;
@@ -138,7 +143,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .sidebar {
     position: fixed; top:0; left:0;
     width:250px; height:100%;
-    background:#1f2937; color:#fff;
+    background:var(--bg-sidebar); color:var(--text-sidebar);
     z-index:1100;
     transition: transform 0.3s ease;
     padding: 20px 0;
@@ -147,12 +152,12 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .sidebar a { 
     display:block; 
     padding:12px 20px; 
-    color:#fff; 
+    color:var(--text-sidebar); 
     text-decoration:none; 
     transition: background 0.3s; 
     border-bottom: 1px solid rgba(255,255,255,0.1);
 }
-.sidebar a:hover, .sidebar a.active { background:#1abc9c; }
+.sidebar a:hover, .sidebar a.active { background:#1abc9c; color:white; }
 
 .sidebar-profile {
     text-align: center;
@@ -172,7 +177,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 }
 
 .sidebar-profile p {
-    color: #fff;
+    color: var(--text-sidebar);
     font-weight: bold;
     margin: 0;
     font-size: 16px;
@@ -191,7 +196,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
     margin-left: 250px;
     padding:30px 50px;
     min-height:100vh;
-    background:#f9fafb;
+    background:var(--bg-primary);
+    color:var(--text-primary);
     transition: all 0.3s ease;
 }
 
@@ -206,7 +212,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
 .header h1 {
     font-size: 2.2rem;
-    color: #1f2937;
+    color: var(--text-primary);
     font-weight: 700;
 }
 
@@ -214,10 +220,10 @@ $current_page = basename($_SERVER['PHP_SELF']);
     display: flex;
     align-items: center;
     gap: 12px;
-    background: white;
+    background: var(--bg-card);
     padding: 12px 18px;
     border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    box-shadow: 0 4px 12px var(--shadow-color);
 }
 
 .user-info img {
@@ -227,11 +233,21 @@ $current_page = basename($_SERVER['PHP_SELF']);
     object-fit: cover;
 }
 
+.user-info div div {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.user-info small {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
 /* Card Styles */
 .card {
-    background: white;
+    background: var(--bg-card);
     border-radius: 15px;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.1);
+    box-shadow: 0 6px 18px var(--shadow-color);
     margin-bottom: 25px;
     overflow: hidden;
 }
@@ -264,16 +280,18 @@ $current_page = basename($_SERVER['PHP_SELF']);
     display: block;
     margin-bottom: 8px;
     font-weight: 600;
-    color: #374151;
+    color: var(--text-primary);
 }
 
 .form-control {
     width: 100%;
     padding: 14px 16px;
-    border: 1px solid #d1d5db;
+    border: 1px solid var(--border-color);
     border-radius: 10px;
     font-size: 1rem;
     transition: all 0.3s ease;
+    background: var(--bg-input);
+    color: var(--text-primary);
 }
 
 .form-control:focus {
@@ -348,6 +366,11 @@ $current_page = basename($_SERVER['PHP_SELF']);
     transform: translateY(-2px);
 }
 
+.btn-secondary {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
 .btn-sm {
     padding: 8px 16px;
     font-size: 0.9rem;
@@ -365,47 +388,47 @@ $current_page = basename($_SERVER['PHP_SELF']);
 }
 
 .message.success {
-    background: #dcfce7;
-    color: #166534;
-    border: 1px solid #bbf7d0;
+    background: var(--success-bg);
+    color: var(--success-text);
+    border: 1px solid var(--success-text);
 }
 
 .message.error {
-    background: #fee2e2;
-    color: #991b1b;
-    border: 1px solid #fecaca;
+    background: var(--error-bg);
+    color: var(--error-text);
+    border: 1px solid var(--error-text);
 }
 
 .message.warning {
-    background: #fef3c7;
-    color: #92400e;
-    border: 1px solid #fde68a;
+    background: var(--warning-bg);
+    color: var(--warning-text);
+    border: 1px solid var(--warning-text);
 }
 
 /* Table Styles */
 .ann-table {
     width: 100%;
     border-collapse: collapse;
-    background: white;
+    background: var(--bg-card);
     border-radius: 15px;
     overflow: hidden;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 12px var(--shadow-color);
 }
 
 .ann-table th, .ann-table td {
     padding: 16px;
     text-align: left;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid var(--border-color);
 }
 
 .ann-table th {
-    background: #f8fafc;
-    color: #374151;
+    background: var(--table-header);
+    color: var(--text-sidebar);
     font-weight: 600;
 }
 
 .ann-table tr:hover {
-    background: #f9fafb;
+    background: var(--hover-color);
 }
 
 .ann-table tr:last-child td {
@@ -419,13 +442,13 @@ $current_page = basename($_SERVER['PHP_SELF']);
     border-radius: 20px;
     font-size: 0.8rem;
     font-weight: 600;
-    background: #eef2ff;
-    color: #0f172a;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
 }
 
 /* Details row */
 .details-row td {
-    background: #ffffff;
+    background: var(--bg-card);
     padding: 25px;
 }
 
@@ -441,7 +464,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
 .details-right {
     width: 300px;
-    background: #f8fafc;
+    background: var(--bg-secondary);
     padding: 20px;
     border-radius: 10px;
 }
@@ -455,16 +478,17 @@ $current_page = basename($_SERVER['PHP_SELF']);
     padding: 8px;
     border-radius: 6px;
     transition: background 0.3s;
+    color: var(--text-primary);
 }
 
 .like-btn:hover {
-    background: #f3f4f6;
+    background: var(--hover-color);
 }
 
 /* Comments */
 .comment-section {
     margin-top: 15px;
-    background: #f3f4f6;
+    background: var(--bg-secondary);
     padding: 15px;
     border-radius: 10px;
     max-height: 250px;
@@ -474,7 +498,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .comment {
     margin-bottom: 12px;
     padding: 12px;
-    background: #eef2ff;
+    background: var(--comment-bg);
     border-radius: 8px;
     display: flex;
     justify-content: space-between;
@@ -483,7 +507,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
 .comment .meta {
     font-size: 13px;
-    color: #334155;
+    color: var(--text-secondary);
 }
 
 .comment button.delete-comment {
@@ -497,7 +521,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 }
 
 .comment button.delete-comment:hover {
-    background: #fee2e2;
+    background: var(--error-bg);
 }
 
 /* Add-comment form */
@@ -511,8 +535,10 @@ $current_page = basename($_SERVER['PHP_SELF']);
     flex: 1;
     padding: 12px;
     border-radius: 8px;
-    border: 1px solid #d1d5db;
+    border: 1px solid var(--border-color);
     font-size: 1rem;
+    background: var(--bg-input);
+    color: var(--text-primary);
 }
 
 .add-comment-form button {
@@ -530,26 +556,52 @@ $current_page = basename($_SERVER['PHP_SELF']);
 }
 
 .text-muted {
-    color: #6b7280;
+    color: var(--text-secondary);
     font-size: 0.875rem;
 }
 
 .empty-state {
     text-align: center;
     padding: 50px;
-    color: #6b7280;
+    color: var(--text-secondary);
 }
 
 .empty-state i {
     font-size: 3.5rem;
     margin-bottom: 20px;
-    color: #d1d5db;
+    color: var(--border-color);
 }
 
 .empty-state h3 {
     font-size: 1.5rem;
     margin-bottom: 10px;
-    color: #374151;
+    color: var(--text-primary);
+}
+
+/* Dark mode specific adjustments */
+[data-theme="dark"] .comment-section {
+    background: var(--bg-secondary);
+}
+
+[data-theme="dark"] .comment {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .details-right {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .add-comment-form input {
+    background: var(--bg-input);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .add-comment-form input::placeholder {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .like-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
 }
 
 /* ================= Responsive ================= */
@@ -581,7 +633,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
    <div class="sidebar">
         <div class="sidebar-profile">
             <img src="<?= htmlspecialchars($profile_src) ?>" alt="Profile Picture">
-            <p><?= htmlspecialchars($user['username'] ?? 'User') ?></p>
+            <p><?= htmlspecialchars($current_user['username'] ?? 'User') ?></p>
         </div>
         <nav>
             <a href="departmenthead_dashboard.php" class="<?= $current_page=='departmenthead_dashboard.php'?'active':'' ?>">
@@ -673,7 +725,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     </button>
                     
                     <?php if($editing): ?>
-                        <a href="manage_announcements.php" class="btn" style="background: #6b7280; color: white; margin-left: 10px;">
+                        <a href="manage_announcements.php" class="btn btn-secondary" style="margin-left: 10px;">
                             <i class="fas fa-times"></i> Cancel
                         </a>
                     <?php endif; ?>
@@ -793,6 +845,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
         </div>
     </div>
 
+    <!-- Include darkmode.js -->
+    <script src="../../assets/js/darkmode.js"></script>
     <script>
         function toggleSidebar() {
             const sidebar = document.querySelector('.sidebar');
@@ -852,13 +906,13 @@ $current_page = basename($_SERVER['PHP_SELF']);
             }
             container.innerHTML = '';
             if(data.length === 0){
-                container.innerHTML = '<div style="color:#64748b">No comments yet.</div>';
+                container.innerHTML = '<div style="color:var(--text-secondary)">No comments yet.</div>';
             } else {
                 data.forEach(c => {
                     const div = document.createElement('div');
                     div.className = 'comment';
                     const left = document.createElement('div');
-                    left.innerHTML = `<div class="meta"><strong>${escapeHtml(c.username)}</strong> <small style="color:#475569"> • ${c.created_at}</small></div>
+                    left.innerHTML = `<div class="meta"><strong>${escapeHtml(c.username)}</strong> <small style="color:var(--text-secondary)"> • ${c.created_at}</small></div>
                                       <div style="margin-top:6px;">${escapeHtml(c.comment)}</div>`;
                     const btn = document.createElement('button');
                     btn.className = 'delete-comment';

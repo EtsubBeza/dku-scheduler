@@ -102,7 +102,10 @@ $current_page = basename($_SERVER['PHP_SELF']);
 <head>
 <meta charset="UTF-8">
 <title>Department Head Dashboard</title>
+<!-- Include Dark Mode -->
+<?php include __DIR__ . '/../includes/darkmode.php'; ?>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
 <style>
 * { box-sizing: border-box; margin:0; padding:0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
 
@@ -110,7 +113,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .topbar {
     display: none;
     position: fixed; top:0; left:0; width:100%;
-    background:#2c3e50; color:#fff;
+    background:var(--bg-sidebar); color:var(--text-sidebar);
     padding:15px 20px;
     z-index:1200;
     justify-content:space-between; align-items:center;
@@ -118,7 +121,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .menu-btn {
     font-size:26px;
     background:#1abc9c;
-    border:none; color:#fff;
+    border:none; color:var(--text-sidebar);
     cursor:pointer;
     padding:10px 14px;
     border-radius:8px;
@@ -131,7 +134,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .sidebar {
     position: fixed; top:0; left:0;
     width:250px; height:100%;
-    background:#1f2937; color:#fff;
+    background:var(--bg-sidebar); color:var(--text-sidebar);
     z-index:1100;
     transition: transform 0.3s ease;
     padding: 20px 0;
@@ -140,12 +143,12 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .sidebar a { 
     display:block; 
     padding:12px 20px; 
-    color:#fff; 
+    color:var(--text-sidebar); 
     text-decoration:none; 
     transition: background 0.3s; 
     border-bottom: 1px solid rgba(255,255,255,0.1);
 }
-.sidebar a:hover, .sidebar a.active { background:#1abc9c; }
+.sidebar a:hover, .sidebar a.active { background:#1abc9c; color:white; }
 
 .sidebar-profile {
     text-align: center;
@@ -165,7 +168,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 }
 
 .sidebar-profile p {
-    color: #fff;
+    color: var(--text-sidebar);
     font-weight: bold;
     margin: 0;
     font-size: 16px;
@@ -184,7 +187,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
     margin-left: 250px;
     padding:30px 50px;
     min-height:100vh;
-    background:#ffffff;
+    background:var(--bg-primary);
+    color:var(--text-primary);
     transition: all 0.3s ease;
 }
 
@@ -195,7 +199,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
     padding:30px 25px;
     border-radius:15px;
     margin-bottom:30px;
-    box-shadow:0 6px 18px rgba(0,0,0,0.1);
+    box-shadow:0 6px 18px var(--shadow-color);
 }
 .welcome-section h1 { font-size:28px; font-weight:600; margin-bottom:8px; }
 .welcome-section p { font-size:16px; opacity:0.9; }
@@ -209,10 +213,10 @@ $current_page = basename($_SERVER['PHP_SELF']);
 }
 .stats-cards .card {
     flex:1 1 220px;
-    background:#f3f4f6;
+    background:var(--bg-card);
     border-radius:15px;
     padding:25px 20px;
-    box-shadow:0 6px 20px rgba(0,0,0,0.08);
+    box-shadow:0 6px 20px var(--shadow-color);
     display:flex; 
     flex-direction:column; 
     justify-content:space-between;
@@ -220,7 +224,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 }
 .stats-cards .card:hover { 
     transform:translateY(-6px); 
-    box-shadow:0 10px 28px rgba(0,0,0,0.15); 
+    box-shadow:0 10px 28px var(--shadow-color); 
 }
 .card-icon { 
     font-size:40px; 
@@ -238,28 +242,28 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .stats-cards .card h3 { 
     font-size:18px; 
     margin-bottom:8px; 
-    color:#111827; 
+    color:var(--text-primary); 
     font-weight:600; 
 }
 .stats-cards .card p { 
     font-size:24px; 
     font-weight:bold; 
-    color:#1f2937; 
+    color:var(--text-primary); 
     margin-bottom:15px; 
 }
 
 /* Table Section */
 .table-section, .announcement-section { 
-    background-color: white; 
+    background-color: var(--bg-card); 
     padding: 25px; 
     border-radius: 15px; 
-    box-shadow: 0 6px 18px rgba(0,0,0,0.1); 
+    box-shadow: 0 6px 18px var(--shadow-color); 
     margin-bottom: 30px; 
 }
 
 .table-section h2, .announcement-section h2 { 
     margin-bottom: 20px; 
-    color: #1f2937; 
+    color: var(--text-primary); 
     font-size: 1.5rem;
     font-weight: 600;
 }
@@ -273,17 +277,17 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .announcements-table th, .announcements-table td {
     padding: 15px; 
     text-align: left; 
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid var(--border-color);
 }
 
 .enrollments-table th, .announcements-table th { 
-    background-color: #f8fafc; 
-    color: #374151; 
+    background-color: var(--table-header); 
+    color: var(--text-sidebar); 
     font-weight: 600; 
 }
 
 .enrollments-table tr:hover, .announcements-table tr:hover { 
-    background-color: #f9fafb; 
+    background-color: var(--hover-color); 
 }
 
 /* Announcement Form */
@@ -296,7 +300,9 @@ $current_page = basename($_SERVER['PHP_SELF']);
     padding: 14px 16px;
     margin-bottom: 16px; 
     border-radius: 10px; 
-    border: 1px solid #d1d5db; 
+    border: 1px solid var(--border-color); 
+    background: var(--bg-input);
+    color: var(--text-primary);
     font-size: 1rem;
     transition: all 0.3s ease;
 }
@@ -360,21 +366,21 @@ $current_page = basename($_SERVER['PHP_SELF']);
 }
 
 .message.success {
-    background: #dcfce7;
-    color: #166534;
-    border: 1px solid #bbf7d0;
+    background: var(--success-bg);
+    color: var(--success-text);
+    border: 1px solid var(--success-text);
 }
 
 .message.error {
-    background: #fee2e2;
-    color: #991b1b;
-    border: 1px solid #fecaca;
+    background: var(--error-bg);
+    color: var(--error-text);
+    border: 1px solid var(--error-text);
 }
 
 .message.warning {
-    background: #fef3c7;
-    color: #92400e;
-    border: 1px solid #fde68a;
+    background: var(--warning-bg);
+    color: var(--warning-text);
+    border: 1px solid var(--warning-text);
 }
 
 /* Header Styles */
@@ -388,7 +394,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
 .header h1 {
     font-size: 2.2rem;
-    color: #1f2937;
+    color: var(--text-primary);
     font-weight: 700;
 }
 
@@ -396,10 +402,10 @@ $current_page = basename($_SERVER['PHP_SELF']);
     display: flex;
     align-items: center;
     gap: 12px;
-    background: white;
+    background: var(--bg-card);
     padding: 12px 18px;
     border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    box-shadow: 0 4px 12px var(--shadow-color);
 }
 
 .user-info img {
@@ -429,6 +435,26 @@ $current_page = basename($_SERVER['PHP_SELF']);
     padding: 25px;
 }
 
+/* Update card icons for dark mode */
+[data-theme="dark"] .card-icon {
+    background: #1e40af;
+    color: #93c5fd;
+}
+
+/* Empty state styling */
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-light);
+}
+
+.empty-state i {
+    font-size: 3rem;
+    margin-bottom: 20px;
+    display: block;
+    color: var(--border-color);
+}
+
 /* ================= Responsive ================= */
 @media(max-width: 768px){
     .topbar { display:flex; }
@@ -453,8 +479,9 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
     <div class="sidebar">
         <div class="sidebar-profile">
-            <img src="<?= htmlspecialchars($profile_src) ?>" alt="Profile Picture">
-            <p><?= htmlspecialchars($user['username'] ?? 'User') ?></p>
+            <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture">
+            <p><?= htmlspecialchars($current_user['username']) ?></p>
+            <!-- Dark mode toggle will be added here automatically by darkmode.js -->
         </div>
         <nav>
             <a href="departmenthead_dashboard.php" class="<?= $current_page=='departmenthead_dashboard.php'?'active':'' ?>">
@@ -531,48 +558,48 @@ $current_page = basename($_SERVER['PHP_SELF']);
             </div>
         </div>
 
-       <!-- Enrollments Table -->
-<div class="table-section">
-    <div class="card-header">
-        <h3><i class="fas fa-list"></i> Current Enrollments</h3>
-    </div>
-    <div class="card-body">
-        <table class="enrollments-table">
-            <thead>
-                <tr>
-                    <th>Student</th>
-                    <th>Course</th>
-                    <th>Schedule</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php if(!empty($grouped_enrollments)): ?>
-                    <?php foreach($grouped_enrollments as $enrollment): ?>
+        <!-- Enrollments Table -->
+        <div class="table-section">
+            <div class="card-header">
+                <h3><i class="fas fa-list"></i> Current Enrollments</h3>
+            </div>
+            <div class="card-body">
+                <table class="enrollments-table">
+                    <thead>
                         <tr>
-                            <td><?= htmlspecialchars($enrollment['student_name']) ?></td>
-                            <td><?= htmlspecialchars($enrollment['course_name']) ?></td>
-                            <td>
-                                <?php foreach($enrollment['schedules'] as $schedule): ?>
-                                    <div style="margin-bottom: 5px;">
-                                        <strong><?= htmlspecialchars($schedule['day']) ?>:</strong>
-                                        <?= htmlspecialchars($schedule['start_time']) ?> - <?= htmlspecialchars($schedule['end_time']) ?>
-                                    </div>
-                                <?php endforeach; ?>
-                            </td>
+                            <th>Student</th>
+                            <th>Course</th>
+                            <th>Schedule</th>
                         </tr>
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <tr>
-                        <td colspan="3" style="text-align:center; padding: 30px;">
-                            <i class="fas fa-inbox" style="font-size: 2.5rem; color: #9ca3af; margin-bottom: 15px;"></i>
-                            <p style="color: #6b7280; font-size: 1.1rem;">No enrollments found.</p>
-                        </td>
-                    </tr>
-                <?php endif; ?>
-            </tbody>
-        </table>
-    </div>
-</div>
+                    </thead>
+                    <tbody>
+                        <?php if(!empty($grouped_enrollments)): ?>
+                            <?php foreach($grouped_enrollments as $enrollment): ?>
+                                <tr>
+                                    <td><?= htmlspecialchars($enrollment['student_name']) ?></td>
+                                    <td><?= htmlspecialchars($enrollment['course_name']) ?></td>
+                                    <td>
+                                        <?php foreach($enrollment['schedules'] as $schedule): ?>
+                                            <div style="margin-bottom: 5px;">
+                                                <strong><?= htmlspecialchars($schedule['day']) ?>:</strong>
+                                                <?= htmlspecialchars($schedule['start_time']) ?> - <?= htmlspecialchars($schedule['end_time']) ?>
+                                            </div>
+                                        <?php endforeach; ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <tr>
+                                <td colspan="3" style="text-align:center; padding: 30px;">
+                                    <i class="fas fa-inbox" style="font-size: 2.5rem; color: var(--text-light); margin-bottom: 15px;"></i>
+                                    <p style="color: var(--text-light); font-size: 1.1rem;">No enrollments found.</p>
+                                </td>
+                            </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
 
         <!-- Announcements Section -->
         <div class="announcement-section">
@@ -580,7 +607,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 <h3><i class="fas fa-bullhorn"></i> Announcements</h3>
             </div>
             <div class="card-body">
-                <h4>Post New Announcement</h4>
+                <h4 style="color: var(--text-primary);">Post New Announcement</h4>
                 <form method="post" class="announcement-form">
                     <input type="text" name="announcement_title" placeholder="Announcement Title" required>
                     <textarea name="announcement_message" placeholder="Announcement Message" rows="4" required></textarea>
@@ -596,7 +623,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     </div>
                 <?php endif; ?>
 
-                <h4 style="margin-top: 30px;">Recent Announcements</h4>
+                <h4 style="margin-top: 30px; color: var(--text-primary);">Recent Announcements</h4>
                 <table class="announcements-table">
                     <thead>
                         <tr>
@@ -617,8 +644,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         <?php else: ?>
                             <tr>
                                 <td colspan="3" style="text-align:center; padding: 30px;">
-                                    <i class="fas fa-bullhorn" style="font-size: 2.5rem; color: #9ca3af; margin-bottom: 15px;"></i>
-                                    <p style="color: #6b7280; font-size: 1.1rem;">No announcements yet.</p>
+                                    <i class="fas fa-bullhorn" style="font-size: 2.5rem; color: var(--text-light); margin-bottom: 15px;"></i>
+                                    <p style="color: var(--text-light); font-size: 1.1rem;">No announcements yet.</p>
                                 </td>
                             </tr>
                         <?php endif; ?>
@@ -649,5 +676,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
             });
         });
     </script>
+    
+    <!-- Optional: Add Font Awesome JS if not already loaded -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
 </body>
 </html>

@@ -8,6 +8,9 @@ if(!isset($_SESSION['user_id'])){
     exit;
 }
 
+// Include dark mode
+include __DIR__ . '/../includes/darkmode.php';
+
 $user_id = $_SESSION['user_id'];
 $message = "";
 
@@ -71,11 +74,13 @@ if(!empty($user['profile_picture']) && file_exists($profile_path)){
 $current_page = basename($_SERVER['PHP_SELF']);
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="<?= $darkMode ? 'dark' : 'light' ?>">
 <head>
 <meta charset="UTF-8">
 <title>Edit Profile</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<!-- Include Dark Mode CSS -->
+<link rel="stylesheet" href="../../assets/css/darkmode.css">
 <style>
 * { box-sizing: border-box; margin:0; padding:0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
 
@@ -83,7 +88,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .topbar {
     display: none;
     position: fixed; top:0; left:0; width:100%;
-    background:#2c3e50; color:#fff;
+    background:var(--bg-sidebar); color:var(--text-sidebar);
     padding:15px 20px;
     z-index:1200;
     justify-content:space-between; align-items:center;
@@ -91,7 +96,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .menu-btn {
     font-size:26px;
     background:#1abc9c;
-    border:none; color:#fff;
+    border:none; color:var(--text-sidebar);
     cursor:pointer;
     padding:10px 14px;
     border-radius:8px;
@@ -104,7 +109,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .sidebar {
     position: fixed; top:0; left:0;
     width:250px; height:100%;
-    background:#1f2937; color:#fff;
+    background:var(--bg-sidebar); color:var(--text-sidebar);
     z-index:1100;
     transition: transform 0.3s ease;
     padding: 20px 0;
@@ -113,12 +118,12 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .sidebar a { 
     display:block; 
     padding:12px 20px; 
-    color:#fff; 
+    color:var(--text-sidebar); 
     text-decoration:none; 
     transition: background 0.3s; 
     border-bottom: 1px solid rgba(255,255,255,0.1);
 }
-.sidebar a:hover, .sidebar a.active { background:#1abc9c; }
+.sidebar a:hover, .sidebar a.active { background:#1abc9c; color:white; }
 
 .sidebar-profile {
     text-align: center;
@@ -138,7 +143,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 }
 
 .sidebar-profile p {
-    color: #fff;
+    color: var(--text-sidebar);
     font-weight: bold;
     margin: 0;
     font-size: 16px;
@@ -157,7 +162,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
     margin-left: 250px;
     padding:30px 50px;
     min-height:100vh;
-    background:#ffffff;
+    background:var(--bg-primary);
+    color:var(--text-primary);
     transition: all 0.3s ease;
 }
 
@@ -172,7 +178,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
 .header h1 {
     font-size: 2.2rem;
-    color: #1f2937;
+    color: var(--text-primary);
     font-weight: 700;
 }
 
@@ -180,10 +186,10 @@ $current_page = basename($_SERVER['PHP_SELF']);
     display: flex;
     align-items: center;
     gap: 12px;
-    background: white;
+    background: var(--bg-card);
     padding: 12px 18px;
     border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    box-shadow: 0 4px 12px var(--shadow-color);
 }
 
 .user-info img {
@@ -193,11 +199,21 @@ $current_page = basename($_SERVER['PHP_SELF']);
     object-fit: cover;
 }
 
+.user-info div div {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.user-info small {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
 /* Form Container */
 .form-container {
-    background: white;
+    background: var(--bg-card);
     border-radius: 15px;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.1);
+    box-shadow: 0 6px 18px var(--shadow-color);
     padding: 30px;
     margin-bottom: 25px;
 }
@@ -210,16 +226,18 @@ $current_page = basename($_SERVER['PHP_SELF']);
     display: block;
     margin-bottom: 8px;
     font-weight: 600;
-    color: #374151;
+    color: var(--text-primary);
 }
 
 .form-control {
     width: 100%;
     padding: 14px 16px;
-    border: 1px solid #d1d5db;
+    border: 1px solid var(--border-color);
     border-radius: 10px;
     font-size: 1rem;
     transition: all 0.3s ease;
+    background: var(--bg-input);
+    color: var(--text-primary);
 }
 
 .form-control:focus {
@@ -275,21 +293,21 @@ $current_page = basename($_SERVER['PHP_SELF']);
 }
 
 .message.success {
-    background: #dcfce7;
-    color: #166534;
-    border: 1px solid #bbf7d0;
+    background: var(--success-bg);
+    color: var(--success-text);
+    border: 1px solid var(--success-text);
 }
 
 .message.error {
-    background: #fee2e2;
-    color: #991b1b;
-    border: 1px solid #fecaca;
+    background: var(--error-bg);
+    color: var(--error-text);
+    border: 1px solid var(--error-text);
 }
 
 .message.warning {
-    background: #fef3c7;
-    color: #92400e;
-    border: 1px solid #fde68a;
+    background: var(--warning-bg);
+    color: var(--warning-text);
+    border: 1px solid var(--warning-text);
 }
 
 .profile-pic {
@@ -299,27 +317,27 @@ $current_page = basename($_SERVER['PHP_SELF']);
     object-fit: cover;
     margin-bottom: 20px;
     border: 3px solid #6366f1;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    box-shadow: 0 4px 12px var(--shadow-color);
 }
 
 .profile-section {
     text-align: center;
     margin-bottom: 30px;
     padding: 20px;
-    background: #f8fafc;
+    background: var(--bg-secondary);
     border-radius: 12px;
 }
 
 .text-muted {
-    color: #6b7280;
+    color: var(--text-secondary);
     font-size: 0.875rem;
 }
 
 /* Card Styles */
 .card {
-    background: white;
+    background: var(--bg-card);
     border-radius: 15px;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.1);
+    box-shadow: 0 6px 18px var(--shadow-color);
     margin-bottom: 25px;
     overflow: hidden;
 }
@@ -341,6 +359,24 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
 .card-body {
     padding: 25px;
+}
+
+/* Dark mode specific adjustments */
+[data-theme="dark"] .user-info {
+    background: var(--bg-secondary);
+}
+
+[data-theme="dark"] .profile-section {
+    background: var(--bg-secondary);
+}
+
+[data-theme="dark"] .form-control {
+    background: var(--bg-input);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .form-control::placeholder {
+    color: var(--text-secondary);
 }
 
 /* ================= Responsive ================= */
@@ -467,6 +503,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
         </div>
     </div>
 
+    <!-- Include darkmode.js -->
+    <script src="../../assets/js/darkmode.js"></script>
     <script>
         function toggleSidebar() {
             const sidebar = document.querySelector('.sidebar');

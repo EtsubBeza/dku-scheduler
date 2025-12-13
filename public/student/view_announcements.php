@@ -10,14 +10,17 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'student'){
     exit;
 }
 
+// Include dark mode
+include __DIR__ . '/../includes/darkmode.php';
+
 $student_id = $_SESSION['user_id'];
 
 // Fetch current user info - MATCHING DASHBOARD
-$user_stmt = $pdo->prepare("SELECT username, profile_picture FROM users WHERE user_id = ?");
+$user_stmt = $pdo->prepare("SELECT username, profile_picture, email FROM users WHERE user_id = ?");
 $user_stmt->execute([$_SESSION['user_id']]);
 $user = $user_stmt->fetch(PDO::FETCH_ASSOC);
 
-// Determine profile picture path - FIXED VERSION
+// Determine profile picture path - FIXED VERSION (same as dashboard)
 $uploads_dir = __DIR__ . '/../uploads/';
 $assets_dir = __DIR__ . '/../assets/';
 
@@ -71,11 +74,13 @@ $announcements = $announcements_stmt->fetchAll(PDO::FETCH_ASSOC);
 $current_page = basename($_SERVER['PHP_SELF']);
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="<?= $darkMode ? 'dark' : 'light' ?>">
 <head>
 <meta charset="UTF-8">
 <title>Announcements | Student Dashboard</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<!-- Include Dark Mode CSS -->
+<link rel="stylesheet" href="../../assets/css/darkmode.css">
 <style>
 * { box-sizing: border-box; margin:0; padding:0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
 
@@ -83,7 +88,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .topbar {
     display: none;
     position: fixed; top:0; left:0; width:100%;
-    background:#2c3e50; color:#fff;
+    background:var(--bg-sidebar); color:var(--text-sidebar);
     padding:15px 20px;
     z-index:1200;
     justify-content:space-between; align-items:center;
@@ -91,7 +96,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .menu-btn {
     font-size:26px;
     background:#1abc9c;
-    border:none; color:#fff;
+    border:none; color:var(--text-sidebar);
     cursor:pointer;
     padding:10px 14px;
     border-radius:8px;
@@ -104,7 +109,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .sidebar {
     position: fixed; top:0; left:0;
     width:250px; height:100%;
-    background:#1f2937; color:#fff;
+    background:var(--bg-sidebar); color:var(--text-sidebar);
     z-index:1100;
     transition: transform 0.3s ease;
     padding: 20px 0;
@@ -113,12 +118,12 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .sidebar a { 
     display:block; 
     padding:12px 20px; 
-    color:#fff; 
+    color:var(--text-sidebar); 
     text-decoration:none; 
     transition: background 0.3s; 
     border-bottom: 1px solid rgba(255,255,255,0.1);
 }
-.sidebar a:hover, .sidebar a.active { background:#1abc9c; }
+.sidebar a:hover, .sidebar a.active { background:#1abc9c; color:white; }
 
 .sidebar-profile {
     text-align: center;
@@ -138,7 +143,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 }
 
 .sidebar-profile p {
-    color: #fff;
+    color: var(--text-sidebar);
     font-weight: bold;
     margin: 0;
     font-size: 16px;
@@ -147,7 +152,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 /* Sidebar title */
 .sidebar h2 {
     text-align: center;
-    color: #ecf0f1;
+    color: var(--text-sidebar);
     margin-bottom: 25px;
     font-size: 22px;
     padding: 0 20px;
@@ -166,16 +171,16 @@ $current_page = basename($_SERVER['PHP_SELF']);
     margin-left: 250px;
     padding:20px;
     min-height:100vh;
-    background: #f8fafc;
+    background: var(--bg-primary);
     transition: all 0.3s ease;
 }
 
 /* Content Wrapper */
 .content-wrapper {
-    background: white;
+    background: var(--bg-card);
     border-radius: 15px;
     padding: 30px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 4px 6px var(--shadow-color);
     min-height: calc(100vh - 40px);
 }
 
@@ -186,12 +191,12 @@ $current_page = basename($_SERVER['PHP_SELF']);
     align-items: center;
     margin-bottom: 30px;
     padding-bottom: 20px;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid var(--border-color);
 }
 
 .header h1 {
     font-size: 2.2rem;
-    color: #1f2937;
+    color: var(--text-primary);
     font-weight: 700;
 }
 
@@ -199,10 +204,10 @@ $current_page = basename($_SERVER['PHP_SELF']);
     display: flex;
     align-items: center;
     gap: 12px;
-    background: #f8fafc;
+    background: var(--bg-secondary);
     padding: 12px 18px;
     border-radius: 12px;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--border-color);
 }
 
 .user-info img {
@@ -212,13 +217,32 @@ $current_page = basename($_SERVER['PHP_SELF']);
     object-fit: cover;
 }
 
+.user-info div div {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.user-info small {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
 /* Welcome Section */
 .welcome-section {
     margin-bottom: 30px;
 }
 
+.welcome-section h1 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #6366f1, #3b82f6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0.5rem;
+}
+
 .welcome-section p {
-    color: #6b7280;
+    color: var(--text-secondary);
     font-size: 1.1rem;
     margin-top: 10px;
 }
@@ -231,8 +255,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .announcement-count {
     display: inline-block;
     padding: 6px 12px;
-    background: #e0e7ff;
-    color: #3730a3;
+    background: var(--badge-primary-bg);
+    color: var(--badge-primary-text);
     border-radius: 20px;
     font-size: 0.9rem;
     font-weight: 600;
@@ -241,30 +265,30 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
 /* Announcement Cards */
 .announcement-card {
-    background: white;
+    background: var(--bg-card);
     border-radius: 12px;
     padding: 25px;
     margin-bottom: 20px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-    border: 1px solid #e5e7eb;
+    box-shadow: 0 4px 6px var(--shadow-color);
+    border: 1px solid var(--border-color);
     transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 .announcement-card:hover {
     transform: translateY(-5px);
-    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 8px 15px var(--shadow-lg);
 }
 
 .announcement-card h3 {
     font-size: 1.3rem;
-    color: #1f2937;
+    color: var(--text-primary);
     margin-bottom: 10px;
     font-weight: 600;
 }
 
 .announcement-meta {
     font-size: 0.9rem;
-    color: #6b7280;
+    color: var(--text-secondary);
     margin-bottom: 15px;
     display: flex;
     align-items: center;
@@ -273,10 +297,11 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
 .announcement-meta i {
     font-size: 0.8rem;
+    color: var(--text-secondary);
 }
 
 .announcement-message {
-    color: #374151;
+    color: var(--text-primary);
     line-height: 1.6;
     margin-bottom: 20px;
     font-size: 1rem;
@@ -293,7 +318,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
     object-fit: cover;
     cursor: pointer;
     transition: transform 0.2s;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--border-color);
 }
 
 .attachment-image:hover, .attachment-video:hover {
@@ -305,8 +330,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
     align-items: center;
     gap: 6px;
     padding: 8px 14px;
-    background: #e0e7ff;
-    color: #3730a3;
+    background: var(--badge-primary-bg);
+    color: var(--badge-primary-text);
     border-radius: 8px;
     text-decoration: none;
     font-weight: 500;
@@ -315,14 +340,14 @@ $current_page = basename($_SERVER['PHP_SELF']);
 }
 
 .external-link:hover {
-    background: #c7d2fe;
+    background: var(--hover-color);
 }
 
 /* Like Button */
 .like-btn {
     cursor: pointer;
-    background: #f8fafc;
-    border: 1px solid #e5e7eb;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
     padding: 8px 16px;
     border-radius: 8px;
     color: #ef4444;
@@ -335,42 +360,42 @@ $current_page = basename($_SERVER['PHP_SELF']);
 }
 
 .like-btn:hover {
-    background: #fee2e2;
-    border-color: #fecaca;
+    background: var(--error-bg);
+    border-color: var(--error-border);
 }
 
 .like-btn.active {
-    background: #fee2e2;
+    background: var(--error-bg);
     border-color: #ef4444;
 }
 
 .like-count {
     font-weight: 600;
-    color: #374151;
+    color: var(--text-primary);
 }
 
 /* Comments Section */
 .comment-section {
     margin-top: 20px;
     padding-top: 20px;
-    border-top: 1px solid #e5e7eb;
+    border-top: 1px solid var(--border-color);
 }
 
 .comment {
     padding: 10px;
-    background: #f8fafc;
+    background: var(--bg-secondary);
     margin-bottom: 8px;
     border-radius: 8px;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--border-color);
 }
 
 .comment strong {
-    color: #1f2937;
+    color: var(--text-primary);
     margin-right: 5px;
 }
 
 .comment-text {
-    color: #374151;
+    color: var(--text-primary);
 }
 
 .add-comment-form {
@@ -383,9 +408,11 @@ $current_page = basename($_SERVER['PHP_SELF']);
     flex: 1;
     padding: 10px 14px;
     border-radius: 8px;
-    border: 1px solid #d1d5db;
+    border: 1px solid var(--border-color);
     font-size: 0.95rem;
     transition: border-color 0.3s;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
 }
 
 .add-comment-form input:focus {
@@ -412,27 +439,68 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .empty-state {
     text-align: center;
     padding: 60px 20px;
-    color: #6b7280;
+    color: var(--text-secondary);
 }
 
 .empty-state i {
     font-size: 4rem;
     margin-bottom: 20px;
-    color: #d1d5db;
+    color: var(--border-color);
     opacity: 0.5;
 }
 
 .empty-state h3 {
     font-size: 1.5rem;
     margin-bottom: 10px;
-    color: #374151;
+    color: var(--text-primary);
 }
 
 .empty-state p {
-    color: #6b7280;
+    color: var(--text-secondary);
     max-width: 400px;
     margin: 0 auto;
     line-height: 1.5;
+}
+
+/* Dark mode specific adjustments */
+[data-theme="dark"] .user-info div div {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .announcement-card h3 {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .announcement-meta {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .announcement-message {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .comment strong {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .comment-text {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .like-count {
+    color: var(--text-primary);
+}
+
+/* Animation classes */
+.fade-in {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 0.5s ease;
+}
+
+.fade-in.active {
+    opacity: 1;
+    transform: translateY(0);
 }
 
 /* ================= Responsive ================= */
@@ -471,16 +539,28 @@ $current_page = basename($_SERVER['PHP_SELF']);
     <!-- Sidebar - SAME AS OTHER PAGES -->
     <div class="sidebar">
         <div class="sidebar-profile">
-            <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture">
+            <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic">
             <p><?= htmlspecialchars($user['username'] ?? 'Student') ?></p>
         </div>
-        <h2>Student Panel</h2>
-        <a href="student_dashboard.php" class="<?= $current_page=='student_dashboard.php'?'active':'' ?>">Dashboard</a>
-        <a href="my_schedule.php" class="<?= $current_page=='my_schedule.php'?'active':'' ?>">My Schedule</a>
-        <a href="view_exam_schedules.php" class="<?= $current_page=='view_exam_schedules.php'?'active':'' ?>">Exam Schedule</a>
-        <a href="view_announcements.php" class="<?= $current_page=='view_announcements.php'?'active':'' ?>">Announcements</a>
-        <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">Edit Profile</a>
-        <a href="../logout.php">Logout</a>
+        <h2>Student Dashboard</h2>
+        <a href="student_dashboard.php" class="<?= $current_page=='student_dashboard.php'?'active':'' ?>">
+            <i class="fas fa-home"></i> Dashboard
+        </a>
+        <a href="my_schedule.php" class="<?= $current_page=='my_schedule.php'?'active':'' ?>">
+            <i class="fas fa-calendar-alt"></i> My Schedule
+        </a>
+        <a href="view_exam_schedules.php" class="<?= $current_page=='view_exam_schedules.php'?'active':'' ?>">
+            <i class="fas fa-clipboard-list"></i> Exam Schedule
+        </a>
+        <a href="view_announcements.php" class="<?= $current_page=='view_announcements.php'?'active':'' ?>">
+            <i class="fas fa-bullhorn"></i> Announcements
+        </a>
+        <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
+            <i class="fas fa-user-edit"></i> Edit Profile
+        </a>
+        <a href="../logout.php">
+            <i class="fas fa-sign-out-alt"></i> Logout
+        </a>
     </div>
 
     <!-- Main Content -->
@@ -492,7 +572,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <p>Stay updated with the latest news and updates from your department</p>
                 </div>
                 <div class="user-info">
-                    <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile">
+                    <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile" id="headerProfilePic">
                     <div>
                         <div><?= htmlspecialchars($user['username'] ?? 'Student') ?></div>
                         <small>Student</small>
@@ -508,7 +588,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
                 <?php if($announcements): ?>
                     <?php foreach($announcements as $a): ?>
-                        <div class="announcement-card" data-id="<?= $a['announcement_id'] ?>">
+                        <div class="announcement-card fade-in" data-id="<?= $a['announcement_id'] ?>">
                             <h3><?= htmlspecialchars($a['title']) ?></h3>
                             <div class="announcement-meta">
                                 <i class="fas fa-user"></i> Posted by <?= htmlspecialchars($a['creator_name']) ?>
@@ -575,6 +655,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
         </div>
     </div>
 
+    <!-- Include darkmode.js -->
+    <script src="../../assets/js/darkmode.js"></script>
     <script>
     function toggleSidebar() {
         const sidebar = document.querySelector('.sidebar');
@@ -600,6 +682,18 @@ $current_page = basename($_SERVER['PHP_SELF']);
             const aid = card.dataset.id;
             loadComments(aid);
         });
+        
+        // Animate announcement cards
+        const cards = document.querySelectorAll('.fade-in');
+        cards.forEach((card, index) => {
+            setTimeout(() => {
+                card.classList.add('active');
+            }, index * 100);
+        });
+        
+        // Debug: Log profile picture paths
+        console.log('Sidebar profile pic src:', document.getElementById('sidebarProfilePic').src);
+        console.log('Header profile pic src:', document.getElementById('headerProfilePic').src);
     });
 
     // Confirm logout
@@ -618,7 +712,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
             container.innerHTML = '';
             
             if(data.length === 0) {
-                container.innerHTML = '<p style="color:#6b7280;font-size:0.9rem;">No comments yet. Be the first to comment!</p>';
+                container.innerHTML = '<p style="color:var(--text-secondary);font-size:0.9rem;">No comments yet. Be the first to comment!</p>';
                 return;
             }
             
@@ -628,7 +722,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 commentDiv.innerHTML = `
                     <strong>${c.username}:</strong>
                     <span class="comment-text">${c.comment}</span>
-                    <div style="font-size:0.8rem;color:#6b7280;margin-top:4px;">
+                    <div style="font-size:0.8rem;color:var(--text-secondary);margin-top:4px;">
                         ${new Date(c.created_at).toLocaleDateString()}
                     </div>
                 `;
@@ -695,17 +789,20 @@ $current_page = basename($_SERVER['PHP_SELF']);
         window.open('../../uploads/announcements/' + filename, '_blank');
     }
 
-    // Add animation to announcement cards on page load
+    // Fallback for broken profile pictures
+    function handleImageError(img) {
+        img.onerror = null;
+        img.src = '../assets/default_profile.png';
+        return true;
+    }
+    
+    // Set profile picture fallbacks
     document.addEventListener('DOMContentLoaded', function() {
-        const cards = document.querySelectorAll('.announcement-card');
-        cards.forEach((card, index) => {
-            card.style.opacity = '0';
-            card.style.transform = 'translateY(20px)';
-            setTimeout(() => {
-                card.style.transition = 'all 0.5s ease';
-                card.style.opacity = '1';
-                card.style.transform = 'translateY(0)';
-            }, index * 100);
+        const profileImages = document.querySelectorAll('img[src*="profile"]');
+        profileImages.forEach(img => {
+            img.onerror = function() {
+                this.src = '../assets/default_profile.png';
+            };
         });
     });
     </script>

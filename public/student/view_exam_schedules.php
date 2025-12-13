@@ -8,17 +8,20 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'student'){
     exit;
 }
 
+// Include dark mode
+include __DIR__ . '/../includes/darkmode.php';
+
 $student_id = $_SESSION['user_id'];
 $dept_id = $_SESSION['department_id'] ?? 0;
 $message = "";
 $message_type = "success";
 
 // Fetch current user info - MATCHING DASHBOARD
-$user_stmt = $pdo->prepare("SELECT username, profile_picture FROM users WHERE user_id = ?");
+$user_stmt = $pdo->prepare("SELECT username, profile_picture, email FROM users WHERE user_id = ?");
 $user_stmt->execute([$_SESSION['user_id']]);
 $user = $user_stmt->fetch(PDO::FETCH_ASSOC);
 
-// Determine profile picture path - FIXED VERSION
+// Determine profile picture path - FIXED VERSION (same as dashboard)
 $uploads_dir = __DIR__ . '/../uploads/';
 $assets_dir = __DIR__ . '/../assets/';
 
@@ -142,16 +145,21 @@ try {
     $upcoming_exams = [];
     error_log("Upcoming exams error: " . $e->getMessage());
 }
+
+// Sidebar active page
+$current_page = basename($_SERVER['PHP_SELF']);
 ?>
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="<?= $darkMode ? 'dark' : 'light' ?>">
 <head>
 <meta charset="UTF-8">
 <title>Exam Schedule | Student Dashboard</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <!-- FullCalendar CSS -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css">
+<!-- Include Dark Mode CSS -->
+<link rel="stylesheet" href="../../assets/css/darkmode.css">
 <style>
 * { box-sizing: border-box; margin:0; padding:0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
 
@@ -159,7 +167,7 @@ try {
 .topbar {
     display: none;
     position: fixed; top:0; left:0; width:100%;
-    background:#2c3e50; color:#fff;
+    background:var(--bg-sidebar); color:var(--text-sidebar);
     padding:15px 20px;
     z-index:1200;
     justify-content:space-between; align-items:center;
@@ -167,7 +175,7 @@ try {
 .menu-btn {
     font-size:26px;
     background:#1abc9c;
-    border:none; color:#fff;
+    border:none; color:var(--text-sidebar);
     cursor:pointer;
     padding:10px 14px;
     border-radius:8px;
@@ -180,7 +188,7 @@ try {
 .sidebar {
     position: fixed; top:0; left:0;
     width:250px; height:100%;
-    background:#1f2937; color:#fff;
+    background:var(--bg-sidebar); color:var(--text-sidebar);
     z-index:1100;
     transition: transform 0.3s ease;
     padding: 20px 0;
@@ -189,12 +197,12 @@ try {
 .sidebar a { 
     display:block; 
     padding:12px 20px; 
-    color:#fff; 
+    color:var(--text-sidebar); 
     text-decoration:none; 
     transition: background 0.3s; 
     border-bottom: 1px solid rgba(255,255,255,0.1);
 }
-.sidebar a:hover, .sidebar a.active { background:#1abc9c; }
+.sidebar a:hover, .sidebar a.active { background:#1abc9c; color:white; }
 
 .sidebar-profile {
     text-align: center;
@@ -214,7 +222,7 @@ try {
 }
 
 .sidebar-profile p {
-    color: #fff;
+    color: var(--text-sidebar);
     font-weight: bold;
     margin: 0;
     font-size: 16px;
@@ -223,7 +231,7 @@ try {
 /* Sidebar title */
 .sidebar h2 {
     text-align: center;
-    color: #ecf0f1;
+    color: var(--text-sidebar);
     margin-bottom: 25px;
     font-size: 22px;
     padding: 0 20px;
@@ -242,16 +250,16 @@ try {
     margin-left: 250px;
     padding:20px;
     min-height:100vh;
-    background: #f8fafc;
+    background: var(--bg-primary);
     transition: all 0.3s ease;
 }
 
 /* Content Wrapper */
 .content-wrapper {
-    background: white;
+    background: var(--bg-card);
     border-radius: 15px;
     padding: 30px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 4px 6px var(--shadow-color);
     min-height: calc(100vh - 40px);
 }
 
@@ -262,12 +270,12 @@ try {
     align-items: center;
     margin-bottom: 30px;
     padding-bottom: 20px;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid var(--border-color);
 }
 
 .header h1 {
     font-size: 2.2rem;
-    color: #1f2937;
+    color: var(--text-primary);
     font-weight: 700;
 }
 
@@ -275,10 +283,10 @@ try {
     display: flex;
     align-items: center;
     gap: 12px;
-    background: #f8fafc;
+    background: var(--bg-secondary);
     padding: 12px 18px;
     border-radius: 12px;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--border-color);
 }
 
 .user-info img {
@@ -288,13 +296,32 @@ try {
     object-fit: cover;
 }
 
+.user-info div div {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.user-info small {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
 /* Welcome Section */
 .welcome-section {
     margin-bottom: 30px;
 }
 
+.welcome-section h1 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #6366f1, #3b82f6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0.5rem;
+}
+
 .welcome-section p {
-    color: #6b7280;
+    color: var(--text-secondary);
     font-size: 1.1rem;
     margin-top: 10px;
 }
@@ -310,23 +337,23 @@ try {
 .stat-card {
     flex: 1;
     min-width: 200px;
-    background: white;
+    background: var(--bg-card);
     padding: 25px;
     border-radius: 12px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-    border: 1px solid #e5e7eb;
+    box-shadow: 0 4px 6px var(--shadow-color);
+    border: 1px solid var(--border-color);
     text-align: center;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 .stat-card:hover {
     transform: translateY(-5px);
-    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 8px 15px var(--shadow-lg);
 }
 
 .stat-card h3 {
     font-size: 1rem;
-    color: #6b7280;
+    color: var(--text-secondary);
     margin-bottom: 10px;
     font-weight: 600;
 }
@@ -334,7 +361,7 @@ try {
 .stat-card .number {
     font-size: 2rem;
     font-weight: bold;
-    color: #1f2937;
+    color: var(--text-primary);
     margin-bottom: 10px;
 }
 
@@ -344,26 +371,31 @@ try {
     display: block;
 }
 
+/* Icon colors */
+.stat-card .fa-calendar-alt.icon { color: #3b82f6; }
+.stat-card .fa-clock.icon { color: #10b981; }
+.stat-card .fa-file-alt.icon { color: #f59e0b; }
+
 /* ================= Calendar Card ================= */
 .calendar-card {
-    background: white;
+    background: var(--bg-card);
     border-radius: 12px;
     overflow: hidden;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-    border: 1px solid #e5e7eb;
+    box-shadow: 0 4px 6px var(--shadow-color);
+    border: 1px solid var(--border-color);
     margin-top: 30px;
 }
 
 .calendar-header {
     padding: 20px;
-    background: #f8fafc;
-    border-bottom: 1px solid #e5e7eb;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
 }
 
 .calendar-header h3 {
     font-size: 1.25rem;
     font-weight: 600;
-    color: #1f2937;
+    color: var(--text-primary);
     display: flex;
     align-items: center;
     gap: 10px;
@@ -371,10 +403,10 @@ try {
 
 #examCalendar {
     padding: 20px;
-    background: white;
+    background: var(--bg-card);
 }
 
-/* FullCalendar Custom Styling */
+/* FullCalendar Custom Styling - Dark Mode Support */
 .fc {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
@@ -382,13 +414,13 @@ try {
 .fc-toolbar-title {
     font-size: 1.5rem !important;
     font-weight: 600;
-    color: #1f2937;
+    color: var(--text-primary) !important;
 }
 
 .fc-button {
-    background: #f8fafc !important;
-    border: 1px solid #e5e7eb !important;
-    color: #374151 !important;
+    background: var(--bg-secondary) !important;
+    border: 1px solid var(--border-color) !important;
+    color: var(--text-primary) !important;
     font-weight: 500 !important;
     border-radius: 8px !important;
     padding: 6px 12px !important;
@@ -396,7 +428,7 @@ try {
 }
 
 .fc-button:hover {
-    background: #e5e7eb !important;
+    background: var(--hover-color) !important;
     transform: translateY(-1px);
 }
 
@@ -404,10 +436,29 @@ try {
 .fc-button-primary:not(:disabled).fc-button-active {
     background: #1abc9c !important;
     border-color: #1abc9c !important;
+    color: white !important;
 }
 
 .fc-day-today {
-    background-color: #fff7ed !important;
+    background-color: var(--today-bg) !important;
+}
+
+.fc-col-header-cell {
+    background: var(--table-header) !important;
+    color: var(--text-sidebar) !important;
+}
+
+.fc-col-header-cell-cushion {
+    color: var(--text-sidebar) !important;
+}
+
+.fc-daygrid-day-number {
+    color: var(--text-primary) !important;
+}
+
+.fc-daygrid-day.fc-day-today .fc-daygrid-day-number {
+    color: var(--text-primary) !important;
+    font-weight: bold;
 }
 
 .fc-event {
@@ -416,11 +467,20 @@ try {
     padding: 4px 8px !important;
     font-size: 0.85rem !important;
     cursor: pointer !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
 }
 
 .fc-event:hover {
     transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15) !important;
+}
+
+.fc-scrollgrid {
+    border-color: var(--border-color) !important;
+}
+
+.fc-scrollgrid td, .fc-scrollgrid th {
+    border-color: var(--border-color) !important;
 }
 
 /* ================= Exam Table ================= */
@@ -429,11 +489,11 @@ try {
 }
 
 .table-container {
-    background: white;
+    background: var(--bg-card);
     border-radius: 12px;
     overflow: hidden;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-    border: 1px solid #e5e7eb;
+    box-shadow: 0 4px 6px var(--shadow-color);
+    border: 1px solid var(--border-color);
 }
 
 .exam-table {
@@ -442,17 +502,18 @@ try {
 }
 
 .exam-table th {
-    background: #f8fafc;
+    background: var(--table-header);
     padding: 15px;
     text-align: left;
     font-weight: 600;
-    color: #374151;
-    border-bottom: 1px solid #e5e7eb;
+    color: var(--text-sidebar);
+    border-bottom: 1px solid var(--border-color);
 }
 
 .exam-table td {
     padding: 15px;
-    border-bottom: 1px solid #f3f4f6;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-primary);
 }
 
 .exam-table tr:last-child td {
@@ -460,25 +521,25 @@ try {
 }
 
 .exam-table tr:hover {
-    background: #f9fafb;
+    background: var(--hover-color);
 }
 
 .exam-table .today-exam {
-    background: #fff7ed !important;
+    background: var(--today-bg) !important;
     border-left: 4px solid #f59e0b;
 }
 
 .exam-table .upcoming-exam {
-    background: #f0fdf4 !important;
+    background: var(--success-bg) !important;
     border-left: 4px solid #10b981;
 }
 
 .exam-table .past-exam {
-    background: #f8fafc !important;
+    background: var(--bg-secondary) !important;
     border-left: 4px solid #94a3b8;
 }
 
-/* Badge styles */
+/* Badge styles for dark mode */
 .badge {
     display: inline-block;
     padding: 4px 10px;
@@ -488,31 +549,31 @@ try {
 }
 
 .badge-primary {
-    background: #e0e7ff;
-    color: #3730a3;
+    background: var(--badge-primary-bg);
+    color: var(--badge-primary-text);
 }
 
 .badge-success {
-    background: #dcfce7;
-    color: #166534;
+    background: var(--badge-success-bg);
+    color: var(--badge-success-text);
 }
 
 .badge-warning {
-    background: #fef3c7;
-    color: #92400e;
+    background: var(--badge-warning-bg);
+    color: var(--badge-warning-text);
 }
 
 .badge-danger {
-    background: #fee2e2;
-    color: #991b1b;
+    background: var(--badge-danger-bg);
+    color: var(--badge-danger-text);
 }
 
 .badge-secondary {
-    background: #f3f4f6;
-    color: #6b7280;
+    background: var(--badge-secondary-bg);
+    color: var(--badge-secondary-text);
 }
 
-/* Message styling */
+/* Message styling for dark mode */
 .message {
     padding: 15px;
     border-radius: 8px;
@@ -520,49 +581,76 @@ try {
     display: flex;
     align-items: center;
     gap: 10px;
+    border-left: 4px solid;
 }
 
 .message.success {
-    background: #dcfce7;
-    color: #166534;
-    border-left: 4px solid #10b981;
+    background: var(--success-bg);
+    color: var(--success-text);
+    border-color: var(--success-border);
 }
 
 .message.error {
-    background: #fee2e2;
-    color: #991b1b;
-    border-left: 4px solid #ef4444;
+    background: var(--error-bg);
+    color: var(--error-text);
+    border-color: var(--error-border);
 }
 
 .message.warning {
-    background: #fef3c7;
-    color: #92400e;
-    border-left: 4px solid #f59e0b;
+    background: var(--warning-bg);
+    color: var(--warning-text);
+    border-color: var(--warning-border);
 }
 
-/* Empty state */
+/* Empty state for dark mode */
 .empty-state {
     text-align: center;
     padding: 40px 20px;
-    color: #6b7280;
+    color: var(--text-secondary);
 }
 
 .empty-state i {
     font-size: 3rem;
     margin-bottom: 15px;
-    color: #d1d5db;
+    color: var(--border-color);
 }
 
 .empty-state h3 {
     font-size: 1.5rem;
     margin-bottom: 10px;
-    color: #374151;
+    color: var(--text-primary);
 }
 
 .empty-state p {
-    color: #6b7280;
+    color: var(--text-secondary);
     max-width: 400px;
     margin: 0 auto;
+}
+
+/* Dark mode specific adjustments */
+[data-theme="dark"] .stat-card .number {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .exam-table th {
+    color: var(--text-sidebar);
+}
+
+[data-theme="dark"] .exam-table td {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .exam-table tr:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+/* Calendar dark mode fixes */
+[data-theme="dark"] .fc .fc-daygrid-day.fc-day-today {
+    background-color: rgba(245, 158, 11, 0.1) !important;
+}
+
+[data-theme="dark"] .fc-theme-standard .fc-scrollgrid {
+    border-color: var(--border-color) !important;
 }
 
 /* ================= Responsive ================= */
@@ -585,6 +673,9 @@ try {
     .fc-toolbar-title {
         font-size: 1.2rem !important;
     }
+    #examCalendar {
+        padding: 10px;
+    }
 }
 </style>
 </head>
@@ -601,16 +692,28 @@ try {
     <!-- Sidebar - EXACTLY LIKE STUDENT DASHBOARD -->
     <div class="sidebar">
         <div class="sidebar-profile">
-            <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture">
+            <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic">
             <p><?= htmlspecialchars($user['username'] ?? 'Student') ?></p>
         </div>
-        <h2>Student Panel</h2>
-        <a href="student_dashboard.php" class="<?= $current_page=='student_dashboard.php'?'active':'' ?>">Dashboard</a>
-        <a href="my_schedule.php" class="<?= $current_page=='my_schedule.php'?'active':'' ?>">My Schedule</a>
-        <a href="view_exam_schedules.php" class="<?= $current_page=='view_exam_schedules.php'?'active':'' ?>">Exam Schedule</a>
-        <a href="view_announcements.php" class="<?= $current_page=='view_announcements.php'?'active':'' ?>">Announcements</a>
-        <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">Edit Profile</a>
-        <a href="../logout.php">Logout</a>
+        <h2>Student Dashboard</h2>
+        <a href="student_dashboard.php" class="<?= $current_page=='student_dashboard.php'?'active':'' ?>">
+            <i class="fas fa-home"></i> Dashboard
+        </a>
+        <a href="my_schedule.php" class="<?= $current_page=='my_schedule.php'?'active':'' ?>">
+            <i class="fas fa-calendar-alt"></i> My Schedule
+        </a>
+        <a href="view_exam_schedules.php" class="<?= $current_page=='view_exam_schedules.php'?'active':'' ?>">
+            <i class="fas fa-clipboard-list"></i> Exam Schedule
+        </a>
+        <a href="view_announcements.php" class="<?= $current_page=='view_announcements.php'?'active':'' ?>">
+            <i class="fas fa-bullhorn"></i> Announcements
+        </a>
+        <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
+            <i class="fas fa-user-edit"></i> Edit Profile
+        </a>
+        <a href="../logout.php">
+            <i class="fas fa-sign-out-alt"></i> Logout
+        </a>
     </div>
 
     <!-- Main Content -->
@@ -622,7 +725,7 @@ try {
                     <p>View all your upcoming and past exam schedules</p>
                 </div>
                 <div class="user-info">
-                    <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile">
+                    <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile" id="headerProfilePic">
                     <div>
                         <div><?= htmlspecialchars($user['username'] ?? 'Student') ?></div>
                         <small>Student</small>
@@ -668,7 +771,7 @@ try {
             <!-- Upcoming Exams Section -->
             <?php if(!empty($upcoming_exams)): ?>
             <div class="exam-section">
-                <h2 style="margin-bottom: 20px; color: #1f2937;">Upcoming Exams (Next 7 Days)</h2>
+                <h2 style="margin-bottom: 20px; color: var(--text-primary);">Upcoming Exams (Next 7 Days)</h2>
                 <div class="table-container">
                     <table class="exam-table">
                         <thead>
@@ -689,7 +792,7 @@ try {
                             <tr class="upcoming-exam">
                                 <td>
                                     <strong><?= htmlspecialchars($exam['course_code']) ?></strong><br>
-                                    <small style="color: #6b7280;"><?= htmlspecialchars($exam['course_name']) ?></small>
+                                    <small style="color: var(--text-secondary);"><?= htmlspecialchars($exam['course_name']) ?></small>
                                 </td>
                                 <td>
                                     <span class="badge badge-primary"><?= htmlspecialchars($exam['exam_type']) ?></span>
@@ -717,7 +820,7 @@ try {
 
             <!-- All Exam Schedules Table -->
             <div class="exam-section">
-                <h2 style="margin-bottom: 20px; color: #1f2937;">All Exam Schedules</h2>
+                <h2 style="margin-bottom: 20px; color: var(--text-primary);">All Exam Schedules</h2>
                 <div class="table-container">
                     <table class="exam-table">
                         <thead>
@@ -758,14 +861,14 @@ try {
                                     <tr class="<?= $row_class ?>">
                                         <td>
                                             <strong><?= htmlspecialchars($exam['course_code']) ?></strong><br>
-                                            <small style="color: #6b7280;"><?= htmlspecialchars($exam['course_name']) ?></small>
+                                            <small style="color: var(--text-secondary);"><?= htmlspecialchars($exam['course_name']) ?></small>
                                         </td>
                                         <td>
                                             <span class="badge badge-primary"><?= htmlspecialchars($exam['exam_type']) ?></span>
                                         </td>
                                         <td>
                                             <?= date('M d, Y', strtotime($exam['exam_date'])) ?><br>
-                                            <small style="color: #6b7280;">
+                                            <small style="color: var(--text-secondary);">
                                                 <?= date('h:i A', strtotime($exam['start_time'])) ?> - 
                                                 <?= date('h:i A', strtotime($exam['end_time'])) ?>
                                             </small>
@@ -797,6 +900,8 @@ try {
 
     <!-- FullCalendar JS -->
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
+    <!-- Include darkmode.js -->
+    <script src="../../assets/js/darkmode.js"></script>
     <script>
     function toggleSidebar() {
         const sidebar = document.querySelector('.sidebar');
@@ -816,6 +921,22 @@ try {
                 link.classList.add('active');
             }
         });
+        
+        // Add animation to stats cards
+        const statCards = document.querySelectorAll('.stat-card');
+        statCards.forEach((card, index) => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            setTimeout(() => {
+                card.style.transition = 'all 0.5s ease';
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, index * 200);
+        });
+        
+        // Debug: Log profile picture paths
+        console.log('Sidebar profile pic src:', document.getElementById('sidebarProfilePic').src);
+        console.log('Header profile pic src:', document.getElementById('headerProfilePic').src);
     });
 
     // Confirm logout
@@ -852,14 +973,18 @@ try {
             // Adjust color for past exams (lighter)
             $baseColor = $colorMap[$exam['exam_type']] ?? '#6b7280';
             if ($is_past) {
-                // Make past exams lighter
-                $color = lightenColor($baseColor, 40);
+                // Make past exams lighter for better contrast in dark mode
+                $color = lightenColor($baseColor, 30);
             } else if ($is_today) {
                 // Make today's exams more vibrant
-                $color = $baseColor;
+                $color = darkenColor($baseColor, 10);
             } else {
                 $color = $baseColor;
             }
+            
+            // Text color based on theme
+            $currentTheme = isset($_SESSION['dark_mode']) && $_SESSION['dark_mode'] ? 'dark' : 'light';
+            $textColor = $currentTheme === 'dark' ? '#ffffff' : '#ffffff';
             
             return [
                 'id' => $exam['exam_id'],
@@ -868,7 +993,7 @@ try {
                 'end' => $exam['exam_date'] . 'T' . $exam['end_time'],
                 'backgroundColor' => $color,
                 'borderColor' => $color,
-                'textColor' => '#ffffff',
+                'textColor' => $textColor,
                 'extendedProps' => [
                     'course' => $exam['course_name'],
                     'room' => $exam['room_name'] ?? 'Not Assigned',
@@ -965,6 +1090,22 @@ try {
         ).toString(16).slice(1);
     }
     
+    // Helper function to darken colors
+    function darkenColor(color, percent) {
+        const num = parseInt(color.replace("#", ""), 16);
+        const amt = Math.round(2.55 * percent);
+        const R = (num >> 16) - amt;
+        const G = (num >> 8 & 0x00FF) - amt;
+        const B = (num & 0x0000FF) - amt;
+        
+        return "#" + (
+            0x1000000 +
+            (R > 0 ? R : 0) * 0x10000 +
+            (G > 0 ? G : 0) * 0x100 +
+            (B > 0 ? B : 0)
+        ).toString(16).slice(1);
+    }
+    
     // Auto-close messages after 5 seconds
     setTimeout(function() {
         const messages = document.querySelectorAll('.message');
@@ -978,6 +1119,13 @@ try {
             }, 500);
         });
     }, 5000);
+    
+    // Fallback for broken profile pictures
+    function handleImageError(img) {
+        img.onerror = null;
+        img.src = '../assets/default_profile.png';
+        return true;
+    }
     </script>
 </body>
 </html>
