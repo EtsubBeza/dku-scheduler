@@ -119,8 +119,18 @@ if(isset($_POST['unenroll_all'])){
 $years_stmt = $pdo->prepare("
     SELECT DISTINCT year 
     FROM users 
-    WHERE role='student' AND department_id=? AND year IS NOT NULL 
-    ORDER BY year
+    WHERE role='student' AND department_id=? AND year IS NOT NULL AND year != ''
+    ORDER BY 
+        CASE 
+            WHEN year LIKE 'E%' THEN 2  -- Put extension years after regular years
+            ELSE 1
+        END,
+        CAST(
+            CASE 
+                WHEN year LIKE 'E%' THEN SUBSTRING(year, 2)
+                ELSE year 
+            END AS UNSIGNED
+        )
 ");
 $years_stmt->execute([$dept_id]);
 $available_years = $years_stmt->fetchAll(PDO::FETCH_COLUMN);
@@ -134,17 +144,33 @@ if(empty($available_years)){
 $selected_year = $_GET['year'] ?? $_POST['year'] ?? ($available_years[0] ?? 1);
 
 // Fetch students based on selected year
-$students_stmt = $pdo->prepare("
-    SELECT user_id, username, year 
-    FROM users 
-    WHERE role='student' AND department_id=? 
-    " . (in_array($selected_year, $available_years) ? "AND year = ?" : "") . "
-    ORDER BY username
-");
-if(in_array($selected_year, $available_years)){
-    $students_stmt->execute([$dept_id, $selected_year]);
-} else {
+if($selected_year == 'all') {
+    $students_stmt = $pdo->prepare("
+        SELECT user_id, username, year 
+        FROM users 
+        WHERE role='student' AND department_id=? 
+        ORDER BY 
+            CASE 
+                WHEN year LIKE 'E%' THEN 2
+                ELSE 1
+            END,
+            CAST(
+                CASE 
+                    WHEN year LIKE 'E%' THEN SUBSTRING(year, 2)
+                    ELSE year 
+                END AS UNSIGNED
+            ),
+            username
+    ");
     $students_stmt->execute([$dept_id]);
+} else {
+    $students_stmt = $pdo->prepare("
+        SELECT user_id, username, year 
+        FROM users 
+        WHERE role='student' AND department_id=? AND year = ?
+        ORDER BY username
+    ");
+    $students_stmt->execute([$dept_id, $selected_year]);
 }
 $students = $students_stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -177,7 +203,18 @@ $enrollments_stmt = $pdo->prepare("
     JOIN schedule s ON e.schedule_id = s.schedule_id
     JOIN courses c ON s.course_id = c.course_id
     WHERE c.department_id = ?
-    ORDER BY u.year, u.username, s.day, s.start_time
+    ORDER BY 
+        CASE 
+            WHEN u.year LIKE 'E%' THEN 2
+            ELSE 1
+        END,
+        CAST(
+            CASE 
+                WHEN u.year LIKE 'E%' THEN SUBSTRING(u.year, 2)
+                ELSE u.year 
+            END AS UNSIGNED
+        ),
+        u.username, s.day, s.start_time
 ");
 $enrollments_stmt->execute([$dept_id]);
 $enrollments = $enrollments_stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -404,6 +441,16 @@ foreach($enrollments as $e){
 
 .year-btn.all.active {
     background: #059669;
+}
+
+.year-btn.extension {
+    background: #8b5cf6;
+    color: white;
+    border-color: #8b5cf6;
+}
+
+.year-btn.extension.active {
+    background: #7c3aed;
 }
 
 .year-stats {
@@ -760,15 +807,34 @@ select.form-control[multiple] {
                                 All Years
                             </button>
                             <?php foreach($available_years as $year): ?>
-                                <button type="button" class="year-btn <?= ($selected_year == $year) ? 'active' : '' ?>" onclick="filterStudents(<?= $year ?>)">
-                                    Year <?= $year ?>
+                                <?php 
+                                    // Check if this is an extension year (starts with E)
+                                    $is_extension = (is_string($year) && strpos($year, 'E') === 0);
+                                    $display_year = $is_extension ? 'E' . substr($year, 1) : $year;
+                                    $year_class = $is_extension ? 'extension' : '';
+                                ?>
+                                <button type="button" class="year-btn <?= $year_class ?> <?= ($selected_year == $year) ? 'active' : '' ?>" 
+                                        onclick="filterStudents('<?= htmlspecialchars($year, ENT_QUOTES) ?>')">
+                                    <?php if($is_extension): ?>
+                                        E<?= substr($year, 1) ?>
+                                    <?php else: ?>
+                                        Year <?= $display_year ?>
+                                    <?php endif; ?>
                                 </button>
                             <?php endforeach; ?>
                         </div>
                     </div>
                     <div class="year-stats">
                         Showing <?= count($students) ?> student(s) from 
-                        <?= ($selected_year == 'all') ? 'all years' : 'Year ' . $selected_year ?>
+                        <?php 
+                            if($selected_year == 'all') {
+                                echo 'all years';
+                            } elseif(is_string($selected_year) && strpos($selected_year, 'E') === 0) {
+                                echo 'Extension Year ' . substr($selected_year, 1);
+                            } else {
+                                echo 'Year ' . $selected_year;
+                            }
+                        ?>
                         <span class="badge"><?= count($students) ?></span>
                     </div>
                 </div>
@@ -784,13 +850,27 @@ select.form-control[multiple] {
                                     <?php foreach($students as $s): ?>
                                         <option value="<?= (int)$s['user_id'] ?>">
                                             <?= htmlspecialchars($s['username']) ?>
-                                            <?php if(isset($s['year'])): ?>
-                                                <span style="color: var(--text-light); font-size: 0.9em;">(Year <?= $s['year'] ?>)</span>
+                                            <?php if(isset($s['year']) && $s['year'] !== ''): ?>
+                                                <?php if(is_string($s['year']) && strpos($s['year'], 'E') === 0): ?>
+                                                    <span style="color: var(--text-light); font-size: 0.9em;">(E<?= substr($s['year'], 1) ?>)</span>
+                                                <?php else: ?>
+                                                    <span style="color: var(--text-light); font-size: 0.9em;">(Year <?= $s['year'] ?>)</span>
+                                                <?php endif; ?>
                                             <?php endif; ?>
                                         </option>
                                     <?php endforeach; ?>
                                 <?php else: ?>
-                                    <option disabled>No students found for Year <?= $selected_year ?></option>
+                                    <option disabled>
+                                        <?php 
+                                            if($selected_year == 'all') {
+                                                echo 'No students found';
+                                            } elseif(is_string($selected_year) && strpos($selected_year, 'E') === 0) {
+                                                echo 'No extension students found for E' . substr($selected_year, 1);
+                                            } else {
+                                                echo 'No students found for Year ' . $selected_year;
+                                            }
+                                        ?>
+                                    </option>
                                 <?php endif; ?>
                             </select>
                         </div>
@@ -842,7 +922,13 @@ select.form-control[multiple] {
                         <?php foreach($enrollments_by_year as $year => $year_enrollments): ?>
                             <div class="year-section">
                                 <div class="year-section-header">
-                                    <span>Year <?= $year ?> Students</span>
+                                    <span>
+                                        <?php if(is_string($year) && strpos($year, 'E') === 0): ?>
+                                            Extension Year <?= substr($year, 1) ?> Students
+                                        <?php else: ?>
+                                            Year <?= $year ?> Students
+                                        <?php endif; ?>
+                                    </span>
                                     <span class="badge"><?= count($year_enrollments) ?> enrollment(s)</span>
                                 </div>
                                 <div class="table-container">
@@ -866,7 +952,13 @@ select.form-control[multiple] {
                                                     </td>
                                                     <td>
                                                         <?= htmlspecialchars($e['student_name']) ?>
-                                                        <span class="student-year-badge">Year <?= $e['student_year'] ?></span>
+                                                        <span class="student-year-badge">
+                                                            <?php if(is_string($e['student_year']) && strpos($e['student_year'], 'E') === 0): ?>
+                                                                E<?= substr($e['student_year'], 1) ?>
+                                                            <?php else: ?>
+                                                                Year <?= $e['student_year'] ?>
+                                                            <?php endif; ?>
+                                                        </span>
                                                     </td>
                                                     <td>
                                                         <?= htmlspecialchars($e['course_name']) ?>
@@ -912,7 +1004,12 @@ select.form-control[multiple] {
 
         // Filter students by year
         function filterStudents(year) {
-            document.getElementById('selectedYear').value = year;
+            // Handle special cases
+            if(year === 'all') {
+                document.getElementById('selectedYear').value = 'all';
+            } else {
+                document.getElementById('selectedYear').value = year;
+            }
             document.getElementById('enrollmentForm').submit();
         }
 
@@ -948,7 +1045,14 @@ select.form-control[multiple] {
                     const yearCheckboxes = Array.from(checkboxes).filter(cb => {
                         const row = cb.closest('tr');
                         const yearBadge = row.querySelector('.student-year-badge');
-                        return yearBadge && yearBadge.textContent.includes(year);
+                        if(yearBadge) {
+                            if(year.startsWith('E')) {
+                                return yearBadge.textContent.includes('E' + year.substring(1));
+                            } else {
+                                return yearBadge.textContent.includes('Year ' + year);
+                            }
+                        }
+                        return false;
                     });
                     
                     yearCheckboxes.forEach(cb => {

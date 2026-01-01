@@ -12,49 +12,37 @@ include __DIR__ . '/../includes/darkmode.php';
 
 $student_id = $_SESSION['user_id'];
 
-// Fetch current user info - MATCHING DASHBOARD
-$user_stmt = $pdo->prepare("SELECT username, profile_picture FROM users WHERE user_id = ?");
-$user_stmt->execute([$_SESSION['user_id']]);
+// Fetch current user info with their YEAR - IMPORTANT!
+$user_stmt = $pdo->prepare("SELECT username, profile_picture, year FROM users WHERE user_id = ?");
+$user_stmt->execute([$student_id]);
 $user = $user_stmt->fetch(PDO::FETCH_ASSOC);
 
-// Determine profile picture path - FIXED VERSION
-$uploads_dir = __DIR__ . '/../uploads/';
-$assets_dir = __DIR__ . '/../assets/';
+$student_year = $user['year'] ?? ''; // Get the student's year (e.g., "1", "2", "E1", "E2")
 
-// Check if profile picture exists in uploads directory
+// Determine profile picture path
+$uploads_dir = __DIR__ . '/../uploads/';
 $profile_picture = $user['profile_picture'] ?? '';
 $default_profile = 'default_profile.png';
 
-// Check multiple possible locations
 if(!empty($profile_picture)) {
-    // Try absolute path first
     if(file_exists($uploads_dir . $profile_picture)) {
         $profile_img_path = '../uploads/' . $profile_picture;
-    }
-    // Try relative path from current directory
-    else if(file_exists('uploads/' . $profile_picture)) {
+    } else if(file_exists('uploads/' . $profile_picture)) {
         $profile_img_path = 'uploads/' . $profile_picture;
-    }
-    // Try direct uploads path
-    else if(file_exists('../uploads/' . $profile_picture)) {
+    } else if(file_exists('../uploads/' . $profile_picture)) {
         $profile_img_path = '../uploads/' . $profile_picture;
-    }
-    // Try ../../uploads path
-    else if(file_exists('../../uploads/' . $profile_picture)) {
+    } else if(file_exists('../../uploads/' . $profile_picture)) {
         $profile_img_path = '../../uploads/' . $profile_picture;
-    }
-    else {
-        // Use default if file doesn't exist
+    } else {
         $profile_img_path = '../assets/' . $default_profile;
     }
 } else {
-    // Use default if no profile picture
     $profile_img_path = '../assets/' . $default_profile;
 }
 
 // Handle Excel/CSV Export
 if(isset($_GET['export']) && $_GET['export'] == 'excel') {
-    // Fetch schedule data
+    // Fetch schedule data WITH YEAR FILTERING
     $schedules = $pdo->prepare("
         SELECT c.course_name, c.course_code, u.full_name AS instructor_name, 
                r.room_name, s.day, s.start_time, s.end_time
@@ -63,17 +51,17 @@ if(isset($_GET['export']) && $_GET['export'] == 'excel') {
         JOIN users u ON s.instructor_id = u.user_id
         JOIN rooms r ON s.room_id = r.room_id
         JOIN enrollments e ON s.schedule_id = e.schedule_id
-        WHERE e.student_id = ?
+        WHERE e.student_id = ? 
+        AND s.year = ?  -- CRITICAL: Filter by student's year
         ORDER BY FIELD(s.day, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'), s.start_time
     ");
-    $schedules->execute([$student_id]);
+    $schedules->execute([$student_id, $student_year]);
     $my_schedule = $schedules->fetchAll();
 
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename="my_schedule_' . date('Y-m-d') . '.csv"');
     
     $output = fopen('php://output', 'w');
-    // Add BOM for UTF-8 to help Excel with special characters
     fwrite($output, "\xEF\xBB\xBF");
     fputcsv($output, ['Course Name', 'Course Code', 'Instructor', 'Room', 'Day', 'Start Time', 'End Time']);
     
@@ -92,23 +80,52 @@ if(isset($_GET['export']) && $_GET['export'] == 'excel') {
     exit;
 }
 
-// Normal page load - fetch schedule for display
+// Normal page load - fetch schedule for display WITH YEAR FILTERING
 $schedules = $pdo->prepare("
     SELECT s.schedule_id, c.course_name, c.course_code, u.full_name AS instructor_name, 
-           r.room_name, s.day, s.start_time, s.end_time
+           r.room_name, s.day, s.start_time, s.end_time, s.year
     FROM schedule s
     JOIN courses c ON s.course_id = c.course_id
     JOIN users u ON s.instructor_id = u.user_id
     JOIN rooms r ON s.room_id = r.room_id
     JOIN enrollments e ON s.schedule_id = e.schedule_id
-    WHERE e.student_id = ?
+    WHERE e.student_id = ? 
+    AND s.year = ?  -- CRITICAL: Filter by student's year
     ORDER BY FIELD(s.day, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'), s.start_time
 ");
-$schedules->execute([$student_id]);
+$schedules->execute([$student_id, $student_year]);
 $my_schedule = $schedules->fetchAll();
 
 // Sidebar active page
 $current_page = basename($_SERVER['PHP_SELF']);
+
+// Debug info (remove in production)
+$debug_info = "";
+if (empty($my_schedule)) {
+    $debug_info = "No schedules found for student ID: $student_id, Year: $student_year";
+    
+    // Check if student is enrolled in any courses
+    $enrollment_check = $pdo->prepare("
+        SELECT COUNT(*) as count 
+        FROM enrollments 
+        WHERE student_id = ?
+    ");
+    $enrollment_check->execute([$student_id]);
+    $enrollment_count = $enrollment_check->fetch()['count'];
+    
+    $debug_info .= " | Enrollments: $enrollment_count";
+    
+    // Check available schedules for this year
+    $schedule_check = $pdo->prepare("
+        SELECT COUNT(*) as count 
+        FROM schedule 
+        WHERE year = ?
+    ");
+    $schedule_check->execute([$student_year]);
+    $schedule_count = $schedule_check->fetch()['count'];
+    
+    $debug_info .= " | Schedules for year $student_year: $schedule_count";
+}
 ?>
 <!DOCTYPE html>
 <html lang="en" data-theme="<?= $darkMode ? 'dark' : 'light' ?>">
@@ -193,6 +210,18 @@ $current_page = basename($_SERVER['PHP_SELF']);
     margin-bottom: 25px;
     font-size: 22px;
     padding: 0 20px;
+}
+
+/* Year badge in sidebar */
+.year-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    background: <?= (substr($student_year, 0, 1) === 'E') ? '#8b5cf6' : '#3b82f6' ?>;
+    color: white;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-top: 5px;
 }
 
 /* ================= Overlay ================= */
@@ -282,6 +311,47 @@ $current_page = basename($_SERVER['PHP_SELF']);
     color: var(--text-secondary);
     font-size: 1.1rem;
     margin-top: 10px;
+}
+
+/* Student info box */
+.student-info-box {
+    background: rgba(99, 102, 241, 0.1);
+    padding: 15px 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    border-left: 4px solid #6366f1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-primary);
+}
+
+.student-info-box i {
+    color: #6366f1;
+    font-size: 1.2rem;
+}
+
+.student-year-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    background: <?= (substr($student_year, 0, 1) === 'E') ? '#8b5cf6' : '#3b82f6' ?>;
+    color: white;
+    border-radius: 15px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-left: 10px;
+}
+
+/* Debug info (only show when empty) */
+.debug-info {
+    background: rgba(239, 68, 68, 0.1);
+    padding: 15px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    border-left: 4px solid #ef4444;
+    color: var(--error-text);
+    font-family: monospace;
+    font-size: 0.9rem;
 }
 
 /* ================= Export Buttons ================= */
@@ -455,7 +525,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
 /* ================= Print Styles ================= */
 @media print {
-    .sidebar, .topbar, .overlay, .export-buttons, .user-info { 
+    .sidebar, .topbar, .overlay, .export-buttons, .user-info, .student-info-box, .debug-info { 
         display: none !important; 
     }
     .main-content { 
@@ -535,17 +605,28 @@ $current_page = basename($_SERVER['PHP_SELF']);
     <!-- Overlay for Mobile -->
     <div class="overlay" onclick="toggleSidebar()"></div>
 
-    <!-- Sidebar - SAME AS OTHER PAGES -->
+    <!-- Sidebar -->
     <div class="sidebar">
         <div class="sidebar-profile">
             <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture">
             <p><?= htmlspecialchars($user['username'] ?? 'Student') ?></p>
+            <?php if($student_year): ?>
+                <span class="year-badge">
+                    <?php 
+                    if(substr($student_year, 0, 1) === 'E') {
+                        echo 'Ext. Year ' . substr($student_year, 1);
+                    } else {
+                        echo 'Year ' . $student_year;
+                    }
+                    ?>
+                </span>
+            <?php endif; ?>
         </div>
         <h2>Student Panel</h2>
         <a href="student_dashboard.php" class="<?= $current_page=='student_dashboard.php'?'active':'' ?>">
             <i class="fas fa-home"></i> Dashboard
         </a>
-        <a href="my_schedule.php" class="<?= $current_page=='my_schedule.php'?'active':'' ?>">
+        <a href="my_schedule.php" class="active">
             <i class="fas fa-calendar-alt"></i> My Schedule
         </a>
         <a href="view_exam_schedules.php" class="<?= $current_page=='view_exam_schedules.php'?'active':'' ?>">
@@ -578,6 +659,34 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     </div>
                 </div>
             </div>
+
+            <!-- Student Info -->
+            <div class="student-info-box">
+                <i class="fas fa-user-graduate"></i>
+                <div>
+                    <strong>Student Information:</strong> 
+                    <?= htmlspecialchars($user['username'] ?? 'Student') ?>
+                    <span class="student-year-badge">
+                        <?php 
+                        if($student_year) {
+                            if(substr($student_year, 0, 1) === 'E') {
+                                echo 'Extension Year ' . substr($student_year, 1);
+                            } else {
+                                echo 'Year ' . $student_year;
+                            }
+                        } else {
+                            echo 'Year not set';
+                        }
+                        ?>
+                    </span>
+                </div>
+            </div>
+
+            <?php if(!empty($debug_info)): ?>
+                <div class="debug-info">
+                    <i class="fas fa-exclamation-triangle"></i> Debug Info: <?= $debug_info ?>
+                </div>
+            <?php endif; ?>
 
             <!-- Export Buttons -->
             <div class="export-buttons">
@@ -633,7 +742,22 @@ $current_page = basename($_SERVER['PHP_SELF']);
                                     <div class="empty-state">
                                         <i class="fas fa-calendar-times"></i>
                                         <h3>No Classes Scheduled</h3>
-                                        <p>You don't have any classes scheduled at the moment.</p>
+                                        <p>You don't have any classes scheduled for 
+                                            <?php 
+                                            if($student_year) {
+                                                if(substr($student_year, 0, 1) === 'E') {
+                                                    echo 'Extension Year ' . substr($student_year, 1);
+                                                } else {
+                                                    echo 'Year ' . $student_year;
+                                                }
+                                            } else {
+                                                echo 'your year';
+                                            }
+                                            ?>
+                                        </p>
+                                        <p style="margin-top: 10px; font-size: 0.9rem;">
+                                            Please check with your department head or administrator.
+                                        </p>
                                     </div>
                                 </td>
                             </tr>

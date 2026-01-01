@@ -114,12 +114,20 @@ if(isset($_POST['save_exam'])){
     $room_id = (int)$_POST['room_id'];
     $supervisor_id = !empty($_POST['supervisor_id']) ? (int)$_POST['supervisor_id'] : null;
     $academic_year = $_POST['academic_year'];
-    $semester = $_POST['semester'];
+    $semester = $_POST['semester']; // 1st Semester or 2nd Semester
+    $student_type = $_POST['student_type']; // regular or extension
+    $year = $_POST['year']; // 1-5 or E1-E5
     $max_students = (int)$_POST['max_students'];
     $is_published = isset($_POST['is_published']) ? 1 : 0;
     
+    // Validate student type and year
+    if($student_type === 'extension' && !preg_match('/^E[1-5]$/', $year)) {
+        showMessage('error', "Invalid extension year. Must be E1-E5.");
+    } elseif($student_type === 'regular' && (!is_numeric($year) || $year < 1 || $year > 5)) {
+        showMessage('error', "Invalid regular year. Must be 1-5.");
+    }
     // Validate time
-    if(strtotime($end_time) <= strtotime($start_time)) {
+    elseif(strtotime($end_time) <= strtotime($start_time)) {
         showMessage('error', "End time must be after start time");
     } elseif(strtotime($exam_date) < strtotime('today')) {
         showMessage('error', "Exam date cannot be in the past");
@@ -143,13 +151,13 @@ if(isset($_POST['save_exam'])){
                         UPDATE exam_schedules 
                         SET course_id = ?, exam_type = ?, exam_date = ?, start_time = ?, end_time = ?, 
                             room_id = ?, supervisor_id = ?, academic_year = ?, semester = ?, 
-                            max_students = ?, is_published = ?
+                            student_type = ?, year = ?, max_students = ?, is_published = ?
                         WHERE exam_id = ? AND created_by = ?
                     ");
                     $stmt->execute([
                         $course_id, $exam_type, $exam_date, $start_time, $end_time,
                         $room_id, $supervisor_id, $academic_year, $semester, 
-                        $max_students, $is_published, $exam_id, $user_id
+                        $student_type, $year, $max_students, $is_published, $exam_id, $user_id
                     ]);
                     
                     if($stmt->rowCount() > 0) {
@@ -162,13 +170,14 @@ if(isset($_POST['save_exam'])){
                     $stmt = $pdo->prepare("
                         INSERT INTO exam_schedules 
                         (course_id, exam_type, exam_date, start_time, end_time, room_id, 
-                         supervisor_id, academic_year, semester, max_students, is_published, created_by)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         supervisor_id, academic_year, semester, student_type, year, 
+                         max_students, is_published, created_by)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ");
                     $stmt->execute([
                         $course_id, $exam_type, $exam_date, $start_time, $end_time,
                         $room_id, $supervisor_id, $academic_year, $semester, 
-                        $max_students, $is_published, $user_id
+                        $student_type, $year, $max_students, $is_published, $user_id
                     ]);
                     
                     showMessage('success', "Exam schedule created successfully!");
@@ -292,7 +301,8 @@ $stats_stmt = $pdo->prepare("
         COUNT(*) as total_exams,
         SUM(CASE WHEN exam_date >= CURDATE() THEN 1 ELSE 0 END) as upcoming_exams,
         SUM(CASE WHEN is_published = 1 THEN 1 ELSE 0 END) as published_exams,
-        COUNT(DISTINCT exam_type) as exam_types_count
+        COUNT(DISTINCT exam_type) as exam_types_count,
+        COUNT(DISTINCT student_type) as student_types_count
     FROM exam_schedules es
     JOIN courses c ON es.course_id = c.course_id
     WHERE c.department_id = ?
@@ -312,9 +322,24 @@ $type_dist_stmt = $pdo->prepare("
 $type_dist_stmt->execute([$dept_id]);
 $type_distribution = $type_dist_stmt->fetchAll();
 
+// Fetch student type distribution
+$student_type_stmt = $pdo->prepare("
+    SELECT 
+        student_type,
+        year,
+        COUNT(*) as count
+    FROM exam_schedules es
+    JOIN courses c ON es.course_id = c.course_id
+    WHERE c.department_id = ?
+    GROUP BY student_type, year
+    ORDER BY student_type DESC, year
+");
+$student_type_stmt->execute([$dept_id]);
+$student_type_distribution = $student_type_stmt->fetchAll();
+
 // Set default academic year and semester
 $default_year = date('Y') . '-' . (date('Y') + 1);
-$default_semester = date('n') <= 6 ? 'Spring' : 'Fall';
+$default_semester = date('n') <= 6 ? '2nd Semester' : '1st Semester';
 ?>
 
 <!DOCTYPE html>
@@ -840,6 +865,65 @@ body {
     border-radius: 20px;
     font-size: 0.75rem;
     font-weight: 600;
+}
+
+/* ================= Student Type Badges ================= */
+.student-type-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    border-radius: 50px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-weight: 500;
+    transition: all 0.3s ease;
+    border: 1px solid var(--border-color);
+}
+
+.student-type-badge.regular {
+    border-left: 4px solid #3b82f6;
+}
+
+.student-type-badge.extension {
+    border-left: 4px solid #8b5cf6;
+}
+
+.student-type-badge .count {
+    background: var(--bg-card);
+    color: var(--text-primary);
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border: 1px solid var(--border-color);
+}
+
+.student-type-distribution {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 15px;
+}
+
+/* Year badge in table */
+.year-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-left: 5px;
+}
+
+.regular-year-badge {
+    background: #3b82f6;
+    color: white;
+}
+
+.extension-year-badge {
+    background: #8b5cf6;
+    color: white;
 }
 
 /* ================= Calendar Card ================= */
@@ -1487,21 +1571,45 @@ body {
                 <h3>Exam Types</h3>
                 <p><?= $stats['exam_types_count'] ?? 0 ?></p>
             </div>
+            
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-user-graduate"></i>
+                </div>
+                <h3>Student Types</h3>
+                <p><?= $stats['student_types_count'] ?? 0 ?></p>
+            </div>
         </div>
 
-        <!-- Exam Type Distribution -->
-        <div class="table-section">
-            <h2><i class="fas fa-chart-bar"></i> Exam Type Distribution</h2>
+        <!-- Distribution Cards -->
+        <div class="distribution-card">
+            <h3><i class="fas fa-chart-bar"></i> Exam Type Distribution</h3>
             <div class="type-distribution">
                 <?php if(!empty($type_distribution)): ?>
                     <?php foreach($type_distribution as $type): ?>
                         <div class="type-badge">
+                            <i class="fas fa-<?= $type['exam_type'] == 'Midterm' ? 'file-alt' : ($type['exam_type'] == 'Final' ? 'graduation-cap' : ($type['exam_type'] == 'Quiz' ? 'question-circle' : 'tasks')) ?>"></i>
                             <span><?= htmlspecialchars($type['exam_type']) ?></span>
                             <span class="count"><?= $type['count'] ?></span>
                         </div>
                     <?php endforeach; ?>
                 <?php else: ?>
                     <p class="empty-state">No exams scheduled yet</p>
+                <?php endif; ?>
+            </div>
+            
+            <h3 style="margin-top: 25px;"><i class="fas fa-user-graduate"></i> Student Type Distribution</h3>
+            <div class="student-type-distribution">
+                <?php if(!empty($student_type_distribution)): ?>
+                    <?php foreach($student_type_distribution as $dist): ?>
+                        <div class="student-type-badge <?= $dist['student_type'] ?>">
+                            <i class="fas fa-<?= $dist['student_type'] == 'regular' ? 'user' : 'user-tie' ?>"></i>
+                            <span><?= ucfirst($dist['student_type']) ?> - Year <?= $dist['year'] ?></span>
+                            <span class="count"><?= $dist['count'] ?></span>
+                        </div>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">No student type data available</p>
                 <?php endif; ?>
             </div>
         </div>
@@ -1528,6 +1636,7 @@ body {
                             <th>Exam Type</th>
                             <th>Date & Time</th>
                             <th>Room</th>
+                            <th>Student Type</th>
                             <th>Supervisor</th>
                             <th>Students</th>
                             <th>Status</th>
@@ -1566,6 +1675,16 @@ body {
                                             <?= htmlspecialchars($exam['room_name']) ?>
                                         </strong>
                                         <small style="color: var(--text-secondary);">Capacity: <?= $exam['capacity'] ?></small>
+                                    </td>
+                                    <td>
+                                        <div style="display: flex; align-items: center; gap: 5px;">
+                                            <span style="font-weight: 500; color: var(--text-primary);">
+                                                <?= ucfirst($exam['student_type']) ?>
+                                            </span>
+                                            <span class="year-badge <?= $exam['student_type'] ?>-year-badge">
+                                                Year <?= $exam['year'] ?>
+                                            </span>
+                                        </div>
                                     </td>
                                     <td>
                                         <?php if($exam['supervisor_name']): ?>
@@ -1638,7 +1757,7 @@ body {
                             <?php endforeach; ?>
                         <?php else: ?>
                             <tr>
-                                <td colspan="8">
+                                <td colspan="9">
                                     <div class="empty-state">
                                         <i class="fas fa-calendar-times"></i>
                                         <h3>No Exam Schedules Found</h3>
@@ -1782,9 +1901,28 @@ body {
                         <div class="form-group">
                             <label for="semester">Semester <span>*</span></label>
                             <select class="form-control" id="semester" name="semester" required>
-                                <option value="Fall" <?= ($edit_exam['semester'] ?? $default_semester) == 'Fall' ? 'selected' : '' ?>>Fall</option>
-                                <option value="Spring" <?= ($edit_exam['semester'] ?? $default_semester) == 'Spring' ? 'selected' : '' ?>>Spring</option>
-                                <option value="Summer" <?= ($edit_exam['semester'] ?? '') == 'Summer' ? 'selected' : '' ?>>Summer</option>
+                                <option value="1st Semester" <?= ($edit_exam['semester'] ?? $default_semester) == '1st Semester' ? 'selected' : '' ?>>1st Semester</option>
+                                <option value="2nd Semester" <?= ($edit_exam['semester'] ?? $default_semester) == '2nd Semester' ? 'selected' : '' ?>>2nd Semester</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="student_type">Student Type <span>*</span></label>
+                            <select class="form-control" id="student_type" name="student_type" required onchange="updateYearOptions()">
+                                <option value="regular" <?= ($edit_exam['student_type'] ?? 'regular') == 'regular' ? 'selected' : '' ?>>Regular</option>
+                                <option value="extension" <?= ($edit_exam['student_type'] ?? '') == 'extension' ? 'selected' : '' ?>>Extension</option>
+                            </select>
+                            <small style="color: var(--text-secondary); font-size: 0.875rem;">
+                                <i class="fas fa-info-circle"></i> Regular: Year 1-5, Extension: Year E1-E5
+                            </small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="year">Year <span>*</span></label>
+                            <select class="form-control" id="year" name="year" required>
+                                <!-- Options will be populated by JavaScript -->
                             </select>
                         </div>
                         
@@ -1845,6 +1983,49 @@ body {
         document.body.style.overflow = 'auto';
     }
 
+    // Update year options based on student type
+    function updateYearOptions() {
+        const studentType = document.getElementById('student_type').value;
+        const yearSelect = document.getElementById('year');
+        
+        // Clear existing options
+        yearSelect.innerHTML = '';
+        
+        let years = [];
+        if (studentType === 'regular') {
+            years = ['1', '2', '3', '4', '5'];
+        } else if (studentType === 'extension') {
+            years = ['E1', 'E2', 'E3', 'E4', 'E5'];
+        }
+        
+        // Add new options
+        years.forEach(year => {
+            const option = document.createElement('option');
+            option.value = year;
+            option.textContent = `Year ${year}`;
+            
+            // If editing, select the saved year
+            <?php if(isset($edit_exam)): ?>
+                if(year === '<?= $edit_exam['year'] ?? '' ?>') {
+                    option.selected = true;
+                }
+            <?php endif; ?>
+            
+            yearSelect.appendChild(option);
+        });
+        
+        // If editing and year not in options (shouldn't happen), add it
+        <?php if(isset($edit_exam)): ?>
+            if(!years.includes('<?= $edit_exam['year'] ?? '' ?>') && '<?= $edit_exam['year'] ?? '' ?>' !== '') {
+                const option = document.createElement('option');
+                option.value = '<?= $edit_exam['year'] ?>';
+                option.textContent = `Year <?= $edit_exam['year'] ?>`;
+                option.selected = true;
+                yearSelect.appendChild(option);
+            }
+        <?php endif; ?>
+    }
+
     // Show room capacity when selected
     document.getElementById('room_id').addEventListener('change', function() {
         const selectedOption = this.options[this.selectedIndex];
@@ -1891,7 +2072,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 'course' => $exam['course_name'],
                 'room' => $exam['room_name'],
                 'supervisor' => $exam['supervisor_name'] || 'Not Assigned',
-                'published' => $exam['is_published'] == 1
+                'published' => $exam['is_published'] == 1,
+                'student_type' => $exam['student_type'],
+                'year' => $exam['year']
             ]
         ];
     }, $exams)) ?>;
@@ -1915,9 +2098,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const room = info.event.extendedProps.room;
             const supervisor = info.event.extendedProps.supervisor;
             const published = info.event.extendedProps.published;
+            const studentType = info.event.extendedProps.student_type;
+            const year = info.event.extendedProps.year;
             
             const status = published ? 'Published' : 'Not Published';
-            info.el.title = `${title}\nCourse: ${course}\nRoom: ${room}\nSupervisor: ${supervisor}\nStatus: ${status}`;
+            info.el.title = `${title}\nCourse: ${course}\nRoom: ${room}\nSupervisor: ${supervisor}\nStudent Type: ${studentType} Year ${year}\nStatus: ${status}`;
             
             // Add custom styling
             info.el.style.borderRadius = '6px';
@@ -1951,6 +2136,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     calendar.render();
     
+    // Initialize year options
+    updateYearOptions();
+    
     // If edit parameter exists, open modal automatically
     <?php if(isset($_GET['edit'])): ?>
         setTimeout(() => openExamModal(), 100);
@@ -1969,6 +2157,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const endTime = document.getElementById('end_time').value;
         const examDate = document.getElementById('exam_date').value;
         const today = new Date().toISOString().split('T')[0];
+        const studentType = document.getElementById('student_type').value;
+        const year = document.getElementById('year').value;
         
         if(startTime >= endTime) {
             e.preventDefault();
@@ -1980,6 +2170,22 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             showToast('error', 'Exam date cannot be in the past.');
             return false;
+        }
+        
+        // Validate year based on student type
+        if(studentType === 'regular') {
+            const yearNum = parseInt(year);
+            if(isNaN(yearNum) || yearNum < 1 || yearNum > 5) {
+                e.preventDefault();
+                showToast('error', 'Regular year must be between 1 and 5.');
+                return false;
+            }
+        } else if(studentType === 'extension') {
+            if(!/^E[1-5]$/.test(year)) {
+                e.preventDefault();
+                showToast('error', 'Extension year must be E1 to E5.');
+                return false;
+            }
         }
         
         return true;

@@ -11,37 +11,39 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin'){
 // Include dark mode
 include __DIR__ . '/../includes/darkmode.php';
 
+// CSRF Token
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 // Fetch current user info
 $user_stmt = $pdo->prepare("SELECT username, email, profile_picture FROM users WHERE user_id=?");
 $user_stmt->execute([$_SESSION['user_id']]);
 $current_user = $user_stmt->fetch();
 
-// FIXED: Simplified profile picture path logic
-$default_profile = '../assets/default_profile.png';
-
-// Function to check if profile picture exists
-function getProfilePicturePath($profile_picture) {
+// Function to get profile picture path for admin
+function getAdminProfilePicturePath($profile_picture) {
     if (empty($profile_picture)) {
         return '../assets/default_profile.png';
     }
     
-    // Try multiple possible locations
+    // Check multiple possible locations for admin profile pictures
     $locations = [
+        __DIR__ . '/../uploads/admin/' . $profile_picture,
         __DIR__ . '/../uploads/' . $profile_picture,
         __DIR__ . '/../../uploads/' . $profile_picture,
-        __DIR__ . '/../../uploads/profiles/' . $profile_picture,
+        'uploads/admin/' . $profile_picture,
+        '../uploads/admin/' . $profile_picture,
         'uploads/' . $profile_picture,
         '../uploads/' . $profile_picture,
-        '../../uploads/profiles/' . $profile_picture,
     ];
     
     foreach ($locations as $location) {
         if (file_exists($location)) {
-            // Return the appropriate web path
-            if (strpos($location, '../../uploads/profiles/') !== false) {
-                return '../../uploads/profiles/' . $profile_picture;
-            } elseif (strpos($location, '../../uploads/') !== false) {
-                return '../../uploads/' . $profile_picture;
+            if (strpos($location, '/admin/') !== false) {
+                return '../uploads/admin/' . $profile_picture;
+            } elseif (strpos($location, 'uploads/admin/') !== false) {
+                return 'uploads/admin/' . $profile_picture;
             } elseif (strpos($location, '../uploads/') !== false) {
                 return '../uploads/' . $profile_picture;
             } elseif (strpos($location, 'uploads/') !== false) {
@@ -50,60 +52,142 @@ function getProfilePicturePath($profile_picture) {
         }
     }
     
-    // If file doesn't exist anywhere, return default
     return '../assets/default_profile.png';
 }
 
 // Get profile image path
-$profile_img_path = getProfilePicturePath($current_user['profile_picture'] ?? '');
+$profile_img_path = getAdminProfilePicturePath($current_user['profile_picture'] ?? '');
 
+$message = "";
+$message_type = "success";
+
+// Initialize variables
 $editing = false;
-$edit_id = 0;
+$edit_id = null;
+$edit_data = [];
 
 // Handle Delete
 if(isset($_GET['delete'])){
-    $delete_id = $_GET['delete'];
-    $stmt = $pdo->prepare("DELETE FROM users WHERE user_id=?");
-    $stmt->execute([$delete_id]);
-    header("Location: manage_users.php");
-    exit;
+    $delete_id = (int)$_GET['delete'];
+    if($delete_id > 0 && $delete_id != $_SESSION['user_id']) {
+        $stmt = $pdo->prepare("DELETE FROM users WHERE user_id=?");
+        $stmt->execute([$delete_id]);
+        $message = "User deleted successfully!";
+        $message_type = "success";
+    } else {
+        $message = "Cannot delete your own account or invalid user!";
+        $message_type = "error";
+    }
 }
 
 // Handle Edit
 if(isset($_GET['edit'])){
-    $edit_id = $_GET['edit'];
+    $edit_id = (int)$_GET['edit'];
     $stmt = $pdo->prepare("SELECT * FROM users WHERE user_id=?");
     $stmt->execute([$edit_id]);
-    $editing = true;
     $edit_data = $stmt->fetch(PDO::FETCH_ASSOC);
+    if($edit_data){
+        $editing = true;
+    }
 }
 
 // Handle Form Submission
 if(isset($_POST['save_user'])){
-    $username = trim($_POST['username']);
-    $full_name = trim($_POST['full_name']);
-    $student_id = ($_POST['role'] === 'student' && isset($_POST['student_id'])) ? trim($_POST['student_id']) : NULL;
-    $email = trim($_POST['email']);
-    $password = trim($_POST['password']);
-    $role = $_POST['role'];
-    $department_id = $_POST['department_id'] ?: NULL;
-    $year = ($role === 'student' && isset($_POST['year'])) ? (int)$_POST['year'] : NULL;
-
-    if($editing){
-        if($password){
-            $stmt = $pdo->prepare("UPDATE users SET username=?, full_name=?, student_id=?, email=?, password=?, role=?, department_id=?, year=? WHERE user_id=?");
-            $stmt->execute([$username, $full_name, $student_id, $email, password_hash($password,PASSWORD_DEFAULT), $role, $department_id, $year, $edit_id]);
-        } else {
-            $stmt = $pdo->prepare("UPDATE users SET username=?, full_name=?, student_id=?, email=?, role=?, department_id=?, year=? WHERE user_id=?");
-            $stmt->execute([$username, $full_name, $student_id, $email, $role, $department_id, $year, $edit_id]);
-        }
-        header("Location: manage_users.php");
-        exit;
+    // CSRF Validation
+    if(!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']){
+        $message = "Security token invalid. Please try again.";
+        $message_type = "error";
     } else {
-        $stmt = $pdo->prepare("INSERT INTO users (username, full_name, student_id, email, password, role, department_id, year) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->execute([$username, $full_name, $student_id, $email, password_hash($password,PASSWORD_DEFAULT), $role, $department_id, $year]);
+        $username = trim($_POST['username']);
+        $full_name = trim($_POST['full_name']);
+        $student_id = ($_POST['role'] === 'student' && isset($_POST['student_id'])) ? trim($_POST['student_id']) : NULL;
+        $email = trim($_POST['email']);
+        $password = trim($_POST['password']);
+        $role = $_POST['role'];
+        $department_id = isset($_POST['department_id']) && $_POST['department_id'] ? (int)$_POST['department_id'] : NULL;
+        $year = isset($_POST['year']) ? trim($_POST['year']) : NULL;
+        
+        // Debug log
+        error_log("Form Submission - Role: $role, Year: " . ($year ?? 'NULL') . ", Student ID: " . ($student_id ?? 'NULL'));
+        
+        // Validate required fields
+        if(empty($username) || empty($email) || empty($role)) {
+            $message = "Please fill in all required fields!";
+            $message_type = "error";
+        } elseif(!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $message = "Please enter a valid email address!";
+            $message_type = "error";
+        } else {
+            // Validate Student ID uniqueness for students
+            if($role === 'student' && $student_id){
+                if($editing && $edit_id){
+                    $check_stmt = $pdo->prepare("SELECT user_id FROM users WHERE student_id = ? AND user_id != ?");
+                    $check_stmt->execute([$student_id, $edit_id]);
+                } else {
+                    $check_stmt = $pdo->prepare("SELECT user_id FROM users WHERE student_id = ?");
+                    $check_stmt->execute([$student_id]);
+                }
+                
+                $existing_user = $check_stmt->fetch();
+                
+                if($existing_user){
+                    $message = "Error: Student ID '$student_id' already exists!";
+                    $message_type = "error";
+                } else {
+                    // Proceed with save/update
+                    saveUser();
+                }
+            } else {
+                // For non-student roles, proceed normally
+                saveUser();
+            }
+        }
     }
 }
+
+function saveUser() {
+    global $pdo, $username, $full_name, $student_id, $email, $password, $role, $department_id, $year, $editing, $edit_id, $message, $message_type;
+    
+    try {
+        // Debug log
+        error_log("saveUser() called - Role: $role, Year: " . ($year ?? 'NULL'));
+        
+        if($editing && $edit_id){
+            if($password){
+                $stmt = $pdo->prepare("UPDATE users SET username=?, full_name=?, student_id=?, email=?, password=?, role=?, department_id=?, year=? WHERE user_id=?");
+                $stmt->execute([$username, $full_name, $student_id, $email, password_hash($password, PASSWORD_DEFAULT), $role, $department_id, $year, $edit_id]);
+            } else {
+                $stmt = $pdo->prepare("UPDATE users SET username=?, full_name=?, student_id=?, email=?, role=?, department_id=?, year=? WHERE user_id=?");
+                $stmt->execute([$username, $full_name, $student_id, $email, $role, $department_id, $year, $edit_id]);
+            }
+            $message = "User updated successfully!";
+            $message_type = "success";
+        } else {
+            if(empty($password)) {
+                $message = "Password is required for new users!";
+                $message_type = "error";
+                return;
+            }
+            $stmt = $pdo->prepare("INSERT INTO users (username, full_name, student_id, email, password, role, department_id, year) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$username, $full_name, $student_id, $email, password_hash($password, PASSWORD_DEFAULT), $role, $department_id, $year]);
+            $message = "User added successfully!";
+            $message_type = "success";
+            
+            // Clear form for new entry
+            $editing = false;
+            $edit_id = null;
+            $edit_data = [];
+        }
+    } catch (Exception $e) {
+        $message = "Error: " . $e->getMessage();
+        $message_type = "error";
+        error_log("Database error: " . $e->getMessage());
+    }
+}
+
+// Fetch pending approvals count
+$pending_stmt = $pdo->query("SELECT COUNT(*) as count FROM users WHERE is_approved = 0");
+$pending_approvals = $pending_stmt->fetchColumn() ?: 0;
 
 // Fetch users and departments
 $users = $pdo->query("SELECT u.*, d.department_name FROM users u LEFT JOIN departments d ON u.department_id=d.department_id ORDER BY u.role, u.year, u.username")->fetchAll();
@@ -118,12 +202,66 @@ $current_page = basename($_SERVER['PHP_SELF']);
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Manage Users - DKU Scheduler</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-<!-- Include Dark Mode CSS -->
 <link rel="stylesheet" href="../../assets/css/darkmode.css">
 <style>
 /* ================= General Reset ================= */
 * { margin:0; padding:0; box-sizing:border-box; font-family: "Segoe UI", Arial, sans-serif; }
-body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x:hidden; }
+body { display:flex; min-height:100vh; background: var(--bg-primary, #f8f9fa); overflow-x:hidden; }
+
+/* ================= CSS Variables ================= */
+:root {
+    --bg-primary: #f8f9fa;
+    --bg-secondary: #ffffff;
+    --bg-card: #ffffff;
+    --bg-sidebar: #2c3e50;
+    --text-primary: #333333;
+    --text-secondary: #666666;
+    --text-sidebar: #ffffff;
+    --border-color: #dee2e6;
+    --shadow-color: rgba(0,0,0,0.1);
+    --hover-color: rgba(0,0,0,0.05);
+    --table-header: #3498db;
+    --success-bg: #d1fae5;
+    --success-text: #065f46;
+    --success-border: #10b981;
+    --error-bg: #fee2e2;
+    --error-text: #991b1b;
+    --error-border: #ef4444;
+    --warning-bg: #fef3c7;
+    --warning-text: #92400e;
+    --warning-border: #f59e0b;
+    --badge-primary-bg: #e0f2fe;
+    --badge-primary-text: #0369a1;
+    --badge-secondary-bg: #f3f4f6;
+    --badge-secondary-text: #374151;
+}
+
+[data-theme="dark"] {
+    --bg-primary: #1a1a1a;
+    --bg-secondary: #2d2d2d;
+    --bg-card: #2d2d2d;
+    --bg-sidebar: #1e2a3a;
+    --text-primary: #e0e0e0;
+    --text-secondary: #b0b0b0;
+    --text-sidebar: #e0e0e0;
+    --border-color: #404040;
+    --shadow-color: rgba(0,0,0,0.3);
+    --hover-color: rgba(255,255,255,0.05);
+    --table-header: #2563eb;
+    --success-bg: #064e3b;
+    --success-text: #a7f3d0;
+    --success-border: #10b981;
+    --error-bg: #7f1d1d;
+    --error-text: #fecaca;
+    --error-border: #ef4444;
+    --warning-bg: #78350f;
+    --warning-text: #fde68a;
+    --warning-border: #f59e0b;
+    --badge-primary-bg: #0c4a6e;
+    --badge-primary-text: #7dd3fc;
+    --badge-secondary-bg: #374151;
+    --badge-secondary-text: #d1d5db;
+}
 
 /* ================= Topbar for Mobile ================= */
 .topbar {
@@ -203,8 +341,22 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
     display: flex;
     align-items: center;
     gap: 10px;
+    position: relative;
 }
 .sidebar a:hover, .sidebar a.active { background:#1abc9c; color:white; }
+
+.pending-badge {
+    background: #ef4444;
+    color: white;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    margin-left: auto;
+}
 
 /* ================= Overlay ================= */
 .overlay {
@@ -312,8 +464,15 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
     cursor:pointer; 
     transition:0.2s; 
     font-weight: 600;
+    padding: 12px 24px;
 }
 .user-form button:hover { background:#1d4ed8; transform: translateY(-1px); }
+.user-form button:disabled {
+    background: #94a3b8;
+    cursor: not-allowed;
+    transform: none;
+}
+
 .cancel-btn { 
     text-decoration:none; 
     color:#dc2626; 
@@ -323,6 +482,7 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
     border-radius: 8px;
     border: 1px solid #dc2626;
     transition: all 0.3s;
+    display: inline-block;
 }
 .cancel-btn:hover {
     background: #dc2626;
@@ -534,6 +694,59 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
     font-size: 1.2rem;
 }
 
+/* ================= Student ID Validation Styles ================= */
+.student-id-error {
+    color: #dc2626;
+    font-size: 0.875rem;
+    margin-top: 5px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: 500;
+}
+
+.student-id-success {
+    color: #10b981;
+    font-size: 0.875rem;
+    margin-top: 5px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: 500;
+}
+
+.student-id-checking {
+    color: #f59e0b;
+    font-size: 0.875rem;
+    margin-top: 5px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: 500;
+}
+
+/* Input Validation States */
+input.valid {
+    border-color: #10b981 !important;
+    background: linear-gradient(90deg, var(--bg-secondary), #d1fae5) !important;
+}
+
+input.invalid {
+    border-color: #dc2626 !important;
+    background: linear-gradient(90deg, var(--bg-secondary), #fee2e2) !important;
+}
+
+input.checking {
+    border-color: #f59e0b !important;
+    background: linear-gradient(90deg, var(--bg-secondary), #fef3c7) !important;
+}
+
+/* Required field indicator */
+.required::after {
+    content: " *";
+    color: #ef4444;
+}
+
 /* ================= Responsive ================= */
 @media (max-width: 1200px){ 
     .main-content{ padding:25px; }
@@ -563,6 +776,9 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
     .user-form input, .user-form select{ width:100%; margin:8px 0; }
 
     /* Mobile-friendly card-style table */
+    .table-container {
+        border: none;
+    }
     .user-table, .user-table thead, .user-table tbody, .user-table th, .user-table td, .user-table tr { 
         display:block; 
         width:100%; 
@@ -575,6 +791,7 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
         box-shadow:0 2px 5px var(--shadow-color); 
         padding:15px; 
         border: 1px solid var(--border-color);
+        position: relative;
     }
     .user-table td { 
         text-align:right; 
@@ -582,6 +799,8 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
         position:relative; 
         border:none; 
         margin-bottom: 10px;
+        padding: 10px 15px;
+        padding-left: 50%;
     }
     .user-table td::before { 
         content: attr(data-label); 
@@ -591,12 +810,24 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
         text-align:left; 
         font-weight:bold; 
         color: var(--text-secondary);
+        top: 50%;
+        transform: translateY(-50%);
     }
     
     /* Action buttons in mobile */
     .action-buttons {
         justify-content: flex-end;
     }
+}
+
+/* Loading spinner */
+.spinner {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 </style>
 </head>
@@ -612,7 +843,7 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
 <div class="overlay" onclick="toggleSidebar()"></div>
 
 <!-- Sidebar -->
-<div class="sidebar">
+<div class="sidebar" id="sidebar">
     <div class="sidebar-profile">
         <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic"
              onerror="this.onerror=null; this.src='../assets/default_profile.png';">
@@ -627,6 +858,12 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
     </a>
     <a href="approve_users.php" class="<?= $current_page=='approve_users.php'?'active':'' ?>">
         <i class="fas fa-user-check"></i> Approve Users
+        <?php if($pending_approvals > 0): ?>
+            <span class="pending-badge"><?= $pending_approvals ?></span>
+        <?php endif; ?>
+    </a>
+    <a href="manage_departments.php" class="<?= $current_page=='manage_departments.php'?'active':'' ?>">
+        <i class="fas fa-building"></i> Manage Departments
     </a>
     <a href="manage_courses.php" class="<?= $current_page=='manage_courses.php'?'active':'' ?>">
         <i class="fas fa-book"></i> Manage Courses
@@ -634,11 +871,11 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
     <a href="manage_rooms.php" class="<?= $current_page=='manage_rooms.php'?'active':'' ?>">
         <i class="fas fa-door-closed"></i> Manage Rooms
     </a>
-    <a href="manage_schedule.php" class="<?= $current_page=='manage_schedule.php'?'active':'' ?>">
+    <a href="manage_schedules.php" class="<?= $current_page=='manage_schedules.php'?'active':'' ?>">
         <i class="fas fa-calendar-alt"></i> Manage Schedule
     </a>
     <a href="manage_announcements.php" class="<?= $current_page=='manage_announcements.php'?'active':'' ?>">
-        <i class="fas fa-bullhorn"></i> Announcements
+        <i class="fas fa-bullhorn"></i> Manage Announcements
     </a>
     <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
         <i class="fas fa-user-edit"></i> Edit Profile
@@ -647,7 +884,6 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
         <i class="fas fa-sign-out-alt"></i> Logout
     </a>
 </div>
-
 <!-- Main Content -->
 <div class="main-content">
     <div class="content-wrapper">
@@ -667,6 +903,14 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
             </div>
         </div>
 
+        <!-- Display Error/Success Messages -->
+        <?php if($message): ?>
+            <div class="message <?= $message_type ?>">
+                <i class="fas fa-<?= $message_type === 'error' ? 'exclamation-circle' : ($message_type === 'warning' ? 'exclamation-triangle' : 'check-circle') ?>"></i>
+                <?= htmlspecialchars($message) ?>
+            </div>
+        <?php endif; ?>
+
         <!-- Form Section -->
         <div class="user-form-section">
             <div class="form-section-title">
@@ -674,61 +918,89 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
                 <?= $editing ? "Edit User" : "Add New User" ?>
             </div>
 
-            <form method="POST" class="user-form">
+            <form method="POST" class="user-form" id="userForm" onsubmit="return validateForm()">
+                <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+                
                 <div class="form-group">
-                    <label>Username:</label>
-                    <input type="text" name="username" value="<?= $editing ? htmlspecialchars($edit_data['username']) : '' ?>" required>
+                    <label class="required">Username:</label>
+                    <input type="text" name="username" value="<?= isset($edit_data['username']) ? htmlspecialchars($edit_data['username']) : '' ?>" required>
                 </div>
                 
                 <div class="form-group">
-                    <label>Full Name:</label>
-                    <input type="text" name="full_name" value="<?= $editing ? htmlspecialchars($edit_data['full_name']) : '' ?>" required>
+                    <label class="required">Full Name:</label>
+                    <input type="text" name="full_name" value="<?= isset($edit_data['full_name']) ? htmlspecialchars($edit_data['full_name']) : '' ?>" required>
                 </div>
                 
                 <div class="form-group" id="student-id-group" style="display:none;">
                     <label>Student ID:</label>
-                    <input type="text" name="student_id" id="student-id-input" value="<?= $editing && isset($edit_data['student_id']) ? htmlspecialchars($edit_data['student_id']) : '' ?>">
+                    <input type="text" name="student_id" id="student-id-input" 
+                           value="<?= (isset($edit_data['role']) && $edit_data['role'] === 'student' && isset($edit_data['student_id'])) ? htmlspecialchars($edit_data['student_id']) : '' ?>"
+                           oninput="checkStudentID()">
+                    <div id="student-id-feedback"></div>
                 </div>
                 
                 <div class="form-group">
-                    <label>Email:</label>
-                    <input type="email" name="email" value="<?= $editing ? htmlspecialchars($edit_data['email']) : '' ?>" required>
+                    <label class="required">Email:</label>
+                    <input type="email" name="email" value="<?= isset($edit_data['email']) ? htmlspecialchars($edit_data['email']) : '' ?>" required>
                 </div>
                 
                 <div class="form-group">
-                    <label>Password: <?= $editing ? "<small>(Leave blank to keep current)</small>" : "" ?></label>
-                    <input type="password" name="password" <?= !$editing ? 'required' : '' ?>>
+                    <label class="<?= !$editing ? 'required' : '' ?>">Password: <?= $editing ? "<small>(Leave blank to keep current)</small>" : "" ?></label>
+                    <input type="password" name="password" id="password-input" <?= !$editing ? 'required' : '' ?>>
                 </div>
                 
                 <div class="form-group">
-                    <label>Role:</label>
+                    <label class="required">Role:</label>
                     <select name="role" id="role-select" required>
                         <option value="">--Select Role--</option>
-                        <option value="admin" <?= ($editing && $edit_data['role']=='admin')?'selected':'' ?>>Admin</option>
-                        <option value="student" <?= ($editing && $edit_data['role']=='student')?'selected':'' ?>>Student</option>
-                        <option value="instructor" <?= ($editing && $edit_data['role']=='instructor')?'selected':'' ?>>Instructor</option>
-                        <option value="department_head" <?= ($editing && $edit_data['role']=='department_head')?'selected':'' ?>>Department Head</option>
+                        <option value="admin" <?= (isset($edit_data['role']) && $edit_data['role']=='admin')?'selected':'' ?>>Admin</option>
+                        <option value="student" <?= (isset($edit_data['role']) && $edit_data['role']=='student')?'selected':'' ?>>Student</option>
+                        <option value="instructor" <?= (isset($edit_data['role']) && $edit_data['role']=='instructor')?'selected':'' ?>>Instructor</option>
+                        <option value="department_head" <?= (isset($edit_data['role']) && $edit_data['role']=='department_head')?'selected':'' ?>>Department Head</option>
                     </select>
                 </div>
                 
                 <div class="form-group" id="year-group" style="display:none;">
-                    <label>Year (for students):</label>
-                    <select name="year" id="year-select">
-                        <option value="">--Select Year--</option>
-                        <option value="1" <?= ($editing && $edit_data['role']=='student' && $edit_data['year']==1)?'selected':'' ?>>Year 1</option>
-                        <option value="2" <?= ($editing && $edit_data['role']=='student' && $edit_data['year']==2)?'selected':'' ?>>Year 2</option>
-                        <option value="3" <?= ($editing && $edit_data['role']=='student' && $edit_data['year']==3)?'selected':'' ?>>Year 3</option>
-                        <option value="4" <?= ($editing && $edit_data['role']=='student' && $edit_data['year']==4)?'selected':'' ?>>Year 4</option>
-                        <option value="5" <?= ($editing && $edit_data['role']=='student' && $edit_data['year']==5)?'selected':'' ?>>Year 5</option>
+                    <label>Student Type:</label>
+                    <select name="year_type" id="year-type-select" onchange="toggleYearDropdown()">
+                        <option value="">--Select Student Type--</option>
+                        <option value="regular" <?= (isset($edit_data['role']) && $edit_data['role']=='student' && isset($edit_data['year']) && is_numeric($edit_data['year']))?'selected':'' ?>>Regular Student</option>
+                        <option value="extension" <?= (isset($edit_data['role']) && $edit_data['role']=='student' && isset($edit_data['year']) && strpos($edit_data['year'], 'E') !== false)?'selected':'' ?>>Extension Student</option>
                     </select>
                 </div>
+
+                <div class="form-group" id="regular-year-group" style="display:none;">
+                    <label>Regular Year:</label>
+                    <select name="regular_year" id="regular-year-select">
+                        <option value="">--Select Year--</option>
+                        <?php for($i=1; $i<=5; $i++): ?>
+                            <option value="<?= $i ?>" <?= (isset($edit_data['role']) && $edit_data['role']=='student' && isset($edit_data['year']) && $edit_data['year']==$i)?'selected':'' ?>>
+                                Year <?= $i ?>
+                            </option>
+                        <?php endfor; ?>
+                    </select>
+                </div>
+
+                <div class="form-group" id="extension-year-group" style="display:none;">
+                    <label>Extension Year:</label>
+                    <select name="extension_year" id="extension-year-select">
+                        <option value="">--Select Extension Year--</option>
+                        <?php for($i=1; $i<=5; $i++): ?>
+                            <option value="E<?= $i ?>" <?= (isset($edit_data['role']) && $edit_data['role']=='student' && isset($edit_data['year']) && $edit_data['year']=="E$i")?'selected':'' ?>>
+                                Extension Year <?= $i ?>
+                            </option>
+                        <?php endfor; ?>
+                    </select>
+                </div>
+
+                <input type="hidden" name="year" id="year-hidden" value="<?= isset($edit_data['year']) ? htmlspecialchars($edit_data['year']) : '' ?>">
                 
                 <div class="form-group" id="department-group" style="display:none;">
                     <label>Department:</label>
                     <select name="department_id" id="department-select">
                         <option value="">--Select Department--</option>
                         <?php foreach($departments as $d): ?>
-                            <option value="<?= $d['department_id'] ?>" <?= ($editing && $edit_data['department_id']==$d['department_id'])?'selected':'' ?>>
+                            <option value="<?= $d['department_id'] ?>" <?= (isset($edit_data['department_id']) && $edit_data['department_id']==$d['department_id'])?'selected':'' ?>>
                                 <?= htmlspecialchars($d['department_name']) ?>
                             </option>
                         <?php endforeach; ?>
@@ -736,7 +1008,7 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
                 </div>
                 
                 <div class="form-group">
-                    <button type="submit" name="save_user">
+                    <button type="submit" name="save_user" id="submit-btn" <?= $editing ? '' : 'disabled' ?>>
                         <i class="fas fa-<?= $editing ? 'save' : 'plus' ?>"></i>
                         <?= $editing ? "Update User" : "Add User" ?>
                     </button>
@@ -760,6 +1032,7 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
                 <table class="user-table">
                     <thead>
                         <tr>
+                            <th>ID</th>
                             <th>Username</th>
                             <th>Full Name</th>
                             <th>Student ID</th>
@@ -774,6 +1047,7 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
                     <tbody>
                         <?php foreach($users as $u): ?>
                             <tr>
+                                <td data-label="ID"><?= $u['user_id'] ?></td>
                                 <td data-label="Username">
                                     <strong><?= htmlspecialchars($u['username']) ?></strong>
                                 </td>
@@ -788,12 +1062,16 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
                                 <td data-label="Email"><?= htmlspecialchars($u['email']) ?></td>
                                 <td data-label="Role">
                                     <span class="role-badge role-<?= $u['role'] ?>">
-                                        <?= htmlspecialchars($u['role']) ?>
+                                        <?= htmlspecialchars(ucfirst(str_replace('_', ' ', $u['role']))) ?>
                                     </span>
                                 </td>
                                 <td data-label="Year">
-                                    <?php if($u['role'] === 'student' && !empty($u['year'])): ?>
-                                        <span class="year-badge">Year <?= $u['year'] ?></span>
+                                    <?php if($u['role'] === 'student' && isset($u['year'])): ?>
+                                        <?php if(strpos($u['year'], 'E') === 0): ?>
+                                            <span class="year-badge">E<?= substr($u['year'], 1) ?></span>
+                                        <?php elseif(is_numeric($u['year'])): ?>
+                                            <span class="year-badge">Year <?= $u['year'] ?></span>
+                                        <?php endif; ?>
                                     <?php else: ?>
                                         -
                                     <?php endif; ?>
@@ -813,9 +1091,11 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
                                         <a class="button-action button-edit" href="?edit=<?= $u['user_id'] ?>">
                                             <i class="fas fa-edit"></i> Edit
                                         </a>
-                                        <a class="button-action button-delete" href="?delete=<?= $u['user_id'] ?>" onclick="return confirm('Are you sure you want to delete this user?')">
-                                            <i class="fas fa-trash"></i> Delete
-                                        </a>
+                                        <?php if($u['user_id'] != $_SESSION['user_id']): ?>
+                                            <a class="button-action button-delete" href="?delete=<?= $u['user_id'] ?>" onclick="return confirm('Are you sure you want to delete this user?')">
+                                                <i class="fas fa-trash"></i> Delete
+                                            </a>
+                                        <?php endif; ?>
                                     </div>
                                 </td>
                             </tr>
@@ -827,8 +1107,6 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
     </div>
 </div>
 
-<!-- Include darkmode.js -->
-<script src="../../assets/js/darkmode.js"></script>
 <script>
 function toggleSidebar(){
     const sidebar = document.querySelector('.sidebar');
@@ -837,115 +1115,321 @@ function toggleSidebar(){
     overlay.classList.toggle('active');
 }
 
-// Set active state for current page
-document.addEventListener('DOMContentLoaded', function() {
-    const currentPage = window.location.pathname.split('/').pop();
-    const navLinks = document.querySelectorAll('.sidebar a');
+// DOM elements
+const roleSelect = document.getElementById('role-select');
+const yearGroup = document.getElementById('year-group');
+const yearTypeSelect = document.getElementById('year-type-select');
+const regularYearGroup = document.getElementById('regular-year-group');
+const regularYearSelect = document.getElementById('regular-year-select');
+const extensionYearGroup = document.getElementById('extension-year-group');
+const extensionYearSelect = document.getElementById('extension-year-select');
+const yearHidden = document.getElementById('year-hidden');
+const studentIdGroup = document.getElementById('student-id-group');
+const studentIdInput = document.getElementById('student-id-input');
+const departmentGroup = document.getElementById('department-group');
+const departmentSelect = document.getElementById('department-select');
+const studentIdFeedback = document.getElementById('student-id-feedback');
+const submitBtn = document.getElementById('submit-btn');
+const passwordInput = document.getElementById('password-input');
+
+let studentIdValid = true; // Default to true for non-students
+
+// Show/hide fields based on role
+function toggleRoleFields(){
+    const role = roleSelect.value;
+    const isStudent = role === 'student';
+    const needsDepartment = ['student', 'instructor', 'department_head'].includes(role);
     
-    navLinks.forEach(link => {
+    // Year and Student ID (students only)
+    yearGroup.style.display = isStudent ? 'block' : 'none';
+    yearTypeSelect.required = isStudent;
+    if(!isStudent) {
+        yearTypeSelect.value = '';
+        // Clear all year values
+        regularYearSelect.value = '';
+        extensionYearSelect.value = '';
+        yearHidden.value = '';
+        toggleYearDropdown();
+    }
+    
+    studentIdGroup.style.display = isStudent ? 'block' : 'none';
+    studentIdInput.required = isStudent;
+    if(!isStudent) {
+        studentIdInput.value = '';
+        studentIdInput.classList.remove('valid', 'invalid', 'checking');
+        studentIdFeedback.innerHTML = '';
+        studentIdValid = true;
+    }
+    
+    // Department
+    departmentGroup.style.display = needsDepartment ? 'block' : 'none';
+    departmentSelect.required = needsDepartment;
+    if(!needsDepartment) departmentSelect.value = '';
+    
+    // Enable/disable submit button
+    updateSubmitButton();
+}
+
+// Toggle year dropdown based on student type
+function toggleYearDropdown() {
+    const yearType = yearTypeSelect.value;
+    
+    // Hide both dropdowns first
+    regularYearGroup.style.display = 'none';
+    extensionYearGroup.style.display = 'none';
+    regularYearSelect.required = false;
+    extensionYearSelect.required = false;
+    
+    // Clear values
+    regularYearSelect.value = '';
+    extensionYearSelect.value = '';
+    
+    // Show appropriate dropdown
+    if (yearType === 'regular') {
+        regularYearGroup.style.display = 'block';
+        regularYearSelect.required = true;
+    } else if (yearType === 'extension') {
+        extensionYearGroup.style.display = 'block';
+        extensionYearSelect.required = true;
+    }
+    
+    updateYearHiddenField();
+    updateSubmitButton();
+}
+
+// Update hidden year field when selections change
+function updateYearHiddenField() {
+    const yearType = yearTypeSelect.value;
+    
+    if (yearType === 'regular') {
+        yearHidden.value = regularYearSelect.value;
+    } else if (yearType === 'extension') {
+        yearHidden.value = extensionYearSelect.value;
+    } else {
+        yearHidden.value = '';
+    }
+    
+    console.log('Year hidden field updated to:', yearHidden.value);
+    updateSubmitButton();
+}
+
+// Initialize year selection from edit data
+function initializeYearSelection() {
+    <?php if($editing && isset($edit_data['role']) && $edit_data['role'] === 'student' && isset($edit_data['year'])): ?>
+        const yearValue = '<?= $edit_data['year'] ?>';
+        console.log('Initializing year selection with:', yearValue);
+        
+        if (yearValue) {
+            if (yearValue.startsWith('E')) {
+                // Extension student
+                yearTypeSelect.value = 'extension';
+                toggleYearDropdown();
+                extensionYearSelect.value = yearValue;
+                yearHidden.value = yearValue;
+            } else if (!isNaN(yearValue)) {
+                // Regular student
+                yearTypeSelect.value = 'regular';
+                toggleYearDropdown();
+                regularYearSelect.value = yearValue;
+                yearHidden.value = yearValue;
+            }
+            console.log('Year initialized to hidden field:', yearHidden.value);
+        }
+    <?php endif; ?>
+}
+
+// Check Student ID uniqueness
+function checkStudentID() {
+    const studentId = studentIdInput.value.trim();
+    const editing = <?= $editing ? 'true' : 'false' ?>;
+    const editId = <?= $edit_id ?: 'null' ?>;
+    
+    // Reset
+    studentIdInput.classList.remove('valid', 'invalid', 'checking');
+    studentIdValid = false;
+    updateSubmitButton();
+    
+    if (!studentId) {
+        studentIdFeedback.innerHTML = '';
+        studentIdValid = true; // Empty student ID is valid
+        updateSubmitButton();
+        return;
+    }
+    
+    // Show checking state
+    studentIdInput.classList.add('checking');
+    studentIdFeedback.innerHTML = '<span class="student-id-checking"><i class="fas fa-spinner fa-spin spinner"></i> Checking Student ID...</span>';
+    
+    // AJAX request
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', 'check_student_id.php', true);
+    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+    
+    xhr.onload = function() {
+        if (xhr.status === 200) {
+            try {
+                const response = JSON.parse(xhr.responseText);
+                
+                if (response.available) {
+                    studentIdInput.classList.remove('checking');
+                    studentIdInput.classList.add('valid');
+                    studentIdFeedback.innerHTML = '<span class="student-id-success"><i class="fas fa-check-circle"></i> Student ID is available!</span>';
+                    studentIdValid = true;
+                } else {
+                    studentIdInput.classList.remove('checking');
+                    studentIdInput.classList.add('invalid');
+                    studentIdFeedback.innerHTML = `<span class="student-id-error"><i class="fas fa-exclamation-circle"></i> Student ID already exists! ${response.suggestion ? 'Suggestion: ' + response.suggestion : ''}</span>`;
+                    studentIdValid = false;
+                }
+            } catch (e) {
+                handleCheckError();
+            }
+        } else {
+            handleCheckError();
+        }
+        updateSubmitButton();
+    };
+    
+    xhr.onerror = handleCheckError;
+    
+    function handleCheckError() {
+        studentIdInput.classList.remove('checking');
+        studentIdFeedback.innerHTML = '<span class="student-id-error"><i class="fas fa-exclamation-circle"></i> Error checking Student ID</span>';
+        studentIdValid = false;
+        updateSubmitButton();
+    }
+    
+    xhr.send(`student_id=${encodeURIComponent(studentId)}&editing=${editing}&edit_id=${editId}`);
+}
+
+// Update submit button state
+function updateSubmitButton() {
+    const role = roleSelect.value;
+    const isStudent = role === 'student';
+    const editing = <?= $editing ? 'true' : 'false' ?>;
+    const hasPassword = passwordInput.value.trim().length > 0;
+    const yearType = yearTypeSelect.value;
+    const yearHiddenValue = yearHidden.value;
+    
+    let enabled = true;
+    
+    // Basic validation
+    if (!role) enabled = false;
+    if (isStudent && !studentIdValid) enabled = false;
+    if (isStudent && !yearType) enabled = false;
+    if (isStudent && !yearHiddenValue) enabled = false;
+    if (!editing && !hasPassword) enabled = false;
+    
+    submitBtn.disabled = !enabled;
+}
+
+// Form validation
+function validateForm() {
+    const role = roleSelect.value;
+    const isStudent = role === 'student';
+    const editing = <?= $editing ? 'true' : 'false' ?>;
+    const password = passwordInput.value.trim();
+    const yearType = yearTypeSelect.value;
+    const yearHiddenValue = yearHidden.value;
+    
+    console.log('Form validation - Role:', role, 'Year hidden:', yearHiddenValue, 'Year type:', yearType);
+    
+    // Student ID validation
+    if (isStudent) {
+        if (!studentIdValid) {
+            alert('Please fix the Student ID errors before submitting');
+            studentIdInput.focus();
+            return false;
+        }
+        
+        // Year validation for students
+        if (!yearType) {
+            alert('Please select student type (Regular or Extension)');
+            yearTypeSelect.focus();
+            return false;
+        }
+        
+        if (!yearHiddenValue) {
+            alert('Please select a year');
+            if (yearType === 'regular') {
+                regularYearSelect.focus();
+            } else {
+                extensionYearSelect.focus();
+            }
+            return false;
+        }
+    }
+    
+    // Password validation for new users
+    if (!editing && password.length < 6) {
+        alert('Password must be at least 6 characters long for new users');
+        passwordInput.focus();
+        return false;
+    }
+    
+    // Final check of hidden year field
+    console.log('Final year value to submit:', yearHiddenValue);
+    return true;
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+    // Set active nav
+    const currentPage = window.location.pathname.split('/').pop();
+    document.querySelectorAll('.sidebar a').forEach(link => {
         const linkPage = link.getAttribute('href');
         if (linkPage === currentPage) {
             link.classList.add('active');
         }
     });
     
-    // Add animation to table rows
+    // Event listeners
+    roleSelect.addEventListener('change', toggleRoleFields);
+    passwordInput.addEventListener('input', updateSubmitButton);
+    yearTypeSelect.addEventListener('change', toggleYearDropdown);
+    regularYearSelect.addEventListener('change', updateYearHiddenField);
+    extensionYearSelect.addEventListener('change', updateYearHiddenField);
+    
+    // Initial field setup
+    toggleRoleFields();
+    initializeYearSelection();
+    
+    // If editing a student, check student ID
+    <?php if($editing && isset($edit_data['role']) && $edit_data['role'] === 'student'): ?>
+        setTimeout(() => {
+            if (studentIdInput.value.trim()) {
+                checkStudentID();
+            }
+        }, 500);
+    <?php endif; ?>
+    
+    // Profile picture fallback
+    document.querySelectorAll('img').forEach(img => {
+        img.addEventListener('error', function() {
+            if (!this.src.includes('default_profile.png')) {
+                this.src = '../assets/default_profile.png';
+            }
+        });
+    });
+    
+    // Animate table rows
     const tableRows = document.querySelectorAll('.user-table tbody tr');
     tableRows.forEach((row, index) => {
         row.style.opacity = '0';
-        row.style.transform = 'translateX(-20px)';
+        row.style.transform = 'translateY(10px)';
         setTimeout(() => {
             row.style.transition = 'all 0.5s ease';
             row.style.opacity = '1';
-            row.style.transform = 'translateX(0)';
+            row.style.transform = 'translateY(0)';
         }, index * 50);
     });
-    
-    // Debug: Log profile picture paths
-    console.log('Sidebar profile pic src:', document.getElementById('sidebarProfilePic').src);
-    console.log('Header profile pic src:', document.getElementById('headerProfilePic').src);
 });
 
 // Confirm logout
-document.querySelector('a[href="../logout.php"]').addEventListener('click', function(e) {
+document.querySelector('a[href="../logout.php"]')?.addEventListener('click', function(e) {
     if(!confirm('Are you sure you want to logout?')) {
         e.preventDefault();
     }
-});
-
-// Show/hide department, year, and student ID fields based on role
-const roleSelect = document.getElementById('role-select');
-const yearGroup = document.getElementById('year-group');
-const yearSelect = document.getElementById('year-select');
-const studentIdGroup = document.getElementById('student-id-group');
-const studentIdInput = document.getElementById('student-id-input');
-const departmentGroup = document.getElementById('department-group');
-const departmentSelect = document.getElementById('department-select');
-
-function toggleRoleFields(){
-    const role = roleSelect.value;
-    
-    // Show/hide year and student ID fields (only for students)
-    if(role === 'student'){
-        yearGroup.style.display = 'block';
-        yearSelect.required = true;
-        studentIdGroup.style.display = 'block';
-        studentIdInput.required = true;
-    } else {
-        yearGroup.style.display = 'none';
-        yearSelect.required = false;
-        yearSelect.value = '';
-        studentIdGroup.style.display = 'none';
-        studentIdInput.required = false;
-        studentIdInput.value = '';
-    }
-    
-    // Show/hide department field (for students, instructors, department heads)
-    if(['student', 'instructor', 'department_head'].includes(role)){
-        departmentGroup.style.display = 'block';
-        departmentSelect.required = true;
-    } else {
-        departmentGroup.style.display = 'none';
-        departmentSelect.required = false;
-        departmentSelect.value = '';
-    }
-}
-
-// Initialize on page load
-roleSelect.addEventListener('change', toggleRoleFields);
-window.addEventListener('load', function() {
-    toggleRoleFields();
-    
-    // If editing a student, make sure year and student ID fields are visible
-    <?php if($editing && $edit_data['role'] === 'student'): ?>
-        yearGroup.style.display = 'block';
-        yearSelect.required = true;
-        studentIdGroup.style.display = 'block';
-        studentIdInput.required = true;
-    <?php endif; ?>
-    
-    // If editing a user that needs department, make sure department field is visible
-    <?php if($editing && in_array($edit_data['role'], ['student', 'instructor', 'department_head'])): ?>
-        departmentGroup.style.display = 'block';
-        departmentSelect.required = true;
-    <?php endif; ?>
-});
-
-// Fallback for broken profile pictures
-function handleImageError(img) {
-    img.onerror = null;
-    img.src = '../assets/default_profile.png';
-    return true;
-}
-
-// Set profile picture fallbacks
-document.addEventListener('DOMContentLoaded', function() {
-    const profileImages = document.querySelectorAll('img[src*="profile"], img[alt*="Profile"]');
-    profileImages.forEach(img => {
-        img.onerror = function() {
-            this.src = '../assets/default_profile.png';
-        };
-    });
 });
 </script>
 

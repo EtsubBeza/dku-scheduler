@@ -16,32 +16,33 @@ $user_stmt = $pdo->prepare("SELECT username, email, profile_picture FROM users W
 $user_stmt->execute([$_SESSION['user_id']]);
 $current_user = $user_stmt->fetch();
 
-// FIXED: Simplified profile picture path logic
-$default_profile = '../assets/default_profile.png';
-
-// Function to check if profile picture exists
-function getProfilePicturePath($profile_picture) {
+// Function to get profile picture path for admin
+function getAdminProfilePicturePath($profile_picture) {
     if (empty($profile_picture)) {
         return '../assets/default_profile.png';
     }
     
-    // Try multiple possible locations
+    // Check multiple possible locations for admin profile pictures
     $locations = [
+        // Admin-specific uploads folder (preferred)
+        __DIR__ . '/../uploads/admin/' . $profile_picture,
+        // Fallback to main uploads
         __DIR__ . '/../uploads/' . $profile_picture,
         __DIR__ . '/../../uploads/' . $profile_picture,
-        __DIR__ . '/../../uploads/profiles/' . $profile_picture,
+        // Relative paths
+        'uploads/admin/' . $profile_picture,
+        '../uploads/admin/' . $profile_picture,
         'uploads/' . $profile_picture,
         '../uploads/' . $profile_picture,
-        '../../uploads/profiles/' . $profile_picture,
     ];
     
     foreach ($locations as $location) {
         if (file_exists($location)) {
-            // Return the appropriate web path
-            if (strpos($location, '../../uploads/profiles/') !== false) {
-                return '../../uploads/profiles/' . $profile_picture;
-            } elseif (strpos($location, '../../uploads/') !== false) {
-                return '../../uploads/' . $profile_picture;
+            // Return appropriate web path
+            if (strpos($location, '/admin/') !== false) {
+                return '../uploads/admin/' . $profile_picture;
+            } elseif (strpos($location, 'uploads/admin/') !== false) {
+                return 'uploads/admin/' . $profile_picture;
             } elseif (strpos($location, '../uploads/') !== false) {
                 return '../uploads/' . $profile_picture;
             } elseif (strpos($location, 'uploads/') !== false) {
@@ -50,12 +51,15 @@ function getProfilePicturePath($profile_picture) {
         }
     }
     
-    // If file doesn't exist anywhere, return default
+    // If file doesn't exist, return default
     return '../assets/default_profile.png';
 }
 
 // Get profile image path
-$profile_img_path = getProfilePicturePath($current_user['profile_picture'] ?? '');
+$profile_img_path = getAdminProfilePicturePath($current_user['profile_picture'] ?? '');
+
+$message = "";
+$message_type = "success"; // success, error, warning
 
 // Quick stats
 $total_students = $pdo->query("SELECT COUNT(*) FROM users WHERE role='student'")->fetchColumn();
@@ -483,7 +487,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 <div class="overlay" onclick="toggleSidebar()"></div>
 
 <!-- Sidebar -->
-<div class="sidebar">
+<div class="sidebar" id="sidebar">
     <div class="sidebar-profile">
         <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic"
              onerror="this.onerror=null; this.src='../assets/default_profile.png';">
@@ -502,17 +506,20 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <span class="pending-badge"><?= $pending_approvals ?></span>
         <?php endif; ?>
     </a>
+    <a href="manage_departments.php" class="<?= $current_page=='manage_departments.php'?'active':'' ?>">
+        <i class="fas fa-building"></i> Manage Departments
+    </a>
     <a href="manage_courses.php" class="<?= $current_page=='manage_courses.php'?'active':'' ?>">
         <i class="fas fa-book"></i> Manage Courses
     </a>
     <a href="manage_rooms.php" class="<?= $current_page=='manage_rooms.php'?'active':'' ?>">
         <i class="fas fa-door-closed"></i> Manage Rooms
     </a>
-    <a href="manage_schedule.php" class="<?= $current_page=='manage_schedule.php'?'active':'' ?>">
+    <a href="manage_schedules.php" class="<?= $current_page=='manage_schedules.php'?'active':'' ?>">
         <i class="fas fa-calendar-alt"></i> Manage Schedule
     </a>
     <a href="manage_announcements.php" class="<?= $current_page=='manage_announcements.php'?'active':'' ?>">
-        <i class="fas fa-bullhorn"></i> Announcements
+        <i class="fas fa-bullhorn"></i> Manage Announcements
     </a>
     <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
         <i class="fas fa-user-edit"></i> Edit Profile

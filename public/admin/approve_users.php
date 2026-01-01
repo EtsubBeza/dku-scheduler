@@ -16,48 +16,7 @@ $user_stmt = $pdo->prepare("SELECT username, email, profile_picture FROM users W
 $user_stmt->execute([$_SESSION['user_id']]);
 $current_user = $user_stmt->fetch();
 
-// FIXED: Simplified profile picture path logic
-$default_profile = '../assets/default_profile.png';
-
-// Function to check if profile picture exists
-function getProfilePicturePath($profile_picture) {
-    if (empty($profile_picture)) {
-        return '../assets/default_profile.png';
-    }
-    
-    // Try multiple possible locations
-    $locations = [
-        __DIR__ . '/../uploads/' . $profile_picture,
-        __DIR__ . '/../../uploads/' . $profile_picture,
-        __DIR__ . '/../../uploads/profiles/' . $profile_picture,
-        'uploads/' . $profile_picture,
-        '../uploads/' . $profile_picture,
-        '../../uploads/profiles/' . $profile_picture,
-    ];
-    
-    foreach ($locations as $location) {
-        if (file_exists($location)) {
-            // Return the appropriate web path
-            if (strpos($location, '../../uploads/profiles/') !== false) {
-                return '../../uploads/profiles/' . $profile_picture;
-            } elseif (strpos($location, '../../uploads/') !== false) {
-                return '../../uploads/' . $profile_picture;
-            } elseif (strpos($location, '../uploads/') !== false) {
-                return '../uploads/' . $profile_picture;
-            } elseif (strpos($location, 'uploads/') !== false) {
-                return 'uploads/' . $profile_picture;
-            }
-        }
-    }
-    
-    // If file doesn't exist anywhere, return default
-    return '../assets/default_profile.png';
-}
-
-// Get profile image path
-$profile_img_path = getProfilePicturePath($current_user['profile_picture'] ?? '');
-
-// Handle approval action
+// FIXED: Added approve action handling
 if(isset($_GET['approve'])){
     $user_id = intval($_GET['approve']);
     $stmt = $pdo->prepare("UPDATE users SET is_approved = 1 WHERE user_id = ?");
@@ -93,6 +52,48 @@ if(isset($_POST['bulk_action']) && isset($_POST['selected_users'])) {
     header("Location: approve_users.php");
     exit;
 }
+
+// Function to get profile picture path for admin
+function getAdminProfilePicturePath($profile_picture) {
+    if (empty($profile_picture)) {
+        return '../assets/default_profile.png';
+    }
+    
+    // Check multiple possible locations for admin profile pictures
+    $locations = [
+        // Admin-specific uploads folder (preferred)
+        __DIR__ . '/../uploads/admin/' . $profile_picture,
+        // Fallback to main uploads
+        __DIR__ . '/../uploads/' . $profile_picture,
+        __DIR__ . '/../../uploads/' . $profile_picture,
+        // Relative paths
+        'uploads/admin/' . $profile_picture,
+        '../uploads/admin/' . $profile_picture,
+        'uploads/' . $profile_picture,
+        '../uploads/' . $profile_picture,
+    ];
+    
+    foreach ($locations as $location) {
+        if (file_exists($location)) {
+            // Return appropriate web path
+            if (strpos($location, '/admin/') !== false) {
+                return '../uploads/admin/' . $profile_picture;
+            } elseif (strpos($location, 'uploads/admin/') !== false) {
+                return 'uploads/admin/' . $profile_picture;
+            } elseif (strpos($location, '../uploads/') !== false) {
+                return '../uploads/' . $profile_picture;
+            } elseif (strpos($location, 'uploads/') !== false) {
+                return 'uploads/' . $profile_picture;
+            }
+        }
+    }
+    
+    // If file doesn't exist, return default
+    return '../assets/default_profile.png';
+}
+
+// Get profile image path
+$profile_img_path = getAdminProfilePicturePath($current_user['profile_picture'] ?? '');
 
 // Fetch pending users
 $pending_users = $pdo->query("
@@ -214,8 +215,28 @@ body {
     display: flex;
     align-items: center;
     gap: 10px;
+    position: relative;
 }
 .sidebar a:hover, .sidebar a.active { background:#1abc9c; color:white; }
+
+/* Pending badge */
+.pending-badge {
+    position: absolute;
+    right: 15px;
+    background: #ef4444;
+    color: white;
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-weight: bold;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
 
 /* =============== Overlay =============== */
 .overlay {
@@ -441,6 +462,7 @@ td:first-child {
     display: inline-flex;
     align-items: center;
     gap: 5px;
+    text-decoration: none;
 }
 
 .btn-approve {
@@ -658,14 +680,14 @@ td:first-child {
 <div class="overlay" onclick="toggleSidebar()"></div>
 
 <!-- Sidebar -->
-<div class="sidebar">
+<div class="sidebar" id="sidebar">
     <div class="sidebar-profile">
         <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic"
              onerror="this.onerror=null; this.src='../assets/default_profile.png';">
         <p><?= htmlspecialchars($current_user['username']) ?></p>
     </div>
     <h2>Admin Panel</h2>
-    <a href="admin_dashboard.php" class="<?= $current_page=='admin_dashboard.php'?'active':'' ?>">
+    <a href="dashboard.php" class="<?= $current_page=='dashboard.php'?'active':'' ?>">
         <i class="fas fa-home"></i> Dashboard
     </a>
     <a href="manage_users.php" class="<?= $current_page=='manage_users.php'?'active':'' ?>">
@@ -674,10 +696,11 @@ td:first-child {
     <a href="approve_users.php" class="active">
         <i class="fas fa-user-check"></i> Approve Users
         <?php if($pending_count > 0): ?>
-            <span style="background:#ef4444; color:white; padding:2px 8px; border-radius:10px; font-size:12px; margin-left:auto;">
-                <?= $pending_count ?>
-            </span>
+            <span class="pending-badge"><?= $pending_count ?></span>
         <?php endif; ?>
+    </a>
+    <a href="manage_departments.php" class="<?= $current_page=='manage_departments.php'?'active':'' ?>">
+        <i class="fas fa-building"></i> Manage Departments
     </a>
     <a href="manage_courses.php" class="<?= $current_page=='manage_courses.php'?'active':'' ?>">
         <i class="fas fa-book"></i> Manage Courses
@@ -685,11 +708,11 @@ td:first-child {
     <a href="manage_rooms.php" class="<?= $current_page=='manage_rooms.php'?'active':'' ?>">
         <i class="fas fa-door-closed"></i> Manage Rooms
     </a>
-    <a href="manage_schedule.php" class="<?= $current_page=='manage_schedule.php'?'active':'' ?>">
+    <a href="manage_schedules.php" class="<?= $current_page=='manage_schedules.php'?'active':'' ?>">
         <i class="fas fa-calendar-alt"></i> Manage Schedule
     </a>
     <a href="manage_announcements.php" class="<?= $current_page=='manage_announcements.php'?'active':'' ?>">
-        <i class="fas fa-bullhorn"></i> Announcements
+        <i class="fas fa-bullhorn"></i> Manage Announcements
     </a>
     <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
         <i class="fas fa-user-edit"></i> Edit Profile
@@ -808,7 +831,7 @@ td:first-child {
                         </td>
                         <td data-label="Actions">
                             <div class="action-buttons">
-                                <a href="?approve=<?= $user['user_id'] ?>" class="btn-approve">
+                                <a href="?approve=<?= $user['user_id'] ?>" class="btn-approve" onclick="return confirmApprove()">
                                     <i class="fas fa-check"></i> Approve
                                 </a>
                                 <a href="?reject=<?= $user['user_id'] ?>" class="btn-reject" onclick="return confirm('Are you sure you want to reject this user?')">
@@ -866,10 +889,6 @@ document.addEventListener('DOMContentLoaded', function() {
             row.style.transform = 'translateX(0)';
         }, index * 100);
     });
-    
-    // Debug: Log profile picture paths
-    console.log('Sidebar profile pic src:', document.getElementById('sidebarProfilePic').src);
-    console.log('Header profile pic src:', document.getElementById('headerProfilePic').src);
 });
 
 // Confirm logout
@@ -878,6 +897,11 @@ document.querySelector('a[href="../logout.php"]').addEventListener('click', func
         e.preventDefault();
     }
 });
+
+// Confirm approve action
+function confirmApprove() {
+    return confirm('Are you sure you want to approve this user?');
+}
 
 // Bulk selection functions
 function toggleSelectAll() {

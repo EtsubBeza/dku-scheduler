@@ -14,10 +14,89 @@ include __DIR__ . '/../includes/darkmode.php';
 
 $student_id = $_SESSION['user_id'];
 
-// Fetch student's info (username & profile picture)
-$user_stmt = $pdo->prepare("SELECT username, profile_picture, email FROM users WHERE user_id = ?");
+// Fetch student's info (username, profile picture, email, AND YEAR)
+$user_stmt = $pdo->prepare("SELECT username, profile_picture, email, year FROM users WHERE user_id = ?");
 $user_stmt->execute([$student_id]);
 $user = $user_stmt->fetch(PDO::FETCH_ASSOC);
+
+// Get student's year
+$student_year = $user['year'] ?? '';
+
+// Create an array of possible year matches for flexible filtering
+$year_variations = [$student_year];
+if (substr($student_year, 0, 1) === 'E') {
+    // For Extension students (E1, E2, E3)
+    $year_variations[] = 'E';
+    $year_variations[] = 'Extension';
+    $year_variations[] = 'Ext';
+    $year_variations[] = substr($student_year, 1); // Also check regular year equivalent
+} else {
+    // For regular students, also check for Extension versions
+    $year_variations[] = 'E' . $student_year;
+}
+
+// Create placeholders for IN clause
+$placeholders = str_repeat('?,', count($year_variations) - 1) . '?';
+
+// Fetch student's schedule WITH YEAR FILTERING
+$schedules = $pdo->prepare("
+    SELECT s.schedule_id, c.course_name, u.username AS instructor_name, r.room_name, 
+           s.academic_year, s.semester, s.day, s.start_time, s.end_time
+    FROM schedule s
+    JOIN courses c ON s.course_id = c.course_id
+    JOIN users u ON s.instructor_id = u.user_id
+    JOIN rooms r ON s.room_id = r.room_id
+    JOIN enrollments e ON s.schedule_id = e.schedule_id
+    WHERE e.student_id = ?
+    AND s.year IN ($placeholders)
+    ORDER BY s.day, s.start_time
+");
+
+$schedule_params = array_merge([$student_id], $year_variations);
+$schedules->execute($schedule_params);
+$my_schedule = $schedules->fetchAll();
+
+// Quick stats: total courses WITH YEAR FILTER
+$total_courses_stmt = $pdo->prepare("
+    SELECT COUNT(DISTINCT s.course_id) AS total_courses
+    FROM schedule s
+    JOIN enrollments e ON s.schedule_id = e.schedule_id
+    WHERE e.student_id = ?
+    AND s.year IN ($placeholders)
+");
+$total_courses_stmt->execute($schedule_params);
+$total_courses = $total_courses_stmt->fetchColumn();
+
+// Quick stats: upcoming classes today WITH YEAR FILTER
+$today = date('l');
+$upcoming_classes_stmt = $pdo->prepare("
+    SELECT COUNT(*) AS upcoming
+    FROM schedule s
+    JOIN enrollments e ON s.schedule_id = e.schedule_id
+    WHERE e.student_id = ?
+    AND s.year IN ($placeholders)
+    AND s.day = ?
+    AND s.start_time >= CURTIME()
+");
+$today_params = array_merge([$student_id], $year_variations, [$today]);
+$upcoming_classes_stmt->execute($today_params);
+$upcoming_classes = $upcoming_classes_stmt->fetchColumn();
+
+// Quick stat: next class WITH YEAR FILTER
+$next_class_stmt = $pdo->prepare("
+    SELECT c.course_name, s.start_time
+    FROM schedule s
+    JOIN courses c ON s.course_id = c.course_id
+    JOIN enrollments e ON s.schedule_id = e.schedule_id
+    WHERE e.student_id = ?
+    AND s.year IN ($placeholders)
+    AND s.day = ?
+    AND s.start_time >= CURTIME()
+    ORDER BY s.start_time ASC
+    LIMIT 1
+");
+$next_class_stmt->execute($today_params);
+$next_class = $next_class_stmt->fetch(PDO::FETCH_ASSOC);
 
 // Determine profile picture path - FIXED PATHS
 // First, let's define the base uploads directory
@@ -54,58 +133,6 @@ if(!empty($profile_picture)) {
     // Use default if no profile picture
     $profile_img_path = '../assets/' . $default_profile;
 }
-
-// Fetch student's schedule
-$schedules = $pdo->prepare("
-    SELECT s.schedule_id, c.course_name, u.username AS instructor_name, r.room_name, 
-           s.academic_year, s.semester, s.day, s.start_time, s.end_time
-    FROM schedule s
-    JOIN courses c ON s.course_id = c.course_id
-    JOIN users u ON s.instructor_id = u.user_id
-    JOIN rooms r ON s.room_id = r.room_id
-    JOIN enrollments e ON s.schedule_id = e.schedule_id
-    WHERE e.student_id = ?
-    ORDER BY s.day, s.start_time
-");
-$schedules->execute([$student_id]);
-$my_schedule = $schedules->fetchAll();
-
-// Quick stats: total courses
-$total_courses_stmt = $pdo->prepare("
-    SELECT COUNT(DISTINCT s.course_id) AS total_courses
-    FROM schedule s
-    JOIN enrollments e ON s.schedule_id = e.schedule_id
-    WHERE e.student_id = ?
-");
-$total_courses_stmt->execute([$student_id]);
-$total_courses = $total_courses_stmt->fetchColumn();
-
-// Quick stats: upcoming classes today
-$upcoming_classes_stmt = $pdo->prepare("
-    SELECT COUNT(*) AS upcoming
-    FROM schedule s
-    JOIN enrollments e ON s.schedule_id = e.schedule_id
-    WHERE e.student_id = ?
-      AND s.day = DAYNAME(CURDATE())
-      AND s.start_time >= CURTIME()
-");
-$upcoming_classes_stmt->execute([$student_id]);
-$upcoming_classes = $upcoming_classes_stmt->fetchColumn();
-
-// Quick stat: next class
-$next_class_stmt = $pdo->prepare("
-    SELECT c.course_name, s.start_time
-    FROM schedule s
-    JOIN courses c ON s.course_id = c.course_id
-    JOIN enrollments e ON s.schedule_id = e.schedule_id
-    WHERE e.student_id = ?
-      AND s.day = DAYNAME(CURDATE())
-      AND s.start_time >= CURTIME()
-    ORDER BY s.start_time ASC
-    LIMIT 1
-");
-$next_class_stmt->execute([$student_id]);
-$next_class = $next_class_stmt->fetch(PDO::FETCH_ASSOC);
 
 // Sidebar active page
 $current_page = basename($_SERVER['PHP_SELF']);
@@ -184,6 +211,18 @@ $current_page = basename($_SERVER['PHP_SELF']);
     font-weight: bold;
     margin: 0;
     font-size: 16px;
+}
+
+/* Year badge in sidebar */
+.year-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    background: <?= (substr($student_year, 0, 1) === 'E') ? '#8b5cf6' : '#3b82f6' ?>;
+    color: white;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-top: 5px;
 }
 
 /* Sidebar title */
@@ -353,6 +392,35 @@ $current_page = basename($_SERVER['PHP_SELF']);
     color: #fca5a5;
 }
 
+/* ================= Student Info Box ================= */
+.student-info-box {
+    background: rgba(99, 102, 241, 0.1);
+    padding: 15px 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    border-left: 4px solid #6366f1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-primary);
+}
+
+.student-info-box i {
+    color: #6366f1;
+    font-size: 1.2rem;
+}
+
+.student-year-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    background: <?= (substr($student_year, 0, 1) === 'E') ? '#8b5cf6' : '#3b82f6' ?>;
+    color: white;
+    border-radius: 15px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-left: 10px;
+}
+
 /* ================= Schedule Table ================= */
 .schedule-section {
     margin-top: 30px;
@@ -513,6 +581,19 @@ $current_page = basename($_SERVER['PHP_SELF']);
     margin: 0 auto;
 }
 
+/* Debug info (optional, remove in production) */
+.debug-info {
+    background: rgba(239, 68, 68, 0.1);
+    padding: 10px 15px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    border-left: 4px solid #ef4444;
+    color: var(--error-text);
+    font-family: monospace;
+    font-size: 0.85rem;
+    display: none; /* Hide by default, show only when needed */
+}
+
 /* Dark mode specific adjustments */
 [data-theme="dark"] .stat-card .number {
     color: var(--text-primary);
@@ -571,6 +652,19 @@ $current_page = basename($_SERVER['PHP_SELF']);
     .schedule-table { min-width: 600px; }
     .profile-picture { width: 120px; height: 120px; }
 }
+
+/* Improved sidebar icons */
+.sidebar a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.sidebar a i {
+    width: 20px;
+    text-align: center;
+    font-size: 1.1rem;
+}
 </style>
 </head>
 <body>
@@ -588,6 +682,17 @@ $current_page = basename($_SERVER['PHP_SELF']);
         <div class="sidebar-profile">
             <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic">
             <p><?= htmlspecialchars($user['username'] ?? 'Student') ?></p>
+            <?php if($student_year): ?>
+                <span class="year-badge">
+                    <?php 
+                    if(substr($student_year, 0, 1) === 'E') {
+                        echo 'Ext. Year ' . substr($student_year, 1);
+                    } else {
+                        echo 'Year ' . $student_year;
+                    }
+                    ?>
+                </span>
+            <?php endif; ?>
         </div>
         <h2>Student Panel</h2>
         <a href="student_dashboard.php" class="<?= $current_page=='student_dashboard.php'?'active':'' ?>">
@@ -624,6 +729,28 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         <div><?= htmlspecialchars($user['username'] ?? 'Student') ?></div>
                         <small>Student</small>
                     </div>
+                </div>
+            </div>
+
+            <!-- Student Info Box -->
+            <div class="student-info-box">
+                <i class="fas fa-user-graduate"></i>
+                <div>
+                    <strong>Student Information:</strong> 
+                    <?= htmlspecialchars($user['username'] ?? 'Student') ?>
+                    <span class="student-year-badge">
+                        <?php 
+                        if($student_year) {
+                            if(substr($student_year, 0, 1) === 'E') {
+                                echo 'Extension Year ' . substr($student_year, 1);
+                            } else {
+                                echo 'Year ' . $student_year;
+                            }
+                        } else {
+                            echo 'Year not set';
+                        }
+                        ?>
+                    </span>
                 </div>
             </div>
 
@@ -682,6 +809,21 @@ $current_page = basename($_SERVER['PHP_SELF']);
         <?php if(isset($user['email'])): ?>
             <p><strong>Email:</strong> <?= htmlspecialchars($user['email']) ?></p>
         <?php endif; ?>
+        <p><strong>Year:</strong> 
+            <span style="color: <?= (substr($student_year, 0, 1) === 'E') ? '#8b5cf6' : '#3b82f6' ?>; font-weight: 600;">
+                <?php 
+                if($student_year) {
+                    if(substr($student_year, 0, 1) === 'E') {
+                        echo 'Extension Year ' . substr($student_year, 1);
+                    } else {
+                        echo 'Year ' . $student_year;
+                    }
+                } else {
+                    echo 'Not set';
+                }
+                ?>
+            </span>
+        </p>
         <p><strong>Status:</strong> <span style="color: #10b981; font-weight: 600;">Active Student</span></p>
         <p>
             <a href="edit_profile.php">
@@ -792,7 +934,22 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <div class="empty-state">
                 <i class="fas fa-calendar-times"></i>
                 <h3>No Classes Scheduled</h3>
-                <p>You don't have any classes scheduled at the moment.</p>
+                <p>You don't have any classes scheduled for 
+                    <?php 
+                    if($student_year) {
+                        if(substr($student_year, 0, 1) === 'E') {
+                            echo 'Extension Year ' . substr($student_year, 1);
+                        } else {
+                            echo 'Year ' . $student_year;
+                        }
+                    } else {
+                        echo 'your year';
+                    }
+                    ?>
+                </p>
+                <p style="margin-top: 10px; font-size: 0.9rem;">
+                    Please check with your department head or administrator.
+                </p>
             </div>
         <?php endif; ?>
     </div>
