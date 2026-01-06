@@ -50,7 +50,7 @@ if(isset($_POST['assign_course'])){
     $semester = $_POST['semester'];
     $academic_year = $_POST['academic_year'];
 
-    // Prevent duplicate assignment - Check more thoroughly
+    // Prevent duplicate assignment
     $check = $pdo->prepare("
         SELECT ca.* 
         FROM course_assignments ca
@@ -183,61 +183,128 @@ if(isset($_GET['msg'])) {
     $message = urldecode($_GET['msg']);
 }
 
-// Fetch instructor workload data for current semester
-$current_semester = 'Spring'; // You can make this dynamic based on current date
-$current_year = date('Y') . '-' . (date('Y') + 1);
+// Get filter values or use defaults
+$selected_semester = $_GET['semester'] ?? '';
+$selected_year = $_GET['year'] ?? '';
 
-$workload_stmt = $pdo->prepare("
+// Fetch ALL instructor workloads (for all semesters) for the summary
+$all_instructors_summary_stmt = $pdo->prepare("
     SELECT 
         u.user_id,
         u.username,
         u.full_name,
-        COALESCE(u.full_name, u.username) as display_name,
-        SUM(iw.credit_hours) as total_credits,
-        COUNT(DISTINCT iw.course_id) as total_courses,
-        GROUP_CONCAT(DISTINCT c.course_code SEPARATOR ', ') as assigned_courses
+        COALESCE(NULLIF(TRIM(u.full_name), ''), u.username) as display_name,
+        COALESCE(SUM(iw.credit_hours), 0) as total_credits,
+        COUNT(DISTINCT iw.course_id) as total_courses
     FROM users u
-    LEFT JOIN instructor_workload iw ON u.user_id = iw.instructor_id 
-        AND iw.semester = ? 
-        AND iw.academic_year = ?
+    LEFT JOIN instructor_workload iw ON u.user_id = iw.instructor_id
     LEFT JOIN courses c ON iw.course_id = c.course_id
     WHERE u.role = 'instructor' 
         AND u.department_id = ?
     GROUP BY u.user_id, u.username, u.full_name
-    ORDER BY total_credits DESC
+    ORDER BY total_credits DESC, display_name ASC
 ");
 
-$workload_stmt->execute([$current_semester, $current_year, $dept_id]);
-$instructor_workloads = $workload_stmt->fetchAll();
+$all_instructors_summary_stmt->execute([$dept_id]);
+$instructor_summary = $all_instructors_summary_stmt->fetchAll();
 
 // Fetch courses and instructors for dropdown
 $courses = $pdo->prepare("SELECT * FROM courses WHERE department_id=? ORDER BY course_name ASC");
 $courses->execute([$dept_id]);
 $courses = $courses->fetchAll();
 
-$instructors = $pdo->prepare("SELECT user_id, username, full_name, email FROM users WHERE role='instructor' AND department_id=? ORDER BY full_name ASC, username ASC");
+$instructors = $pdo->prepare("SELECT user_id, username, full_name, email FROM users WHERE role='instructor' AND department_id=? ORDER BY COALESCE(NULLIF(TRIM(full_name), ''), username) ASC");
 $instructors->execute([$dept_id]);
 $instructors = $instructors->fetchAll();
 
-// Fetch current assignments
+// Fetch ALL assignments
 $assignments_stmt = $pdo->prepare("
-    SELECT ca.id, c.course_name, c.course_code, u.full_name, u.username, ca.semester, ca.academic_year 
+    SELECT ca.id, c.course_name, c.course_code, c.credit_hours, 
+           u.full_name, u.username, ca.semester, ca.academic_year
     FROM course_assignments ca
     JOIN courses c ON ca.course_id = c.course_id
     JOIN users u ON ca.user_id = u.user_id
     WHERE c.department_id = ?
-    ORDER BY ca.academic_year DESC, ca.semester, c.course_name
+    ORDER BY ca.academic_year DESC, 
+        CASE ca.semester 
+            WHEN '1st Semester' THEN 1 
+            WHEN '2nd Semester' THEN 2 
+            WHEN 'Summer' THEN 3 
+            ELSE 4 
+        END,
+        c.course_name
 ");
 $assignments_stmt->execute([$dept_id]);
-$assignments = $assignments_stmt->fetchAll();
+$all_assignments = $assignments_stmt->fetchAll();
 
-// Check if there are overloaded instructors
+// Filter assignments if filter is set
+$filtered_assignments = $all_assignments;
+if($selected_semester) {
+    $filtered_assignments = array_filter($filtered_assignments, function($a) use ($selected_semester) {
+        return $a['semester'] == $selected_semester;
+    });
+}
+if($selected_year) {
+    $filtered_assignments = array_filter($filtered_assignments, function($a) use ($selected_year) {
+        return $a['academic_year'] == $selected_year;
+    });
+}
+
+// Calculate workload statistics for ALL semesters
 $overloaded_instructors = [];
-foreach($instructor_workloads as $iw) {
-    if($iw['total_credits'] >= 12) {
-        $overloaded_instructors[] = $iw['display_name'] . " (" . $iw['total_credits'] . "/12 credits)";
+$warning_count = 0;
+$overloaded_count = 0;
+$normal_count = 0;
+$no_load_count = 0;
+$total_credits = 0;
+$total_instructors = count($instructor_summary);
+
+// Count workload distribution for chart (ALL semesters)
+$chart_low_load = 0;     // 1-6 credits
+$chart_warning_load = 0; // 7-9 credits  
+$chart_high_load = 0;    // 10-12 credits
+
+foreach($instructor_summary as $iw) {
+    $credits = $iw['total_credits'] ?? 0;
+    $total_credits += $credits;
+    
+    // Count for charts
+    if($credits > 0 && $credits <= 6) {
+        $chart_low_load++;
+    } elseif($credits >= 7 && $credits <= 9) {
+        $chart_warning_load++;
+    } elseif($credits >= 10 && $credits < 12) {
+        $chart_high_load++;
+    }
+    
+    // Count for stats
+    if($credits >= 12) {
+        $overloaded_count++;
+        $overloaded_instructors[] = $iw['display_name'] . " (" . $credits . "/12 credits)";
+    } elseif($credits >= 9) {
+        $warning_count++;
+    } elseif($credits > 0) {
+        $normal_count++;
+    } else {
+        $no_load_count++;
     }
 }
+
+$avg_workload = $total_instructors > 0 ? round($total_credits / $total_instructors, 1) : 0;
+
+// Get unique semesters and years for filter dropdowns
+$semesters = [];
+$years = [];
+foreach($all_assignments as $assignment) {
+    if(!in_array($assignment['semester'], $semesters)) {
+        $semesters[] = $assignment['semester'];
+    }
+    if(!in_array($assignment['academic_year'], $years)) {
+        $years[] = $assignment['academic_year'];
+    }
+}
+sort($years);
+rsort($years); // Show most recent first
 ?>
 
 <!DOCTYPE html>
@@ -482,11 +549,17 @@ foreach($instructor_workloads as $iw) {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px;
+    padding: 12px 15px;
     background: var(--bg-card);
     margin-bottom: 8px;
-    border-radius: 6px;
+    border-radius: 8px;
     border-left: 4px solid #10b981;
+    transition: transform 0.2s ease;
+}
+
+.instructor-workload-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px var(--shadow-color);
 }
 
 .instructor-workload-item.warning {
@@ -495,6 +568,11 @@ foreach($instructor_workloads as $iw) {
 
 .instructor-workload-item.danger {
     border-left-color: #ef4444;
+}
+
+.instructor-workload-item.no-load {
+    border-left-color: #9ca3af;
+    opacity: 0.8;
 }
 
 .progress-bar {
@@ -518,6 +596,10 @@ foreach($instructor_workloads as $iw) {
 
 .progress-fill.danger {
     background: #ef4444;
+}
+
+.progress-fill.no-load {
+    background: #9ca3af;
 }
 
 /* Workload Alert */
@@ -753,10 +835,54 @@ foreach($instructor_workloads as $iw) {
     color: var(--error-text);
 }
 
-/* Workload Preview Dark Mode Adjustments */
-#workloadPreview {
+.badge-secondary {
+    background: #e5e7eb;
+    color: #374151;
+}
+
+/* Filter Styles */
+.filter-section {
     background: var(--bg-secondary);
+    padding: 15px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+}
+
+.filter-form {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.filter-form select,
+.filter-form input {
+    padding: 8px 12px;
     border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-card);
+    color: var(--text-primary);
+}
+
+.filter-btn {
+    padding: 8px 16px;
+    background: #6366f1;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.filter-btn:hover {
+    background: #4f46e5;
+}
+
+.filter-btn.reset {
+    background: #6b7280;
+}
+
+.filter-btn.reset:hover {
+    background: #4b5563;
 }
 
 /* ================= Responsive ================= */
@@ -771,6 +897,23 @@ foreach($instructor_workloads as $iw) {
     .form-row .form-group { min-width: auto; }
     .charts-container { flex-direction: column; }
     .chart-box { min-width: 100%; }
+    .workload-stats { flex-direction: column; }
+    .instructor-workload-item {
+        flex-direction: column;
+        gap: 10px;
+    }
+    .instructor-workload-item > div {
+        width: 100%;
+        text-align: center;
+    }
+    .progress-bar {
+        margin: 10px 0;
+        width: 100%;
+    }
+    .filter-form {
+        flex-direction: column;
+        align-items: stretch;
+    }
 }
 </style>
 </head>
@@ -843,7 +986,7 @@ foreach($instructor_workloads as $iw) {
         <div class="card">
             <div class="card-header">
                 <h3><i class="fas fa-chart-pie"></i> Workload Monitoring Dashboard</h3>
-                <small>Current Semester: <?= htmlspecialchars($current_semester) ?> <?= htmlspecialchars($current_year) ?></small>
+                <small>Showing: Overall Summary (All Semesters)</small>
             </div>
             <div class="card-body">
                 <?php if(!empty($overloaded_instructors)): ?>
@@ -858,28 +1001,6 @@ foreach($instructor_workloads as $iw) {
 
                 <!-- Workload Stats -->
                 <div class="workload-stats">
-                    <?php
-                    // Calculate statistics
-                    $total_instructors = count($instructor_workloads);
-                    $total_credits = array_sum(array_column($instructor_workloads, 'total_credits'));
-                    $avg_workload = $total_instructors > 0 ? round($total_credits / $total_instructors, 1) : 0;
-                    
-                    $overloaded_count = 0;
-                    $warning_count = 0;
-                    $normal_count = 0;
-                    
-                    foreach($instructor_workloads as $iw) {
-                        $credits = $iw['total_credits'] ?? 0;
-                        if($credits >= 12) {
-                            $overloaded_count++;
-                        } elseif($credits >= 9) {
-                            $warning_count++;
-                        } else {
-                            $normal_count++;
-                        }
-                    }
-                    ?>
-                    
                     <div class="stat-card">
                         <h4>Total Instructors</h4>
                         <div class="value"><?= $total_instructors ?></div>
@@ -903,6 +1024,12 @@ foreach($instructor_workloads as $iw) {
                         <div class="value"><?= $overloaded_count ?></div>
                         <div class="subtext">≥12 credits</div>
                     </div>
+
+                    <div class="stat-card">
+                        <h4>No Load</h4>
+                        <div class="value"><?= $no_load_count ?></div>
+                        <div class="subtext">0 credits assigned</div>
+                    </div>
                 </div>
 
                 <!-- Charts -->
@@ -920,46 +1047,39 @@ foreach($instructor_workloads as $iw) {
 
                 <!-- Instructor Workload Preview -->
                 <div class="workload-preview">
-                    <h4><i class="fas fa-users"></i> Instructor Workload Preview</h4>
-                    <?php if(!empty($instructor_workloads)): ?>
-                        <?php foreach($instructor_workloads as $iw): ?>
+                    <h4><i class="fas fa-users"></i> Instructor Workload Details (All Semesters Combined)</h4>
+                    <?php if(!empty($instructor_summary)): ?>
+                        <?php foreach($instructor_summary as $iw): ?>
                             <?php
                             $credits = $iw['total_credits'] ?? 0;
                             $percentage = min(100, ($credits / 12) * 100);
+                            $display_name = $iw['display_name'] ?? 'Unknown Instructor';
                             
-                            // Get the best available name
-                            $display_name = 'Unknown Instructor';
-                            if (!empty(trim($iw['full_name'] ?? ''))) {
-                                $display_name = trim($iw['full_name']);
-                            } elseif (!empty(trim($iw['username'] ?? ''))) {
-                                $display_name = trim($iw['username']);
-                            }
-                            
-                            // Determine status with percentage-based logic
-                            if($percentage >= 100) { // 12+ credits
+                            // Determine status
+                            if($credits >= 12) {
                                 $status_text = 'Overloaded';
                                 $status_class = 'danger';
                                 $icon = 'exclamation-circle';
                                 $item_class = 'danger';
                                 $progress_class = 'danger';
-                            } elseif($percentage >= 75) { // 9-11 credits (75-91%)
+                            } elseif($credits >= 9) {
                                 $status_text = 'Near Limit';
                                 $status_class = 'warning';
                                 $icon = 'exclamation-triangle';
                                 $item_class = 'warning';
                                 $progress_class = 'warning';
-                            } elseif($percentage >= 66) { // 8 credits (66%)
-                                $status_text = 'Approaching Limit';
-                                $status_class = 'warning';
-                                $icon = 'exclamation-triangle';
-                                $item_class = 'warning';
-                                $progress_class = 'warning';
-                            } else { // 0-7 credits (0-58%)
+                            } elseif($credits > 0) {
                                 $status_text = 'Normal';
                                 $status_class = 'success';
                                 $icon = 'check-circle';
                                 $item_class = '';
                                 $progress_class = '';
+                            } else {
+                                $status_text = 'No Load';
+                                $status_class = 'secondary';
+                                $icon = 'info-circle';
+                                $item_class = 'no-load';
+                                $progress_class = 'no-load';
                             }
                             ?>
                             
@@ -973,13 +1093,38 @@ foreach($instructor_workloads as $iw) {
                                     <div style="font-size: 0.85rem; color: var(--text-secondary);">
                                         <div style="margin-bottom: 3px;">
                                             <i class="fas fa-book" style="margin-right: 5px;"></i>
-                                            <?= $iw['total_courses'] ?? 0 ?> course(s)
+                                            <?= $iw['total_courses'] ?? 0 ?> course(s) total
                                         </div>
                                         
-                                        <?php if(!empty($iw['assigned_courses'])): ?>
+                                        <!-- Get semester-specific details for this instructor -->
+                                        <?php
+                                        $semester_details_stmt = $pdo->prepare("
+                                            SELECT iw.semester, iw.academic_year, SUM(iw.credit_hours) as semester_credits
+                                            FROM instructor_workload iw
+                                            WHERE iw.instructor_id = ?
+                                            GROUP BY iw.semester, iw.academic_year
+                                            ORDER BY iw.academic_year DESC, 
+                                                CASE iw.semester 
+                                                    WHEN '1st Semester' THEN 1 
+                                                    WHEN '2nd Semester' THEN 2 
+                                                    WHEN 'Summer' THEN 3 
+                                                    ELSE 4 
+                                                END
+                                        ");
+                                        $semester_details_stmt->execute([$iw['user_id']]);
+                                        $semester_details = $semester_details_stmt->fetchAll();
+                                        
+                                        if(!empty($semester_details)): 
+                                        ?>
                                             <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 3px;">
-                                                <i class="fas fa-list" style="margin-right: 5px;"></i>
-                                                <?= htmlspecialchars($iw['assigned_courses']) ?>
+                                                <i class="fas fa-calendar-alt" style="margin-right: 5px;"></i>
+                                                <?php 
+                                                $detail_strings = [];
+                                                foreach($semester_details as $detail) {
+                                                    $detail_strings[] = $detail['semester'] . ' ' . $detail['academic_year'] . ' (' . $detail['semester_credits'] . 'cr)';
+                                                }
+                                                echo htmlspecialchars(implode(', ', $detail_strings));
+                                                ?>
                                             </div>
                                         <?php endif; ?>
                                     </div>
@@ -1008,7 +1153,7 @@ foreach($instructor_workloads as $iw) {
                     <?php else: ?>
                         <div style="text-align: center; padding: 30px; color: var(--text-secondary);">
                             <i class="fas fa-user-graduate" style="font-size: 2.5rem; margin-bottom: 15px; opacity: 0.5;"></i>
-                            <p>No instructor workload data available for current semester.</p>
+                            <p>No instructor workload data available.</p>
                         </div>
                     <?php endif; ?>
                 </div>
@@ -1025,14 +1170,14 @@ foreach($instructor_workloads as $iw) {
                     <div class="form-row">
                         <div class="form-group">
                             <label for="course_id">Select Course:</label>
-                            <select name="course_id" id="course_id" class="form-control" required onchange="updateWorkloadInfo()">
+                            <select name="course_id" id="course_id" class="form-control" required>
                                 <option value="">-- Select Course --</option>
                                 <?php foreach($courses as $course): ?>
                                     <?php 
                                     $course_credits = $course['credit_hours'];
                                     $course_info = htmlspecialchars($course['course_code'] . ' - ' . $course['course_name'] . " ({$course_credits} credits)");
                                     ?>
-                                    <option value="<?= $course['course_id'] ?>" data-credits="<?= $course_credits ?>">
+                                    <option value="<?= $course['course_id'] ?>">
                                         <?= $course_info ?>
                                     </option>
                                 <?php endforeach; ?>
@@ -1041,25 +1186,14 @@ foreach($instructor_workloads as $iw) {
 
                         <div class="form-group">
                             <label for="user_id">Select Instructor:</label>
-                            <select name="user_id" id="user_id" class="form-control" required onchange="updateWorkloadInfo()">
+                            <select name="user_id" id="user_id" class="form-control" required>
                                 <option value="">-- Select Instructor --</option>
                                 <?php foreach($instructors as $inst): ?>
                                     <?php 
-                                    // Find current workload for this instructor
-                                    $current_load = 0;
-                                    foreach($instructor_workloads as $iw) {
-                                        if($iw['user_id'] == $inst['user_id']) {
-                                            $current_load = $iw['total_credits'] ?? 0;
-                                            break;
-                                        }
-                                    }
-                                    
                                     $displayName = !empty(trim($inst['full_name'])) ? $inst['full_name'] : $inst['username'];
-                                    $workload_info = "Current: {$current_load}/12 credits";
-                                    $status_color = $current_load >= 12 ? '#ef4444' : ($current_load >= 9 ? '#f59e0b' : '#10b981');
                                     ?>
-                                    <option value="<?= $inst['user_id'] ?>" data-current-load="<?= $current_load ?>" data-status-color="<?= $status_color ?>">
-                                        <?= htmlspecialchars($displayName . ' (' . $inst['email'] . ') - ' . $workload_info) ?>
+                                    <option value="<?= $inst['user_id'] ?>">
+                                        <?= htmlspecialchars($displayName . ' (' . $inst['email'] . ')') ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
@@ -1071,51 +1205,17 @@ foreach($instructor_workloads as $iw) {
                             <label for="semester">Semester:</label>
                             <select name="semester" id="semester" class="form-control" required>
                                 <option value="">-- Select Semester --</option>
-                                <option value="Fall" <?= $current_semester == 'Fall' ? 'selected' : '' ?>>Fall</option>
-                                <option value="Spring" <?= $current_semester == 'Spring' ? 'selected' : '' ?>>Spring</option>
+                                <option value="1st Semester">1st Semester</option>
+                                <option value="2nd Semester">2nd Semester</option>
                                 <option value="Summer">Summer</option>
-                                <option value="Winter">Winter</option>
                             </select>
                         </div>
 
                         <div class="form-group">
                             <label for="academic_year">Academic Year:</label>
                             <input type="text" name="academic_year" id="academic_year" class="form-control" required 
-                                   placeholder="e.g., 2024-2025" value="<?= $current_year ?>">
+                                   placeholder="e.g., 2024-2025" value="2024-2025">
                         </div>
-                    </div>
-
-                    <!-- Workload Preview -->
-                    <div id="workloadPreview" style="display: none; margin: 20px 0; padding: 15px; background: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border-color);">
-                        <h4 style="margin-bottom: 10px; color: var(--text-primary);">Workload Impact Preview</h4>
-                        <div style="display: flex; align-items: center; gap: 15px;">
-                            <div style="flex: 1;">
-                                <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: var(--text-secondary);">
-                                    <span>Current Load:</span>
-                                    <strong id="currentLoad" style="color: var(--text-primary);">0</strong>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: var(--text-secondary);">
-                                    <span>Course Credits:</span>
-                                    <strong id="courseCredits" style="color: var(--text-primary);">0</strong>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: var(--text-secondary);">
-                                    <span>New Total:</span>
-                                    <strong id="newTotal" style="color: var(--text-primary);">0</strong>
-                                </div>
-                            </div>
-                            <div style="flex: 2;">
-                                <div style="height: 10px; background: var(--border-color); border-radius: 5px; overflow: hidden; margin: 5px 0;">
-                                    <div id="workloadProgress" style="height: 100%; width: 0%; background: #10b981; transition: width 0.3s;"></div>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-secondary);">
-                                    <span>0</span>
-                                    <span>6 (50%)</span>
-                                    <span>9 (75%)</span>
-                                    <span>12 (100%)</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div id="workloadWarning" style="margin-top: 10px; padding: 10px; border-radius: 5px; display: none;"></div>
                     </div>
 
                     <button type="submit" name="assign_course" class="btn btn-primary">
@@ -1135,13 +1235,40 @@ foreach($instructor_workloads as $iw) {
                 <h3><i class="fas fa-list"></i> Current Assignments</h3>
             </div>
             <div class="card-body">
-                <?php if($assignments): ?>
+                <!-- Filter Section -->
+                <div class="filter-section">
+                    <form method="GET" class="filter-form">
+                        <select name="semester" class="form-control">
+                            <option value="">All Semesters</option>
+                            <?php foreach($semesters as $sem): ?>
+                                <option value="<?= htmlspecialchars($sem) ?>" <?= ($selected_semester == $sem) ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($sem) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        
+                        <select name="year" class="form-control">
+                            <option value="">All Years</option>
+                            <?php foreach($years as $year): ?>
+                                <option value="<?= htmlspecialchars($year) ?>" <?= ($selected_year == $year) ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($year) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        
+                        <button type="submit" class="filter-btn">Filter</button>
+                        <a href="assign_courses.php" class="filter-btn reset">Reset</a>
+                    </form>
+                </div>
+
+                <?php if($all_assignments): ?>
                     <div class="table-container">
                         <table class="assignment-table">
                             <thead>
                                 <tr>
                                     <th>Course Code</th>
                                     <th>Course Name</th>
+                                    <th>Credits</th>
                                     <th>Instructor</th>
                                     <th>Semester</th>
                                     <th>Academic Year</th>
@@ -1149,25 +1276,34 @@ foreach($instructor_workloads as $iw) {
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach($assignments as $a): ?>
+                                <?php if(empty($filtered_assignments)): ?>
                                     <tr>
-                                        <td><strong><?= htmlspecialchars($a['course_code'] ?? 'N/A') ?></strong></td>
-                                        <td><?= htmlspecialchars($a['course_name']) ?></td>
-                                        <td>
-                                            <?php
-                                            $displayName = !empty(trim($a['full_name'])) ? $a['full_name'] : $a['username'];
-                                            echo htmlspecialchars($displayName);
-                                            ?>
-                                        </td>
-                                        <td><span class="badge"><?= htmlspecialchars($a['semester']) ?></span></td>
-                                        <td><?= htmlspecialchars($a['academic_year']) ?></td>
-                                        <td>
-                                            <a class="action-btn delete" href="?delete=<?= $a['id'] ?>" onclick="return confirm('Are you sure you want to delete this assignment?')">
-                                                <i class="fas fa-trash"></i> Delete
-                                            </a>
+                                        <td colspan="7" style="text-align: center; padding: 30px;">
+                                            No assignments found for the selected filters.
                                         </td>
                                     </tr>
-                                <?php endforeach; ?>
+                                <?php else: ?>
+                                    <?php foreach($filtered_assignments as $a): ?>
+                                        <tr>
+                                            <td><strong><?= htmlspecialchars($a['course_code'] ?? 'N/A') ?></strong></td>
+                                            <td><?= htmlspecialchars($a['course_name']) ?></td>
+                                            <td><span class="badge"><?= $a['credit_hours'] ?> credits</span></td>
+                                            <td>
+                                                <?php
+                                                $displayName = !empty(trim($a['full_name'])) ? $a['full_name'] : $a['username'];
+                                                echo htmlspecialchars($displayName);
+                                                ?>
+                                            </td>
+                                            <td><span class="badge"><?= htmlspecialchars($a['semester']) ?></span></td>
+                                            <td><?= htmlspecialchars($a['academic_year']) ?></td>
+                                            <td>
+                                                <a class="action-btn delete" href="?delete=<?= $a['id'] ?>" onclick="return confirm('Are you sure you want to delete this assignment?')">
+                                                    <i class="fas fa-trash"></i> Delete
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
                             </tbody>
                         </table>
                     </div>
@@ -1205,9 +1341,6 @@ foreach($instructor_workloads as $iw) {
 
             // Initialize Charts
             initCharts();
-            
-            // Initialize workload preview
-            updateWorkloadInfo();
         });
 
         // Workload Chart Data
@@ -1222,35 +1355,21 @@ foreach($instructor_workloads as $iw) {
             datasets: [{
                 label: 'Number of Instructors',
                 data: [
-                    <?= $normal_count ?>,
-                    <?php 
-                    $low_load = 0;
-                    foreach($instructor_workloads as $iw) {
-                        $credits = $iw['total_credits'] ?? 0;
-                        if($credits > 0 && $credits <= 6) $low_load++;
-                    }
-                    echo $low_load;
-                    ?>,
-                    <?= $warning_count ?>,
-                    <?php 
-                    $high_load = 0;
-                    foreach($instructor_workloads as $iw) {
-                        $credits = $iw['total_credits'] ?? 0;
-                        if($credits >= 10 && $credits < 12) $high_load++;
-                    }
-                    echo $high_load;
-                    ?>,
+                    <?= $no_load_count ?>,
+                    <?= $chart_low_load ?>,
+                    <?= $chart_warning_load ?>,
+                    <?= $chart_high_load ?>,
                     <?= $overloaded_count ?>
                 ],
                 backgroundColor: [
-                    '#e5e7eb',  // Gray for no load
+                    '#9ca3af',  // Gray for no load
                     '#10b981',  // Green for low load
                     '#f59e0b',  // Yellow for warning
                     '#f97316',  // Orange for high load
                     '#ef4444'   // Red for overloaded
                 ],
                 borderColor: [
-                    '#9ca3af',
+                    '#6b7280',
                     '#059669',
                     '#d97706',
                     '#ea580c',
@@ -1261,15 +1380,17 @@ foreach($instructor_workloads as $iw) {
         };
 
         const statusData = {
-            labels: ['Normal', 'Near Limit', 'Overloaded'],
+            labels: ['No Load', 'Normal', 'Near Limit', 'Overloaded'],
             datasets: [{
-                data: [<?= $normal_count ?>, <?= $warning_count ?>, <?= $overloaded_count ?>],
+                data: [<?= $no_load_count ?>, <?= $normal_count ?>, <?= $warning_count ?>, <?= $overloaded_count ?>],
                 backgroundColor: [
+                    '#9ca3af',
                     '#10b981',
                     '#f59e0b',
                     '#ef4444'
                 ],
                 borderColor: [
+                    '#6b7280',
                     '#059669',
                     '#d97706',
                     '#dc2626'
@@ -1281,146 +1402,84 @@ foreach($instructor_workloads as $iw) {
         function initCharts() {
             // Workload Distribution Chart
             const workloadCtx = document.getElementById('workloadChart').getContext('2d');
-            new Chart(workloadCtx, {
-                type: 'bar',
-                data: workloadData,
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                stepSize: 1,
-                                color: 'var(--text-secondary)'
+            if (workloadCtx) {
+                new Chart(workloadCtx, {
+                    type: 'bar',
+                    data: workloadData,
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                display: false
                             },
-                            grid: {
-                                color: 'var(--border-color)'
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return `${context.dataset.label}: ${context.raw}`;
+                                    }
+                                }
                             }
                         },
-                        x: {
-                            ticks: {
-                                color: 'var(--text-secondary)'
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    stepSize: 1,
+                                    color: 'var(--text-secondary)'
+                                },
+                                grid: {
+                                    color: 'var(--border-color)'
+                                }
                             },
-                            grid: {
-                                color: 'var(--border-color)'
+                            x: {
+                                ticks: {
+                                    color: 'var(--text-secondary)',
+                                    maxRotation: 45
+                                },
+                                grid: {
+                                    color: 'var(--border-color)'
+                                }
                             }
                         }
                     }
-                }
-            });
+                });
+            }
 
             // Status Overview Chart
             const statusCtx = document.getElementById('statusChart').getContext('2d');
-            new Chart(statusCtx, {
-                type: 'pie',
-                data: statusData,
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: {
-                                color: 'var(--text-primary)'
+            if (statusCtx) {
+                new Chart(statusCtx, {
+                    type: 'doughnut',
+                    data: statusData,
+                    options: {
+                        responsive: true,
+                        cutout: '60%',
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    color: 'var(--text-primary)',
+                                    padding: 20
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                        const percentage = Math.round((context.raw / total) * 100);
+                                        return `${context.label}: ${context.raw} (${percentage}%)`;
+                                    }
+                                }
                             }
                         }
                     }
-                }
-            });
-        }
-
-        function updateWorkloadInfo() {
-            const courseSelect = document.getElementById('course_id');
-            const instructorSelect = document.getElementById('user_id');
-            const previewDiv = document.getElementById('workloadPreview');
-            const warningDiv = document.getElementById('workloadWarning');
-            
-            if(courseSelect.value && instructorSelect.value) {
-                const courseCredits = parseInt(courseSelect.options[courseSelect.selectedIndex].getAttribute('data-credits'));
-                const currentLoad = parseInt(instructorSelect.options[instructorSelect.selectedIndex].getAttribute('data-current-load'));
-                const newTotal = currentLoad + courseCredits;
-                
-                // Update display
-                document.getElementById('currentLoad').textContent = currentLoad + ' credits';
-                document.getElementById('courseCredits').textContent = courseCredits + ' credits';
-                document.getElementById('newTotal').textContent = newTotal + ' credits';
-                
-                // Update progress bar
-                const percentage = Math.min(100, (newTotal / 12) * 100);
-                const progressBar = document.getElementById('workloadProgress');
-                progressBar.style.width = percentage + '%';
-                
-                // Set color based on workload
-                if(newTotal >= 12) {
-                    progressBar.style.background = '#ef4444';
-                } else if(newTotal >= 9) {
-                    progressBar.style.background = '#f59e0b';
-                } else {
-                    progressBar.style.background = '#10b981';
-                }
-                
-                // Show warnings
-                warningDiv.innerHTML = '';
-                warningDiv.style.display = 'none';
-                
-                if(newTotal > 12) {
-                    warningDiv.innerHTML = `
-                        <div class="workload-alert danger">
-                            <i class="fas fa-exclamation-circle"></i>
-                            <div>
-                                <strong>Overload Warning!</strong>
-                                <p>Assigning this course would exceed the maximum limit of 12 credits.</p>
-                            </div>
-                        </div>
-                    `;
-                    warningDiv.style.display = 'block';
-                } else if(newTotal >= 9) {
-                    warningDiv.innerHTML = `
-                        <div class="workload-alert warning">
-                            <i class="fas fa-exclamation-triangle"></i>
-                            <div>
-                                <strong>Approaching Limit</strong>
-                                <p>Instructor will be at ${newTotal}/12 credits (${Math.round(percentage)}% of maximum).</p>
-                            </div>
-                        </div>
-                    `;
-                    warningDiv.style.display = 'block';
-                }
-                
-                previewDiv.style.display = 'block';
-            } else {
-                previewDiv.style.display = 'none';
+                });
             }
         }
 
         function resetForm() {
             document.getElementById('assignForm').reset();
-            document.getElementById('workloadPreview').style.display = 'none';
         }
-
-        // Form submission validation
-        document.getElementById('assignForm').addEventListener('submit', function(e) {
-            const courseSelect = document.getElementById('course_id');
-            const instructorSelect = document.getElementById('user_id');
-            
-            if(courseSelect.value && instructorSelect.value) {
-                const courseCredits = parseInt(courseSelect.options[courseSelect.selectedIndex].getAttribute('data-credits'));
-                const currentLoad = parseInt(instructorSelect.options[instructorSelect.selectedIndex].getAttribute('data-current-load'));
-                const newTotal = currentLoad + courseCredits;
-                
-                if(newTotal > 12) {
-                    if(!confirm(`Warning: This assignment will overload the instructor (${newTotal}/12 credits). Do you want to proceed anyway?`)) {
-                        e.preventDefault();
-                        return false;
-                    }
-                }
-            }
-            return true;
-        });
     </script>
     
     <!-- Include darkmode.js -->

@@ -11,7 +11,7 @@ if(!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin'){
 // Include dark mode
 include __DIR__ . '/../includes/darkmode.php';
 
-// CSRF Token
+// CSRF Token - Only generate if not exists
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
@@ -64,10 +64,17 @@ $message_type = "success";
 
 // Add Room
 if(isset($_POST['add_room'])){
+    // Debug logging
+    error_log("Add room form submitted");
+    error_log("CSRF Token from form: " . ($_POST['csrf_token'] ?? 'none'));
+    error_log("CSRF Token from session: " . ($_SESSION['csrf_token'] ?? 'none'));
+    error_log("Room name: " . ($_POST['room_name'] ?? 'none'));
+    
     // CSRF validation
     if(!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']){
         $message = "Security token invalid. Please try again.";
         $message_type = "error";
+        error_log("CSRF token mismatch");
     } else {
         $room_name = trim($_POST['room_name']);
         $capacity = (int)$_POST['capacity'];
@@ -92,10 +99,15 @@ if(isset($_POST['add_room'])){
                     $stmt->execute([$room_name, $capacity, $building]);
                     $message = "Room added successfully!";
                     $message_type = "success";
+                    
+                    // Redirect to clear POST data
+                    header("Location: manage_rooms.php?success=1");
+                    exit;
                 }
             } catch (Exception $e) {
                 $message = "Error: " . $e->getMessage();
                 $message_type = "error";
+                error_log("Database error: " . $e->getMessage());
             }
         }
     }
@@ -132,6 +144,10 @@ if(isset($_POST['edit_room'])){
                     $stmt->execute([$room_name, $capacity, $building, $room_id]);
                     $message = "Room updated successfully!";
                     $message_type = "success";
+                    
+                    // Redirect to clear POST data
+                    header("Location: manage_rooms.php?success=2");
+                    exit;
                 }
             } catch (Exception $e) {
                 $message = "Error: " . $e->getMessage();
@@ -164,11 +180,33 @@ if(isset($_POST['delete_room'])){
                 $stmt->execute([$room_id]);
                 $message = "Room deleted successfully!";
                 $message_type = "success";
+                
+                // Redirect to clear POST data
+                header("Location: manage_rooms.php?success=3");
+                exit;
             }
         } catch (Exception $e) {
             $message = "Error: " . $e->getMessage();
             $message_type = "error";
         }
+    }
+}
+
+// Check for success messages from redirects
+if(isset($_GET['success'])) {
+    switch($_GET['success']) {
+        case '1':
+            $message = "Room added successfully!";
+            $message_type = "success";
+            break;
+        case '2':
+            $message = "Room updated successfully!";
+            $message_type = "success";
+            break;
+        case '3':
+            $message = "Room deleted successfully!";
+            $message_type = "success";
+            break;
     }
 }
 
@@ -956,6 +994,12 @@ input.checking {
     <a href="manage_schedules.php" class="<?= $current_page=='manage_schedules.php'?'active':'' ?>">
         <i class="fas fa-calendar-alt"></i> Manage Schedule
     </a>
+     <a href="assign_instructors.php" class="<?= $current_page=='assign_instructors.php'?'active':'' ?>">
+        <i class="fas fa-user-graduate"></i> Assign Instructors
+    </a>
+      <a href="admin_exam_schedules.php" class="<?= $current_page=='admin_exam_schedules.php'?'active':'' ?>">
+        <i class="fas fa-clipboard-list"></i> Exam Scheduling
+    </a>
     <a href="manage_announcements.php" class="<?= $current_page=='manage_announcements.php'?'active':'' ?>">
         <i class="fas fa-bullhorn"></i> Manage Announcements
     </a>
@@ -1002,7 +1046,7 @@ input.checking {
             </div>
 
             <div class="room-form-wrapper">
-                <form method="POST" class="room-form" id="roomForm" onsubmit="return validateForm()">
+                <form method="POST" class="room-form" id="roomForm">
                     <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
                     <input type="hidden" name="room_id" value="<?= $edit_room['room_id'] ?? '' ?>">
                     
@@ -1138,6 +1182,7 @@ const roomNameFeedback = document.getElementById('room-name-feedback');
 const submitBtn = document.getElementById('submit-btn');
 
 let roomValid = false;
+let checkingTimeout = null;
 
 // Check Room uniqueness
 function checkRoomAvailability() {
@@ -1145,6 +1190,11 @@ function checkRoomAvailability() {
     const building = buildingInput.value.trim();
     const editing = <?= isset($edit_room) ? 'true' : 'false' ?>;
     const roomId = <?= isset($edit_room) ? $edit_room['room_id'] : 'null' ?>;
+    
+    // Clear any existing timeout
+    if (checkingTimeout) {
+        clearTimeout(checkingTimeout);
+    }
     
     // Reset
     roomNameInput.classList.remove('valid', 'invalid', 'checking');
@@ -1158,50 +1208,53 @@ function checkRoomAvailability() {
         return;
     }
     
-    // Show checking state
-    roomNameInput.classList.add('checking');
-    roomNameFeedback.innerHTML = '<span class="room-checking"><i class="fas fa-spinner fa-spin spinner"></i> Checking room availability...</span>';
-    
-    // AJAX request
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', 'check_room_availability.php', true);
-    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-    
-    xhr.onload = function() {
-        if (xhr.status === 200) {
-            try {
-                const response = JSON.parse(xhr.responseText);
-                
-                if (response.available) {
-                    roomNameInput.classList.remove('checking');
-                    roomNameInput.classList.add('valid');
-                    roomNameFeedback.innerHTML = '<span class="room-success"><i class="fas fa-check-circle"></i> Room is available!</span>';
-                    roomValid = true;
-                } else {
-                    roomNameInput.classList.remove('checking');
-                    roomNameInput.classList.add('invalid');
-                    roomNameFeedback.innerHTML = `<span class="room-error"><i class="fas fa-exclamation-circle"></i> ${response.message || 'Room already exists!'}</span>`;
-                    roomValid = false;
+    // Debounce the check to avoid too many requests
+    checkingTimeout = setTimeout(() => {
+        // Show checking state
+        roomNameInput.classList.add('checking');
+        roomNameFeedback.innerHTML = '<span class="room-checking"><i class="fas fa-spinner fa-spin spinner"></i> Checking room availability...</span>';
+        
+        // AJAX request
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', 'check_room_availability.php', true);
+        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+        
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                try {
+                    const response = JSON.parse(xhr.responseText);
+                    
+                    if (response.available) {
+                        roomNameInput.classList.remove('checking');
+                        roomNameInput.classList.add('valid');
+                        roomNameFeedback.innerHTML = '<span class="room-success"><i class="fas fa-check-circle"></i> Room is available!</span>';
+                        roomValid = true;
+                    } else {
+                        roomNameInput.classList.remove('checking');
+                        roomNameInput.classList.add('invalid');
+                        roomNameFeedback.innerHTML = `<span class="room-error"><i class="fas fa-exclamation-circle"></i> ${response.message || 'Room already exists!'}</span>`;
+                        roomValid = false;
+                    }
+                } catch (e) {
+                    handleCheckError();
                 }
-            } catch (e) {
+            } else {
                 handleCheckError();
             }
-        } else {
-            handleCheckError();
+            updateSubmitButton();
+        };
+        
+        xhr.onerror = handleCheckError;
+        
+        function handleCheckError() {
+            roomNameInput.classList.remove('checking');
+            roomNameFeedback.innerHTML = '<span class="room-error"><i class="fas fa-exclamation-circle"></i> Error checking room availability</span>';
+            roomValid = false;
+            updateSubmitButton();
         }
-        updateSubmitButton();
-    };
-    
-    xhr.onerror = handleCheckError;
-    
-    function handleCheckError() {
-        roomNameInput.classList.remove('checking');
-        roomNameFeedback.innerHTML = '<span class="room-error"><i class="fas fa-exclamation-circle"></i> Error checking room availability</span>';
-        roomValid = false;
-        updateSubmitButton();
-    }
-    
-    xhr.send(`room_name=${encodeURIComponent(roomName)}&building=${encodeURIComponent(building)}&editing=${editing}&room_id=${roomId}`);
+        
+        xhr.send(`room_name=${encodeURIComponent(roomName)}&building=${encodeURIComponent(building)}&editing=${editing}&room_id=${roomId}`);
+    }, 500); // 500ms debounce
 }
 
 // Update submit button state
@@ -1216,14 +1269,14 @@ function updateSubmitButton() {
         enabled = false;
     }
     
-    if (!roomValid) {
+    if (!roomValid && roomName && building) {
         enabled = false;
     }
     
     submitBtn.disabled = !enabled;
 }
 
-// Form validation
+// Simple form validation (server-side validation is still primary)
 function validateForm() {
     const roomName = roomNameInput.value.trim();
     const building = buildingInput.value.trim();
@@ -1237,11 +1290,6 @@ function validateForm() {
     if (capacity <= 0 || capacity > 500) {
         alert('Capacity must be between 1 and 500');
         capacityInput.focus();
-        return false;
-    }
-    
-    if (!roomValid) {
-        alert('Please fix the room availability errors before submitting');
         return false;
     }
     
@@ -1264,6 +1312,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
+    // Initialize submit button state
+    submitBtn.disabled = <?= isset($edit_room) ? 'false' : 'true' ?>;
+    
     // Event listeners
     roomNameInput.addEventListener('input', checkRoomAvailability);
     buildingInput.addEventListener('input', checkRoomAvailability);
@@ -1276,7 +1327,8 @@ document.addEventListener('DOMContentLoaded', function() {
     <?php if(isset($edit_room)): ?>
         setTimeout(() => {
             if (roomNameInput.value.trim() && buildingInput.value.trim()) {
-                checkRoomAvailability();
+                roomValid = true; // Assume valid for editing
+                updateSubmitButton();
             }
         }, 500);
     <?php endif; ?>
@@ -1332,13 +1384,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
-
-// Fallback for broken profile pictures
-function handleImageError(img) {
-    img.onerror = null;
-    img.src = '../assets/default_profile.png';
-    return true;
-}
 </script>
 
 </body>

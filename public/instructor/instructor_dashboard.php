@@ -626,27 +626,33 @@ body {
     <!-- Overlay for Mobile -->
     <div class="overlay" onclick="toggleSidebar()"></div>
 
-    <!-- Sidebar -->
-    <div class="sidebar">
-        <div class="sidebar-profile">
-            <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic"
-                 onerror="this.onerror=null; this.src='../assets/default_profile.png';">
-            <p><?= htmlspecialchars($user['username'] ?? 'Instructor') ?></p>
-        </div>
-        <h2>Instructor Dashboard</h2>
-        <a href="instructor_dashboard.php" class="<?= $current_page=='instructor_dashboard.php'?'active':'' ?>">
-            <i class="fas fa-home"></i> Dashboard
-        </a>
-        <a href="my_courses.php" class="<?= $current_page=='my_courses.php'?'active':'' ?>">
-            <i class="fas fa-book"></i> My Courses
-        </a>
-        <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
-            <i class="fas fa-user-edit"></i> Edit Profile
-        </a>
-        <a href="../logout.php">
-            <i class="fas fa-sign-out-alt"></i> Logout
-        </a>
+   <!-- Sidebar -->
+<div class="sidebar">
+    <div class="sidebar-profile">
+        <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic"
+             onerror="this.onerror=null; this.src='../assets/default_profile.png';">
+        <p><?= htmlspecialchars($user['username'] ?? 'Instructor') ?></p>
     </div>
+    <h2>Instructor Dashboard</h2>
+    <a href="instructor_dashboard.php" class="<?= $current_page=='instructor_dashboard.php'?'active':'' ?>">
+        <i class="fas fa-home"></i> Dashboard
+    </a>
+    <a href="announcements.php" class="<?= $current_page=='announcements.php'?'active':'' ?>">
+        <i class="fas fa-bullhorn"></i> Announcements
+    </a>
+    <a href="exam_assignments.php" class="<?= $current_page=='exam_assignments.php'?'active':'' ?>">
+        <i class="fas fa-clipboard-list"></i> Exam Assignments
+    </a>
+    <a href="my_courses.php" class="<?= $current_page=='my_courses.php'?'active':'' ?>">
+        <i class="fas fa-book"></i> My Courses
+    </a>
+    <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
+        <i class="fas fa-user-edit"></i> Edit Profile
+    </a>
+    <a href="../logout.php">
+        <i class="fas fa-sign-out-alt"></i> Logout
+    </a>
+</div>
 
     <!-- Main Content -->
     <div class="main-content">

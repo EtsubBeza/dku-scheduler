@@ -74,7 +74,11 @@ if(isset($_POST['add_course'])){
     } else {
         $course_name = trim($_POST['course_name']);
         $course_code = trim($_POST['course_code']);
-        $department_id = (int)$_POST['department_id'];
+        $is_freshman = isset($_POST['is_freshman']) ? 1 : 0;
+        
+        // Department is optional for freshman courses
+        $department_id = !empty($_POST['department_id']) ? (int)$_POST['department_id'] : NULL;
+        
         $credit_hours = isset($_POST['credit_hours']) ? (int)$_POST['credit_hours'] : 3;
         $category = isset($_POST['category']) ? $_POST['category'] : 'Compulsory';
         $contact_hours = isset($_POST['contact_hours']) ? (int)$_POST['contact_hours'] : 3;
@@ -84,8 +88,11 @@ if(isset($_POST['add_course'])){
         $description = trim($_POST['description'] ?? '');
         
         // Validate inputs
-        if(empty($course_name) || empty($course_code) || empty($department_id)){
-            $message = "All required fields must be filled!";
+        if(empty($course_name) || empty($course_code)){
+            $message = "Course name and code are required!";
+            $message_type = "error";
+        } elseif(!$is_freshman && empty($department_id)) {
+            $message = "Department is required for non-freshman courses!";
             $message_type = "error";
         } elseif($credit_hours <= 0) {
             $message = "Credit hours must be greater than 0!";
@@ -112,11 +119,11 @@ if(isset($_POST['add_course'])){
                         $message_type = "error";
                     } else {
                         $stmt = $pdo->prepare("INSERT INTO courses 
-                            (course_name, course_code, department_id, credit_hours, category, 
+                            (course_name, course_code, department_id, is_freshman, credit_hours, category, 
                              contact_hours, lab_hours, tutorial_hours, prerequisite, description) 
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
                         $stmt->execute([
-                            $course_name, strtoupper($course_code), $department_id, $credit_hours, $category,
+                            $course_name, strtoupper($course_code), $department_id, $is_freshman, $credit_hours, $category,
                             $contact_hours, $lab_hours, $tutorial_hours, $prerequisite, $description
                         ]);
                         $message = "Course added successfully!";
@@ -140,7 +147,11 @@ if(isset($_POST['edit_course'])){
         $course_id = (int)$_POST['course_id'];
         $course_name = trim($_POST['course_name']);
         $course_code = trim($_POST['course_code']);
-        $department_id = (int)$_POST['department_id'];
+        $is_freshman = isset($_POST['is_freshman']) ? 1 : 0;
+        
+        // Department is optional for freshman courses
+        $department_id = !empty($_POST['department_id']) ? (int)$_POST['department_id'] : NULL;
+        
         $credit_hours = isset($_POST['credit_hours']) ? (int)$_POST['credit_hours'] : 3;
         $category = isset($_POST['category']) ? $_POST['category'] : 'Compulsory';
         $contact_hours = isset($_POST['contact_hours']) ? (int)$_POST['contact_hours'] : 3;
@@ -150,8 +161,11 @@ if(isset($_POST['edit_course'])){
         $description = trim($_POST['description'] ?? '');
         
         // Validate inputs
-        if(empty($course_name) || empty($course_code) || empty($department_id)){
-            $message = "All required fields must be filled!";
+        if(empty($course_name) || empty($course_code)){
+            $message = "Course name and code are required!";
+            $message_type = "error";
+        } elseif(!$is_freshman && empty($department_id)) {
+            $message = "Department is required for non-freshman courses!";
             $message_type = "error";
         } elseif($credit_hours <= 0) {
             $message = "Credit hours must be greater than 0!";
@@ -178,11 +192,11 @@ if(isset($_POST['edit_course'])){
                         $message_type = "error";
                     } else {
                         $stmt = $pdo->prepare("UPDATE courses SET 
-                            course_name=?, course_code=?, department_id=?, credit_hours=?, category=?,
+                            course_name=?, course_code=?, department_id=?, is_freshman=?, credit_hours=?, category=?,
                             contact_hours=?, lab_hours=?, tutorial_hours=?, prerequisite=?, description=?
                             WHERE course_id=?");
                         $stmt->execute([
-                            $course_name, strtoupper($course_code), $department_id, $credit_hours, $category,
+                            $course_name, strtoupper($course_code), $department_id, $is_freshman, $credit_hours, $category,
                             $contact_hours, $lab_hours, $tutorial_hours, $prerequisite, $description,
                             $course_id
                         ]);
@@ -232,7 +246,12 @@ if(isset($_POST['delete_course'])){
 $edit_course = null;
 if(isset($_GET['edit'])){
     $edit_id = (int)$_GET['edit'];
-    $stmt = $pdo->prepare("SELECT c.*, d.department_name, d.category as dept_category FROM courses c JOIN departments d ON c.department_id=d.department_id WHERE c.course_id=?");
+    $stmt = $pdo->prepare("
+        SELECT c.*, d.department_name, d.category as dept_category 
+        FROM courses c 
+        LEFT JOIN departments d ON c.department_id = d.department_id 
+        WHERE c.course_id=?
+    ");
     $stmt->execute([$edit_id]);
     $edit_course = $stmt->fetch();
 }
@@ -240,11 +259,11 @@ if(isset($_GET['edit'])){
 // Fetch all courses with enhanced details
 $courses = $pdo->query("
     SELECT c.course_id, c.course_name, c.course_code, c.credit_hours, c.category as course_category,
-           c.contact_hours, c.lab_hours, c.tutorial_hours, c.prerequisite, c.description,
+           c.is_freshman, c.contact_hours, c.lab_hours, c.tutorial_hours, c.prerequisite, c.description,
            d.department_name, d.category as dept_category
     FROM courses c
-    JOIN departments d ON c.department_id = d.department_id
-    ORDER BY d.department_name, c.course_code
+    LEFT JOIN departments d ON c.department_id = d.department_id
+    ORDER BY c.is_freshman DESC, d.department_name, c.course_code
 ")->fetchAll();
 
 // Fetch pending approvals count
@@ -287,6 +306,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
     --badge-compulsory: #3b82f6;
     --badge-elective: #10b981;
     --badge-optional: #f59e0b;
+    --badge-freshman: #8b5cf6;
+    --badge-regular: #6b7280;
 }
 
 [data-theme="dark"] {
@@ -313,6 +334,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
     --badge-compulsory: #2563eb;
     --badge-elective: #059669;
     --badge-optional: #d97706;
+    --badge-freshman: #7c3aed;
+    --badge-regular: #9ca3af;
 }
 
 /* ================= Reset ================= */
@@ -580,6 +603,26 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); position:r
     margin-top: 4px;
 }
 
+/* Checkbox Styles */
+.checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.checkbox-group input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.checkbox-group label {
+    margin: 0;
+    cursor: pointer;
+    font-weight: 500;
+}
+
 /* Button Styles */
 .btn {
     padding: 14px 24px;
@@ -709,6 +752,16 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); position:r
     color: white;
 }
 
+.badge-freshman {
+    background: var(--badge-freshman);
+    color: white;
+}
+
+.badge-regular {
+    background: var(--badge-regular);
+    color: white;
+}
+
 .category-badge {
     display: inline-block;
     padding: 4px 12px;
@@ -834,6 +887,13 @@ input.checking {
 .required::after {
     content: " *";
     color: #ef4444;
+}
+
+/* Optional field indicator */
+.optional::after {
+    content: " (Optional)";
+    color: var(--text-secondary);
+    font-weight: normal;
 }
 
 /* ================= Responsive ================= */
@@ -965,6 +1025,12 @@ input.checking {
     <a href="manage_schedules.php" class="<?= $current_page=='manage_schedules.php'?'active':'' ?>">
         <i class="fas fa-calendar-alt"></i> Manage Schedule
     </a>
+     <a href="assign_instructors.php" class="<?= $current_page=='assign_instructors.php'?'active':'' ?>">
+        <i class="fas fa-user-graduate"></i> Assign Instructors
+    </a>
+      <a href="admin_exam_schedules.php" class="<?= $current_page=='admin_exam_schedules.php'?'active':'' ?>">
+        <i class="fas fa-clipboard-list"></i> Exam Scheduling
+    </a>
     <a href="manage_announcements.php" class="<?= $current_page=='manage_announcements.php'?'active':'' ?>">
         <i class="fas fa-bullhorn"></i> Manage Announcements
     </a>
@@ -1026,7 +1092,7 @@ input.checking {
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="department_id" class="required">Department</label>
+                        <label for="department_id" id="department_label" class="required">Department</label>
                         <select name="department_id" id="department_id" class="form-control" required>
                             <option value="">Select Department</option>
                             <?php foreach($departments as $d): ?>
@@ -1037,6 +1103,7 @@ input.checking {
                                 </option>
                             <?php endforeach; ?>
                         </select>
+                        <small class="hours-info" id="department_hint">Required for non-freshman courses</small>
                     </div>
                     <div class="form-group">
                         <label for="credit_hours" class="required">Credit Hours</label>
@@ -1051,13 +1118,24 @@ input.checking {
                     </div>
                 </div>
 
+                <div class="form-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" name="is_freshman" id="is_freshman" value="1" 
+                               <?= (isset($edit_course) && $edit_course['is_freshman'])?'checked':'' ?>>
+                        <label for="is_freshman">
+                            <strong>This is a Freshman Course</strong> (general education course for all departments)
+                        </label>
+                    </div>
+                    <small class="hours-info">Freshman courses are not tied to a specific department. Department selection becomes optional.</small>
+                </div>
+
                 <div class="form-row">
                     <div class="form-group">
                         <label for="category" class="required">Course Category</label>
                         <select name="category" id="category" class="form-control" required>
-                            <option value="Compulsory" <?= (!isset($edit_course) || (isset($edit_course) && $edit_course['course_category']=='Compulsory'))?'selected':'' ?>>Compulsory</option>
-                            <option value="Elective" <?= (isset($edit_course) && $edit_course['course_category']=='Elective')?'selected':'' ?>>Elective</option>
-                            <option value="Optional" <?= (isset($edit_course) && $edit_course['course_category']=='Optional')?'selected':'' ?>>Optional</option>
+                            <option value="Compulsory" <?= (!isset($edit_course) || (isset($edit_course) && $edit_course['category']=='Compulsory'))?'selected':'' ?>>Compulsory</option>
+                            <option value="Elective" <?= (isset($edit_course) && $edit_course['category']=='Elective')?'selected':'' ?>>Elective</option>
+                            <option value="Optional" <?= (isset($edit_course) && $edit_course['category']=='Optional')?'selected':'' ?>>Optional</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -1128,6 +1206,7 @@ input.checking {
                             <tr>
                                 <th>Code</th>
                                 <th>Name</th>
+                                <th>Type</th>
                                 <th>Department</th>
                                 <th>Credits</th>
                                 <th>Category</th>
@@ -1140,8 +1219,20 @@ input.checking {
                             <tr>
                                 <td data-label="Code"><strong><?= htmlspecialchars($c['course_code']) ?></strong></td>
                                 <td data-label="Name"><?= htmlspecialchars($c['course_name']) ?></td>
-                                <td data-label="Department"><?= htmlspecialchars($c['department_name']) ?>
-                                    <br><small><?= $c['dept_category'] ?></small>
+                                <td data-label="Type">
+                                    <?php if($c['is_freshman']): ?>
+                                        <span class="course-badge badge-freshman">Freshman</span>
+                                    <?php else: ?>
+                                        <span class="course-badge badge-regular">Regular</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td data-label="Department">
+                                    <?php if($c['department_name']): ?>
+                                        <?= htmlspecialchars($c['department_name']) ?>
+                                        <br><small><?= $c['dept_category'] ?></small>
+                                    <?php else: ?>
+                                        <em>General (Freshman)</em>
+                                    <?php endif; ?>
                                 </td>
                                 <td data-label="Credits"><?= $c['credit_hours'] ?></td>
                                 <td data-label="Category">
@@ -1202,6 +1293,27 @@ const contactHoursInput = document.getElementById('contact_hours');
 const labHoursInput = document.getElementById('lab_hours');
 const tutorialHoursInput = document.getElementById('tutorial_hours');
 const submitBtn = document.getElementById('submit-btn');
+const isFreshmanCheckbox = document.getElementById('is_freshman');
+const departmentSelect = document.getElementById('department_id');
+const departmentLabel = document.getElementById('department_label');
+const departmentHint = document.getElementById('department_hint');
+
+// Handle freshman checkbox change
+isFreshmanCheckbox.addEventListener('change', function() {
+    if (this.checked) {
+        // Freshman course - department becomes optional
+        departmentSelect.removeAttribute('required');
+        departmentLabel.classList.remove('required');
+        departmentHint.textContent = 'Optional for freshman courses';
+        departmentHint.style.color = '#6b7280';
+    } else {
+        // Regular course - department is required
+        departmentSelect.setAttribute('required', 'required');
+        departmentLabel.classList.add('required');
+        departmentHint.textContent = 'Required for non-freshman courses';
+        departmentHint.style.color = '';
+    }
+});
 
 // Simplified Course Code validation
 function checkCourseCode() {
@@ -1256,12 +1368,21 @@ function validateForm() {
     const contactHours = parseInt(contactHoursInput.value);
     const labHours = parseInt(labHoursInput.value);
     const tutorialHours = parseInt(tutorialHoursInput.value);
+    const isFreshman = isFreshmanCheckbox.checked;
+    const departmentId = departmentSelect.value;
     
     // Validate course code format
     const courseCodeRegex = /^[A-Za-z]{2,6}\d{3,4}$/i;
     if (!courseCodeRegex.test(courseCode)) {
         alert('Please enter a valid course code format: Letters (2-6) + Numbers (3-4), e.g., CS101');
         courseCodeInput.focus();
+        return false;
+    }
+    
+    // Validate department for non-freshman courses
+    if (!isFreshman && !departmentId) {
+        alert('Department is required for non-freshman courses. Please select a department or check "This is a Freshman Course".');
+        departmentSelect.focus();
         return false;
     }
     
@@ -1318,6 +1439,14 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+    
+    // Initialize freshman checkbox state on page load
+    if (isFreshmanCheckbox.checked) {
+        departmentSelect.removeAttribute('required');
+        departmentLabel.classList.remove('required');
+        departmentHint.textContent = 'Optional for freshman courses';
+        departmentHint.style.color = '#6b7280';
+    }
     
     // Add data-labels for mobile table view
     const tableHeaders = document.querySelectorAll('.courses-table thead th');

@@ -12,12 +12,262 @@ include __DIR__ . '/../includes/darkmode.php';
 
 $student_id = $_SESSION['user_id'];
 
-// Fetch current user info with their YEAR - IMPORTANT!
+// Fetch current user info
 $user_stmt = $pdo->prepare("SELECT username, profile_picture, year FROM users WHERE user_id = ?");
 $user_stmt->execute([$student_id]);
 $user = $user_stmt->fetch(PDO::FETCH_ASSOC);
 
-$student_year = $user['year'] ?? ''; // Get the student's year (e.g., "1", "2", "E1", "E2")
+$student_year = $user['year'] ?? '';
+
+// Debug: Show what year is stored for this student
+error_log("Student ID $student_id has year value: " . $student_year);
+
+// Check what enrollment tables exist in the database
+$tables_check = $pdo->query("SHOW TABLES LIKE '%enrollment%'");
+$enrollment_tables = $tables_check->fetchAll(PDO::FETCH_COLUMN);
+
+error_log("Found enrollment tables: " . implode(', ', $enrollment_tables));
+
+// Determine student type
+$is_freshman = false;
+$is_extension = false;
+$is_regular = false;
+
+if (strtolower($student_year) === 'freshman' || $student_year === '1' || $student_year === 'first year') {
+    $is_freshman = true;
+    error_log("Student $student_id is a FRESHMAN");
+} elseif (strtoupper(substr($student_year, 0, 1)) === 'E') {
+    $is_extension = true;
+    error_log("Student $student_id is an EXTENSION student");
+} elseif (is_numeric($student_year) && $student_year >= 2 && $student_year <= 5) {
+    $is_regular = true;
+    error_log("Student $student_id is a REGULAR student (Year $student_year)");
+} else {
+    error_log("Student $student_id year format not recognized: $student_year");
+}
+
+// Create a mapping of equivalent year values
+$year_equivalents = [
+    // Regular years
+    'freshman' => ['1', 'freshman', 'Freshman', 'FIRST YEAR', 'first year'],
+    '1' => ['1', 'freshman', 'Freshman', 'FIRST YEAR', 'first year'],
+    '2' => ['2', 'sophomore', 'Sophomore', 'SECOND YEAR', 'second year'],
+    '3' => ['3', 'junior', 'Junior', 'THIRD YEAR', 'third year'],
+    '4' => ['4', 'senior', 'Senior', 'FOURTH YEAR', 'fourth year'],
+    '5' => ['5', 'fifth', 'Fifth', 'FIFTH YEAR', 'fifth year'],
+    
+    // Extension years
+    'E1' => ['E1', 'e1', 'Extension 1', 'extension 1', 'EXTENSION 1'],
+    'E2' => ['E2', 'e2', 'Extension 2', 'extension 2', 'EXTENSION 2'],
+    'E3' => ['E3', 'e3', 'Extension 3', 'extension 3', 'EXTENSION 3'],
+    'E4' => ['E4', 'e4', 'Extension 4', 'extension 4', 'EXTENSION 4'],
+    'E5' => ['E5', 'e5', 'Extension 5', 'extension 5', 'EXTENSION 5'],
+];
+
+// Function to get all equivalent year values for a given year
+function getYearEquivalents($year, $year_equivalents) {
+    $equivalents = [];
+    
+    // First, try exact match
+    foreach ($year_equivalents as $key => $values) {
+        if (strtolower($year) == strtolower($key)) {
+            $equivalents = array_merge($equivalents, $values);
+        }
+    }
+    
+    // Also check if year is in any of the value arrays
+    foreach ($year_equivalents as $values) {
+        foreach ($values as $value) {
+            if (strtolower($year) == strtolower($value)) {
+                $equivalents = array_merge($equivalents, $values);
+            }
+        }
+    }
+    
+    // Add the original year
+    $equivalents[] = $year;
+    
+    // Remove duplicates and return
+    return array_unique($equivalents);
+}
+
+// Get all possible year values that match this student's year
+$year_search_values = getYearEquivalents($student_year, $year_equivalents);
+
+// Debug: Show what we'll search for
+error_log("Searching for year equivalents: " . implode(', ', $year_search_values));
+
+// Create IN clause for SQL query
+$placeholders = str_repeat('?,', count($year_search_values) - 1) . '?';
+
+// =================================================================
+// FETCH SCHEDULES BASED ON STUDENT TYPE
+// =================================================================
+
+$my_schedule = [];
+$debug_info = "";
+$enrolled_schedule_ids = "";
+$enrollment_count = 0;
+
+if ($is_freshman) {
+    // =============================================================
+    // FRESHMAN STUDENTS: Use student_enrollments table (PLURAL!)
+    // =============================================================
+    error_log("Fetching schedules for FRESHMAN student using student_enrollments table");
+    
+    // First, check if student_enrollments table exists
+    $table_exists = in_array('student_enrollments', $enrollment_tables);
+    
+    if (!$table_exists) {
+        error_log("ERROR: student_enrollments table not found!");
+        $debug_info = "ERROR: Freshman enrollment table 'student_enrollments' not found in database.";
+    } else {
+        // Check enrollments in student_enrollments table
+        $enrollment_check = $pdo->prepare("
+            SELECT COUNT(*) as count, GROUP_CONCAT(schedule_id) as schedule_ids
+            FROM student_enrollments 
+            WHERE student_id = ? AND status = 'enrolled'
+        ");
+        $enrollment_check->execute([$student_id]);
+        $enrollment_data = $enrollment_check->fetch();
+        $enrollment_count = $enrollment_data['count'];
+        $enrolled_schedule_ids = $enrollment_data['schedule_ids'] ?? '';
+        
+        error_log("Freshman student $student_id has $enrollment_count enrollments in student_enrollments table");
+        error_log("Enrolled schedule IDs: " . $enrolled_schedule_ids);
+        
+        if ($enrollment_count > 0) {
+            // Main query for freshman
+            $schedules = $pdo->prepare("
+                SELECT s.schedule_id, c.course_name, c.course_code, u.full_name AS instructor_name, 
+                       r.room_name, s.day, s.start_time, s.end_time, s.year as schedule_year
+                FROM schedule s
+                JOIN courses c ON s.course_id = c.course_id
+                JOIN users u ON s.instructor_id = u.user_id
+                JOIN rooms r ON s.room_id = r.room_id
+                JOIN student_enrollments se ON s.schedule_id = se.schedule_id
+                WHERE se.student_id = ? 
+                AND se.status = 'enrolled'
+                AND s.year IN ($placeholders)
+                ORDER BY FIELD(s.day, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'), s.start_time
+            ");
+            
+            // Prepare parameters: student_id + year equivalents
+            $params = array_merge([$student_id], $year_search_values);
+            error_log("Executing FRESHMAN query with params: " . implode(', ', $params));
+            
+            $schedules->execute($params);
+            $my_schedule = $schedules->fetchAll();
+            
+            error_log("Found " . count($my_schedule) . " schedules for FRESHMAN student $student_id");
+            
+            // Debug info
+            if (empty($my_schedule)) {
+                // Check available schedules
+                $schedule_check = $pdo->prepare("
+                    SELECT COUNT(*) as count 
+                    FROM schedule 
+                    WHERE year IN ($placeholders)
+                ");
+                $schedule_check->execute($year_search_values);
+                $schedule_count = $schedule_check->fetch()['count'];
+                
+                $debug_info = "FRESHMAN: No schedules found. Student ID: $student_id, Year: $student_year";
+                $debug_info .= " | Active enrollments in student_enrollments: $enrollment_count";
+                $debug_info .= " | Available schedules for year: $schedule_count";
+                
+                if ($enrolled_schedule_ids) {
+                    $debug_info .= " | Enrolled schedule IDs: " . $enrolled_schedule_ids;
+                }
+            }
+        } else {
+            $debug_info = "FRESHMAN: You have no active enrollments. Please contact your department head to enroll you in courses.";
+        }
+    }
+    
+} elseif ($is_regular || $is_extension) {
+    // =============================================================
+    // REGULAR & EXTENSION STUDENTS: Use enrollments table
+    // =============================================================
+    error_log("Fetching schedules for " . ($is_regular ? "REGULAR" : "EXTENSION") . " student using enrollments table");
+    
+    // First, check if enrollments table exists
+    $table_exists = in_array('enrollments', $enrollment_tables);
+    
+    if (!$table_exists) {
+        error_log("ERROR: enrollments table not found!");
+        $debug_info = "ERROR: Enrollment table 'enrollments' not found in database.";
+    } else {
+        // Check enrollments in enrollments table
+        $enrollment_check = $pdo->prepare("
+            SELECT COUNT(*) as count, GROUP_CONCAT(schedule_id) as schedule_ids
+            FROM enrollments 
+            WHERE student_id = ?
+        ");
+        $enrollment_check->execute([$student_id]);
+        $enrollment_data = $enrollment_check->fetch();
+        $enrollment_count = $enrollment_data['count'];
+        $enrolled_schedule_ids = $enrollment_data['schedule_ids'] ?? '';
+        
+        error_log(($is_regular ? "REGULAR" : "EXTENSION") . " student $student_id has $enrollment_count enrollments in enrollments table");
+        
+        if ($enrollment_count > 0) {
+            // Main query for regular/extension students
+            $schedules = $pdo->prepare("
+                SELECT s.schedule_id, c.course_name, c.course_code, u.full_name AS instructor_name, 
+                       r.room_name, s.day, s.start_time, s.end_time, s.year as schedule_year
+                FROM schedule s
+                JOIN courses c ON s.course_id = c.course_id
+                JOIN users u ON s.instructor_id = u.user_id
+                JOIN rooms r ON s.room_id = r.room_id
+                JOIN enrollments e ON s.schedule_id = e.schedule_id
+                WHERE e.student_id = ? 
+                AND s.year IN ($placeholders)
+                ORDER BY FIELD(s.day, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'), s.start_time
+            ");
+            
+            // Prepare parameters: student_id + year equivalents
+            $params = array_merge([$student_id], $year_search_values);
+            error_log("Executing " . ($is_regular ? "REGULAR" : "EXTENSION") . " query with params: " . implode(', ', $params));
+            
+            $schedules->execute($params);
+            $my_schedule = $schedules->fetchAll();
+            
+            error_log("Found " . count($my_schedule) . " schedules for " . ($is_regular ? "REGULAR" : "EXTENSION") . " student $student_id");
+            
+            // Debug info
+            if (empty($my_schedule)) {
+                // Check available schedules
+                $schedule_check = $pdo->prepare("
+                    SELECT COUNT(*) as count 
+                    FROM schedule 
+                    WHERE year IN ($placeholders)
+                ");
+                $schedule_check->execute($year_search_values);
+                $schedule_count = $schedule_check->fetch()['count'];
+                
+                $student_type = $is_regular ? "REGULAR" : "EXTENSION";
+                $debug_info = "$student_type: No schedules found. Student ID: $student_id, Year: $student_year";
+                $debug_info .= " | Enrollments: $enrollment_count";
+                $debug_info .= " | Available schedules for year: $schedule_count";
+                
+                if ($enrolled_schedule_ids) {
+                    $debug_info .= " | Enrolled schedule IDs: " . $enrolled_schedule_ids;
+                }
+            }
+        } else {
+            $student_type = $is_regular ? "REGULAR" : "EXTENSION";
+            $debug_info = "$student_type: You have no enrollments. Please contact your department head to enroll in courses.";
+        }
+    }
+    
+} else {
+    // =============================================================
+    // UNKNOWN STUDENT TYPE
+    // =============================================================
+    error_log("Unknown student type for year: $student_year");
+    $debug_info = "Unknown student type. Year format not recognized: $student_year";
+}
 
 // Determine profile picture path
 $uploads_dir = __DIR__ . '/../uploads/';
@@ -40,30 +290,17 @@ if(!empty($profile_picture)) {
     $profile_img_path = '../assets/' . $default_profile;
 }
 
+// Sidebar active page
+$current_page = basename($_SERVER['PHP_SELF']);
+
 // Handle Excel/CSV Export
 if(isset($_GET['export']) && $_GET['export'] == 'excel') {
-    // Fetch schedule data WITH YEAR FILTERING
-    $schedules = $pdo->prepare("
-        SELECT c.course_name, c.course_code, u.full_name AS instructor_name, 
-               r.room_name, s.day, s.start_time, s.end_time
-        FROM schedule s
-        JOIN courses c ON s.course_id = c.course_id
-        JOIN users u ON s.instructor_id = u.user_id
-        JOIN rooms r ON s.room_id = r.room_id
-        JOIN enrollments e ON s.schedule_id = e.schedule_id
-        WHERE e.student_id = ? 
-        AND s.year = ?  -- CRITICAL: Filter by student's year
-        ORDER BY FIELD(s.day, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'), s.start_time
-    ");
-    $schedules->execute([$student_id, $student_year]);
-    $my_schedule = $schedules->fetchAll();
-
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename="my_schedule_' . date('Y-m-d') . '.csv"');
     
     $output = fopen('php://output', 'w');
     fwrite($output, "\xEF\xBB\xBF");
-    fputcsv($output, ['Course Name', 'Course Code', 'Instructor', 'Room', 'Day', 'Start Time', 'End Time']);
+    fputcsv($output, ['Course Name', 'Course Code', 'Instructor', 'Room', 'Day', 'Start Time', 'End Time', 'Year']);
     
     foreach($my_schedule as $s) {
         fputcsv($output, [
@@ -73,58 +310,12 @@ if(isset($_GET['export']) && $_GET['export'] == 'excel') {
             $s['room_name'],
             $s['day'],
             date('g:i A', strtotime($s['start_time'])),
-            date('g:i A', strtotime($s['end_time']))
+            date('g:i A', strtotime($s['end_time'])),
+            $s['schedule_year']
         ]);
     }
     fclose($output);
     exit;
-}
-
-// Normal page load - fetch schedule for display WITH YEAR FILTERING
-$schedules = $pdo->prepare("
-    SELECT s.schedule_id, c.course_name, c.course_code, u.full_name AS instructor_name, 
-           r.room_name, s.day, s.start_time, s.end_time, s.year
-    FROM schedule s
-    JOIN courses c ON s.course_id = c.course_id
-    JOIN users u ON s.instructor_id = u.user_id
-    JOIN rooms r ON s.room_id = r.room_id
-    JOIN enrollments e ON s.schedule_id = e.schedule_id
-    WHERE e.student_id = ? 
-    AND s.year = ?  -- CRITICAL: Filter by student's year
-    ORDER BY FIELD(s.day, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'), s.start_time
-");
-$schedules->execute([$student_id, $student_year]);
-$my_schedule = $schedules->fetchAll();
-
-// Sidebar active page
-$current_page = basename($_SERVER['PHP_SELF']);
-
-// Debug info (remove in production)
-$debug_info = "";
-if (empty($my_schedule)) {
-    $debug_info = "No schedules found for student ID: $student_id, Year: $student_year";
-    
-    // Check if student is enrolled in any courses
-    $enrollment_check = $pdo->prepare("
-        SELECT COUNT(*) as count 
-        FROM enrollments 
-        WHERE student_id = ?
-    ");
-    $enrollment_check->execute([$student_id]);
-    $enrollment_count = $enrollment_check->fetch()['count'];
-    
-    $debug_info .= " | Enrollments: $enrollment_count";
-    
-    // Check available schedules for this year
-    $schedule_check = $pdo->prepare("
-        SELECT COUNT(*) as count 
-        FROM schedule 
-        WHERE year = ?
-    ");
-    $schedule_check->execute([$student_year]);
-    $schedule_count = $schedule_check->fetch()['count'];
-    
-    $debug_info .= " | Schedules for year $student_year: $schedule_count";
 }
 ?>
 <!DOCTYPE html>
@@ -342,6 +533,19 @@ if (empty($my_schedule)) {
     margin-left: 10px;
 }
 
+/* Student type indicator */
+.student-type-indicator {
+    display: inline-block;
+    padding: 2px 8px;
+    background: <?= ($is_freshman ? '#10b981' : ($is_extension ? '#8b5cf6' : '#3b82f6')) ?>;
+    color: white;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-left: 5px;
+    vertical-align: middle;
+}
+
 /* Debug info (only show when empty) */
 .debug-info {
     background: rgba(239, 68, 68, 0.1);
@@ -352,6 +556,54 @@ if (empty($my_schedule)) {
     color: var(--error-text);
     font-family: monospace;
     font-size: 0.9rem;
+}
+
+/* Info box */
+.info-box {
+    background: rgba(59, 130, 246, 0.1);
+    padding: 15px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    border-left: 4px solid #3b82f6;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+.info-box i {
+    color: #3b82f6;
+    margin-right: 8px;
+}
+
+/* Database info box */
+.db-info-box {
+    background: rgba(34, 197, 94, 0.1);
+    padding: 15px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    border-left: 4px solid #10b981;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+.db-info-box i {
+    color: #10b981;
+    margin-right: 8px;
+}
+
+/* Warning box */
+.warning-box {
+    background: rgba(249, 115, 22, 0.1);
+    padding: 15px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    border-left: 4px solid #f97316;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+.warning-box i {
+    color: #f97316;
+    margin-right: 8px;
 }
 
 /* ================= Export Buttons ================= */
@@ -525,7 +777,7 @@ if (empty($my_schedule)) {
 
 /* ================= Print Styles ================= */
 @media print {
-    .sidebar, .topbar, .overlay, .export-buttons, .user-info, .student-info-box, .debug-info { 
+    .sidebar, .topbar, .overlay, .export-buttons, .user-info, .student-info-box, .debug-info, .info-box, .db-info-box, .warning-box { 
         display: none !important; 
     }
     .main-content { 
@@ -613,10 +865,13 @@ if (empty($my_schedule)) {
             <?php if($student_year): ?>
                 <span class="year-badge">
                     <?php 
-                    if(substr($student_year, 0, 1) === 'E') {
-                        echo 'Ext. Year ' . substr($student_year, 1);
-                    } else {
+                    // Display year in a user-friendly format
+                    if (strtoupper(substr($student_year, 0, 1)) === 'E') {
+                        echo 'Extension Year ' . substr($student_year, 1);
+                    } elseif (is_numeric($student_year)) {
                         echo 'Year ' . $student_year;
+                    } else {
+                        echo ucfirst($student_year);
                     }
                     ?>
                 </span>
@@ -669,18 +924,40 @@ if (empty($my_schedule)) {
                     <span class="student-year-badge">
                         <?php 
                         if($student_year) {
-                            if(substr($student_year, 0, 1) === 'E') {
+                            if (strtoupper(substr($student_year, 0, 1)) === 'E') {
                                 echo 'Extension Year ' . substr($student_year, 1);
-                            } else {
+                            } elseif (is_numeric($student_year)) {
                                 echo 'Year ' . $student_year;
+                            } else {
+                                echo ucfirst($student_year);
                             }
                         } else {
                             echo 'Year not set';
                         }
                         ?>
                     </span>
+                    <span class="student-type-indicator">
+                        <?php
+                        if ($is_freshman) {
+                            echo 'Freshman';
+                        } elseif ($is_extension) {
+                            echo 'Extension';
+                        } elseif ($is_regular) {
+                            echo 'Regular';
+                        } else {
+                            echo 'Unknown';
+                        }
+                        ?>
+                    </span>
                 </div>
             </div>
+
+            <?php if(!empty($enrollment_tables)): ?>
+            <div class="db-info-box">
+                <i class="fas fa-database"></i>
+                <strong>Database Info:</strong> Found enrollment tables: <?= htmlspecialchars(implode(', ', $enrollment_tables)) ?>
+            </div>
+            <?php endif; ?>
 
             <?php if(!empty($debug_info)): ?>
                 <div class="debug-info">
@@ -688,7 +965,37 @@ if (empty($my_schedule)) {
                 </div>
             <?php endif; ?>
 
+            <?php if($is_freshman && !empty($enrolled_schedule_ids)): ?>
+            <div class="warning-box">
+                <i class="fas fa-info-circle"></i>
+                <strong>Data Mismatch Detected:</strong> Freshman student is enrolled in schedule IDs: <?= htmlspecialchars($enrolled_schedule_ids) ?>
+                <?php if(empty($my_schedule)): ?>
+                    <br><small>But no matching schedules found in schedule table. Possible issues:</small>
+                    <ul style="margin: 5px 0 0 20px; font-size: 0.9rem;">
+                        <li>Schedule IDs don't exist in schedule table</li>
+                        <li>Schedule year doesn't match student year (Freshman vs 1)</li>
+                        <li>Data inconsistency between tables</li>
+                    </ul>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
+
+            <?php if(empty($my_schedule) && !empty($debug_info) && strpos($debug_info, 'no active enrollments') !== false): ?>
+                <div class="info-box">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>No Enrollments Found:</strong> 
+                    <?php if($is_freshman): ?>
+                        As a freshman student, you need to be enrolled in courses by your department head. Please check back later or contact your department administrator.
+                    <?php elseif($is_regular || $is_extension): ?>
+                        You are not currently enrolled in any courses. Please contact your department head to enroll in courses for <?= htmlspecialchars($student_year) ?>.
+                    <?php else: ?>
+                        Please contact your department head or administrator to enroll you in courses.
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
+
             <!-- Export Buttons -->
+            <?php if(!empty($my_schedule)): ?>
             <div class="export-buttons">
                 <a href="?export=pdf" class="export-btn pdf" target="_blank">
                     <i class="fas fa-file-pdf"></i> Export PDF
@@ -700,6 +1007,7 @@ if (empty($my_schedule)) {
                     <i class="fas fa-print"></i> Print Schedule
                 </button>
             </div>
+            <?php endif; ?>
 
             <!-- Schedule Table -->
             <div class="schedule-section">
@@ -713,6 +1021,7 @@ if (empty($my_schedule)) {
                                 <th>Room</th>
                                 <th>Day</th>
                                 <th>Time</th>
+                                <th>Year</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -734,21 +1043,24 @@ if (empty($my_schedule)) {
                                 <td><?= htmlspecialchars($s['room_name']) ?></td>
                                 <td><?= htmlspecialchars($s['day']) ?></td>
                                 <td><?= date('g:i A', strtotime($s['start_time'])) . ' - ' . date('g:i A', strtotime($s['end_time'])) ?></td>
+                                <td><small><?= htmlspecialchars($s['schedule_year']) ?></small></td>
                             </tr>
                         <?php endforeach; ?>
                         <?php if(empty($my_schedule)): ?>
                             <tr>
-                                <td colspan="5">
+                                <td colspan="6">
                                     <div class="empty-state">
                                         <i class="fas fa-calendar-times"></i>
                                         <h3>No Classes Scheduled</h3>
                                         <p>You don't have any classes scheduled for 
                                             <?php 
                                             if($student_year) {
-                                                if(substr($student_year, 0, 1) === 'E') {
+                                                if (strtoupper(substr($student_year, 0, 1)) === 'E') {
                                                     echo 'Extension Year ' . substr($student_year, 1);
-                                                } else {
+                                                } elseif (is_numeric($student_year)) {
                                                     echo 'Year ' . $student_year;
+                                                } else {
+                                                    echo ucfirst($student_year);
                                                 }
                                             } else {
                                                 echo 'your year';

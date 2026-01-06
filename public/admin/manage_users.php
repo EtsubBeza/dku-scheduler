@@ -108,7 +108,7 @@ if(isset($_POST['save_user'])){
         $year = isset($_POST['year']) ? trim($_POST['year']) : NULL;
         
         // Debug log
-        error_log("Form Submission - Role: $role, Year: " . ($year ?? 'NULL') . ", Student ID: " . ($student_id ?? 'NULL'));
+        error_log("Form Submission - Role: $role, Year: " . ($year ?? 'NULL') . ", Student ID: " . ($student_id ?? 'NULL') . ", Department: " . ($department_id ?? 'NULL'));
         
         // Validate required fields
         if(empty($username) || empty($email) || empty($role)) {
@@ -148,9 +148,22 @@ if(isset($_POST['save_user'])){
 function saveUser() {
     global $pdo, $username, $full_name, $student_id, $email, $password, $role, $department_id, $year, $editing, $edit_id, $message, $message_type;
     
+    // Validate department for non-freshman students, instructors, and department heads
+    if($role === 'student' && $year !== 'Freshman' && empty($department_id)) {
+        $message = "Department is required for non-freshman students!";
+        $message_type = "error";
+        return;
+    }
+    
+    if(($role === 'instructor' || $role === 'department_head') && empty($department_id)) {
+        $message = "Department is required for instructors and department heads!";
+        $message_type = "error";
+        return;
+    }
+    
     try {
         // Debug log
-        error_log("saveUser() called - Role: $role, Year: " . ($year ?? 'NULL'));
+        error_log("saveUser() called - Role: $role, Year: " . ($year ?? 'NULL') . ", Department: " . ($department_id ?? 'NULL'));
         
         if($editing && $edit_id){
             if($password){
@@ -168,8 +181,24 @@ function saveUser() {
                 $message_type = "error";
                 return;
             }
-            $stmt = $pdo->prepare("INSERT INTO users (username, full_name, student_id, email, password, role, department_id, year) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->execute([$username, $full_name, $student_id, $email, password_hash($password, PASSWORD_DEFAULT), $role, $department_id, $year]);
+            
+            // Prepare SQL based on whether department_id is NULL
+            $sql = "INSERT INTO users (username, full_name, student_id, email, password, role, year";
+            $placeholders = "?, ?, ?, ?, ?, ?, ?";
+            $values = [$username, $full_name, $student_id, $email, password_hash($password, PASSWORD_DEFAULT), $role, $year];
+            
+            // Add department_id if it's not NULL
+            if($department_id !== NULL) {
+                $sql .= ", department_id";
+                $placeholders .= ", ?";
+                $values[] = $department_id;
+            }
+            
+            $sql .= ") VALUES (" . $placeholders . ")";
+            
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($values);
+            
             $message = "User added successfully!";
             $message_type = "success";
             
@@ -747,6 +776,17 @@ input.checking {
     color: #ef4444;
 }
 
+/* Department not required for Freshman */
+.department-optional {
+    opacity: 0.7;
+}
+.department-optional label::after {
+    content: " (Optional for Freshman)";
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    font-weight: normal;
+}
+
 /* ================= Responsive ================= */
 @media (max-width: 1200px){ 
     .main-content{ padding:25px; }
@@ -874,6 +914,12 @@ input.checking {
     <a href="manage_schedules.php" class="<?= $current_page=='manage_schedules.php'?'active':'' ?>">
         <i class="fas fa-calendar-alt"></i> Manage Schedule
     </a>
+     <a href="assign_instructors.php" class="<?= $current_page=='assign_instructors.php'?'active':'' ?>">
+        <i class="fas fa-user-graduate"></i> Assign Course
+    </a>
+      <a href="admin_exam_schedules.php" class="<?= $current_page=='admin_exam_schedules.php'?'active':'' ?>">
+        <i class="fas fa-clipboard-list"></i> Exam Scheduling
+    </a>
     <a href="manage_announcements.php" class="<?= $current_page=='manage_announcements.php'?'active':'' ?>">
         <i class="fas fa-bullhorn"></i> Manage Announcements
     </a>
@@ -964,16 +1010,19 @@ input.checking {
                     <label>Student Type:</label>
                     <select name="year_type" id="year-type-select" onchange="toggleYearDropdown()">
                         <option value="">--Select Student Type--</option>
-                        <option value="regular" <?= (isset($edit_data['role']) && $edit_data['role']=='student' && isset($edit_data['year']) && is_numeric($edit_data['year']))?'selected':'' ?>>Regular Student</option>
-                        <option value="extension" <?= (isset($edit_data['role']) && $edit_data['role']=='student' && isset($edit_data['year']) && strpos($edit_data['year'], 'E') !== false)?'selected':'' ?>>Extension Student</option>
+                        <option value="regular" <?= (isset($edit_data['role']) && $edit_data['role']=='student' && isset($edit_data['year']) && (is_numeric($edit_data['year']) || $edit_data['year'] == 'Freshman'))?'selected':'' ?>>Regular Student</option>
+                        <option value="extension" <?= (isset($edit_data['role']) && $edit_data['role']=='student' && isset($edit_data['year']) && (strpos($edit_data['year'], 'E') !== false || $edit_data['year'] == 'Freshman'))?'selected':'' ?>>Extension Student</option>
                     </select>
                 </div>
 
                 <div class="form-group" id="regular-year-group" style="display:none;">
                     <label>Regular Year:</label>
-                    <select name="regular_year" id="regular-year-select">
+                    <select name="regular_year" id="regular-year-select" onchange="updateDepartmentRequirement()">
                         <option value="">--Select Year--</option>
-                        <?php for($i=1; $i<=5; $i++): ?>
+                        <option value="Freshman" <?= (isset($edit_data['role']) && $edit_data['role']=='student' && isset($edit_data['year']) && $edit_data['year']=='Freshman')?'selected':'' ?>>
+                            Freshman
+                        </option>
+                        <?php for($i=2; $i<=5; $i++): ?>
                             <option value="<?= $i ?>" <?= (isset($edit_data['role']) && $edit_data['role']=='student' && isset($edit_data['year']) && $edit_data['year']==$i)?'selected':'' ?>>
                                 Year <?= $i ?>
                             </option>
@@ -983,9 +1032,12 @@ input.checking {
 
                 <div class="form-group" id="extension-year-group" style="display:none;">
                     <label>Extension Year:</label>
-                    <select name="extension_year" id="extension-year-select">
+                    <select name="extension_year" id="extension-year-select" onchange="updateDepartmentRequirement()">
                         <option value="">--Select Extension Year--</option>
-                        <?php for($i=1; $i<=5; $i++): ?>
+                        <option value="Freshman" <?= (isset($edit_data['role']) && $edit_data['role']=='student' && isset($edit_data['year']) && $edit_data['year']=="Freshman")?'selected':'' ?>>
+                            Freshman (Extension)
+                        </option>
+                        <?php for($i=2; $i<=5; $i++): ?>
                             <option value="E<?= $i ?>" <?= (isset($edit_data['role']) && $edit_data['role']=='student' && isset($edit_data['year']) && $edit_data['year']=="E$i")?'selected':'' ?>>
                                 Extension Year <?= $i ?>
                             </option>
@@ -996,7 +1048,7 @@ input.checking {
                 <input type="hidden" name="year" id="year-hidden" value="<?= isset($edit_data['year']) ? htmlspecialchars($edit_data['year']) : '' ?>">
                 
                 <div class="form-group" id="department-group" style="display:none;">
-                    <label>Department:</label>
+                    <label id="department-label">Department:</label>
                     <select name="department_id" id="department-select">
                         <option value="">--Select Department--</option>
                         <?php foreach($departments as $d): ?>
@@ -1067,7 +1119,9 @@ input.checking {
                                 </td>
                                 <td data-label="Year">
                                     <?php if($u['role'] === 'student' && isset($u['year'])): ?>
-                                        <?php if(strpos($u['year'], 'E') === 0): ?>
+                                        <?php if($u['year'] == 'Freshman'): ?>
+                                            <span class="year-badge">Freshman</span>
+                                        <?php elseif(strpos($u['year'], 'E') === 0): ?>
                                             <span class="year-badge">E<?= substr($u['year'], 1) ?></span>
                                         <?php elseif(is_numeric($u['year'])): ?>
                                             <span class="year-badge">Year <?= $u['year'] ?></span>
@@ -1128,6 +1182,7 @@ const studentIdGroup = document.getElementById('student-id-group');
 const studentIdInput = document.getElementById('student-id-input');
 const departmentGroup = document.getElementById('department-group');
 const departmentSelect = document.getElementById('department-select');
+const departmentLabel = document.getElementById('department-label');
 const studentIdFeedback = document.getElementById('student-id-feedback');
 const submitBtn = document.getElementById('submit-btn');
 const passwordInput = document.getElementById('password-input');
@@ -1163,8 +1218,10 @@ function toggleRoleFields(){
     
     // Department
     departmentGroup.style.display = needsDepartment ? 'block' : 'none';
-    departmentSelect.required = needsDepartment;
     if(!needsDepartment) departmentSelect.value = '';
+    
+    // Update department requirement based on year selection
+    updateDepartmentRequirement();
     
     // Enable/disable submit button
     updateSubmitButton();
@@ -1194,6 +1251,44 @@ function toggleYearDropdown() {
     }
     
     updateYearHiddenField();
+    updateDepartmentRequirement();
+    updateSubmitButton();
+}
+
+// Update department requirement based on year selection
+function updateDepartmentRequirement() {
+    const role = roleSelect.value;
+    const yearType = yearTypeSelect.value;
+    let selectedYear = '';
+    
+    // Get the selected year value
+    if (yearType === 'regular') {
+        selectedYear = regularYearSelect.value;
+    } else if (yearType === 'extension') {
+        selectedYear = extensionYearSelect.value;
+    }
+    
+    // Check if it's a freshman (Freshman)
+    const isFreshman = selectedYear === 'Freshman';
+    
+    // Update department requirement
+    if (role === 'student' && isFreshman) {
+        // For freshman, department is optional
+        departmentSelect.required = false;
+        departmentGroup.classList.add('department-optional');
+        departmentLabel.innerHTML = 'Department <small>(Optional for Freshman)</small>';
+    } else if (role === 'student') {
+        // For non-freshman students, department is required
+        departmentSelect.required = true;
+        departmentGroup.classList.remove('department-optional');
+        departmentLabel.innerHTML = 'Department:';
+    } else if (['instructor', 'department_head'].includes(role)) {
+        // For instructors and department heads, department is required
+        departmentSelect.required = true;
+        departmentGroup.classList.remove('department-optional');
+        departmentLabel.innerHTML = 'Department:';
+    }
+    
     updateSubmitButton();
 }
 
@@ -1210,6 +1305,7 @@ function updateYearHiddenField() {
     }
     
     console.log('Year hidden field updated to:', yearHidden.value);
+    updateDepartmentRequirement();
     updateSubmitButton();
 }
 
@@ -1220,21 +1316,31 @@ function initializeYearSelection() {
         console.log('Initializing year selection with:', yearValue);
         
         if (yearValue) {
-            if (yearValue.startsWith('E')) {
+            // Check if it's a regular year (numeric or Freshman)
+            if (yearValue === 'Freshman' || (!isNaN(yearValue) && yearValue !== '')) {
+                // Regular student
+                yearTypeSelect.value = 'regular';
+                toggleYearDropdown();
+                if (yearValue === 'Freshman') {
+                    regularYearSelect.value = 'Freshman';
+                } else {
+                    regularYearSelect.value = yearValue;
+                }
+                yearHidden.value = yearValue;
+            } 
+            // Check if it's an extension year (starts with E)
+            else if (yearValue.startsWith('E')) {
                 // Extension student
                 yearTypeSelect.value = 'extension';
                 toggleYearDropdown();
                 extensionYearSelect.value = yearValue;
                 yearHidden.value = yearValue;
-            } else if (!isNaN(yearValue)) {
-                // Regular student
-                yearTypeSelect.value = 'regular';
-                toggleYearDropdown();
-                regularYearSelect.value = yearValue;
-                yearHidden.value = yearValue;
             }
             console.log('Year initialized to hidden field:', yearHidden.value);
         }
+        
+        // Update department requirement based on initialized year
+        updateDepartmentRequirement();
     <?php endif; ?>
 }
 
@@ -1310,6 +1416,7 @@ function updateSubmitButton() {
     const hasPassword = passwordInput.value.trim().length > 0;
     const yearType = yearTypeSelect.value;
     const yearHiddenValue = yearHidden.value;
+    const departmentValue = departmentSelect.value;
     
     let enabled = true;
     
@@ -1319,6 +1426,14 @@ function updateSubmitButton() {
     if (isStudent && !yearType) enabled = false;
     if (isStudent && !yearHiddenValue) enabled = false;
     if (!editing && !hasPassword) enabled = false;
+    
+    // Department validation (not required for Freshman)
+    if (isStudent && yearHiddenValue && yearHiddenValue !== 'Freshman' && !departmentValue) {
+        enabled = false;
+    }
+    if (['instructor', 'department_head'].includes(role) && !departmentValue) {
+        enabled = false;
+    }
     
     submitBtn.disabled = !enabled;
 }
@@ -1331,8 +1446,9 @@ function validateForm() {
     const password = passwordInput.value.trim();
     const yearType = yearTypeSelect.value;
     const yearHiddenValue = yearHidden.value;
+    const departmentValue = departmentSelect.value;
     
-    console.log('Form validation - Role:', role, 'Year hidden:', yearHiddenValue, 'Year type:', yearType);
+    console.log('Form validation - Role:', role, 'Year hidden:', yearHiddenValue, 'Department:', departmentValue);
     
     // Student ID validation
     if (isStudent) {
@@ -1358,6 +1474,20 @@ function validateForm() {
             }
             return false;
         }
+        
+        // Department validation (not required for Freshman)
+        if (yearHiddenValue !== 'Freshman' && !departmentValue) {
+            alert('Please select a department (required for non-freshman students)');
+            departmentSelect.focus();
+            return false;
+        }
+    }
+    
+    // Department validation for instructors and department heads
+    if (['instructor', 'department_head'].includes(role) && !departmentValue) {
+        alert('Please select a department');
+        departmentSelect.focus();
+        return false;
     }
     
     // Password validation for new users
@@ -1389,6 +1519,7 @@ document.addEventListener('DOMContentLoaded', function() {
     yearTypeSelect.addEventListener('change', toggleYearDropdown);
     regularYearSelect.addEventListener('change', updateYearHiddenField);
     extensionYearSelect.addEventListener('change', updateYearHiddenField);
+    departmentSelect.addEventListener('change', updateSubmitButton);
     
     // Initial field setup
     toggleRoleFields();

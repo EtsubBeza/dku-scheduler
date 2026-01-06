@@ -141,6 +141,7 @@ if(isset($_POST['auto_generate'])){
     $auto_year = trim($_POST['auto_year'] ?? '');
     $auto_semester = trim($_POST['auto_semester'] ?? '');
     $auto_academic_year = trim($_POST['auto_academic_year'] ?? '');
+    $auto_room_id = $_POST['room_id'] ?? null; // NEW: Room selection
 
     // Validate year (supports regular years 1-5 and extension years E1-E5)
     $is_extension = substr($auto_year, 0, 1) === 'E';
@@ -160,7 +161,7 @@ if(isset($_POST['auto_generate'])){
             setMessage($message, $message_type, "Invalid extension year selected. Please select Extension Year 1-5.", "error");
         } else {
             // Proceed with auto-generation for extension students
-            processAutoGeneration($is_extension);
+            processAutoGeneration($is_extension, $auto_room_id);
         }
     } else {
         // Validate regular year
@@ -168,12 +169,12 @@ if(isset($_POST['auto_generate'])){
             setMessage($message, $message_type, "Invalid year selected. Please select Year 1-5.", "error");
         } else {
             // Proceed with auto-generation for regular students
-            processAutoGeneration($is_extension);
+            processAutoGeneration($is_extension, $auto_room_id);
         }
     }
 }
 
-function processAutoGeneration($is_extension = false) {
+function processAutoGeneration($is_extension = false, $selected_room_id = null) {
     global $pdo, $auto_courses, $auto_year, $auto_semester, $auto_academic_year, $message, $message_type, $dept_id;
     
     error_log("Auto generation started for department $dept_id");
@@ -254,6 +255,46 @@ function processAutoGeneration($is_extension = false) {
             $course_details[$course_id] = $course;
         }
 
+        // DETERMINE ROOM TO USE
+        $room_id = null;
+        $room_name = "";
+        
+        if($selected_room_id) {
+            // Use the user-selected room
+            $room_stmt = $pdo->prepare("SELECT * FROM rooms WHERE room_id = ?");
+            $room_stmt->execute([$selected_room_id]);
+            $selected_room = $room_stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if($selected_room) {
+                $room_id = $selected_room['room_id'];
+                $room_name = $selected_room['room_name'];
+            } else {
+                // Fall back to first room if selected room doesn't exist
+                $room_id = $rooms[0]['room_id'];
+                $room_name = $rooms[0]['room_name'];
+            }
+        } else {
+            // Auto-select the first available classroom (not lab or auditorium)
+            foreach($rooms as $room) {
+                if($room['room_type'] === 'classroom') {
+                    $room_id = $room['room_id'];
+                    $room_name = $room['room_name'];
+                    break;
+                }
+            }
+            
+            // If no classroom found, use first room
+            if(!$room_id && !empty($rooms)) {
+                $room_id = $rooms[0]['room_id'];
+                $room_name = $rooms[0]['room_name'];
+            }
+        }
+        
+        if(!$room_id) {
+            setMessage($message, $message_type, "No room available for scheduling.", "error");
+            return;
+        }
+
         $pdo->beginTransaction();
         $scheduled_count = 0;
         $schedule_plan = [];
@@ -280,9 +321,9 @@ function processAutoGeneration($is_extension = false) {
         }
         
         error_log("Total slots to fill: $total_slots, Courses prepared: " . count($courses_to_schedule));
+        error_log("Using room: $room_name (ID: $room_id) for all classes");
         
-        // SYSTEMATICALLY FILL ALL SLOTS
-        $room_index = 0;
+        // SYSTEMATICALLY FILL ALL SLOTS WITH SAME ROOM
         $instructor_index = 0;
         $course_index = 0;
         
@@ -299,17 +340,12 @@ function processAutoGeneration($is_extension = false) {
                 $start_time = $time_slot[0];
                 $end_time = $time_slot[1];
                 
-                // Get room (round robin)
-                $room = $rooms[$room_index % count($rooms)];
-                $room_id = $room['room_id'];
-                $room_name = $room['room_name'];
-                
                 // Get instructor (round robin)
                 $instructor = $instructors[$instructor_index % count($instructors)];
                 $instructor_id = $instructor['user_id'];
                 $instructor_name = !empty($instructor['full_name']) ? $instructor['full_name'] : $instructor['username'];
                 
-                // Insert schedule
+                // Insert schedule - SAME ROOM FOR ALL
                 try {
                     $stmt = $pdo->prepare("
                         INSERT INTO schedule 
@@ -321,7 +357,7 @@ function processAutoGeneration($is_extension = false) {
                     $result = $stmt->execute([
                         $course_id, 
                         $instructor_id, 
-                        $room_id,
+                        $room_id, // SAME ROOM FOR ALL
                         $day, 
                         $start_time, 
                         $end_time, 
@@ -339,15 +375,14 @@ function processAutoGeneration($is_extension = false) {
                             'course_code' => $course_code,
                             'day' => $day,
                             'time' => substr($start_time, 0, 5) . ' - ' . substr($end_time, 0, 5),
-                            'room' => $room_name,
+                            'room' => $room_name, // SAME ROOM
                             'instructor' => $instructor_name
                         ];
                         
                         error_log("Scheduled: $course_code on $day at $start_time in $room_name");
                         
-                        // Move to next course, room, and instructor
+                        // Move to next course and instructor
                         $course_index++;
-                        $room_index++;
                         $instructor_index++;
                     } else {
                         error_log("Failed to insert schedule for $course_code");
@@ -371,6 +406,7 @@ function processAutoGeneration($is_extension = false) {
             
             $schedule_info = "✅ SUCCESS! Filled $scheduled_count out of $total_slots available slots!\n\n";
             $schedule_info .= "📅 For: $year_text\n";
+            $schedule_info .= "📍 All Classes in: $room_name\n";
             $schedule_info .= "📊 Slot Utilization: $slot_usage% ($scheduled_count/$total_slots slots filled)\n";
             $schedule_info .= "📚 Semester: $auto_semester $auto_academic_year\n\n";
             
@@ -387,7 +423,7 @@ function processAutoGeneration($is_extension = false) {
                     foreach($schedule_by_day[$day] as $session) {
                         $time_display = substr($session['time'], 0, 5) . '-' . substr($session['time'], 8, 5);
                         $schedule_info .= "  ⏰ $time_display: {$session['course_code']}\n";
-                        $schedule_info .= "     📍 {$session['room']} | 👨‍🏫 {$session['instructor']}\n";
+                        $schedule_info .= "     👨‍🏫 {$session['instructor']}\n";
                     }
                 } else {
                     $schedule_info .= "\n$day: No classes scheduled\n";
@@ -399,7 +435,8 @@ function processAutoGeneration($is_extension = false) {
                 $schedule_info .= "\n⚠️ Note: $empty_slots slot(s) could not be filled.\n";
                 $final_message_type = "warning";
             } else {
-                $schedule_info .= "\n🎉 ALL $total_slots slots successfully filled!";
+                $schedule_info .= "\n🎉 ALL $total_slots slots successfully filled!\n";
+                $schedule_info .= "🏫 All classes are in: $room_name";
                 $final_message_type = "success";
             }
             
@@ -438,6 +475,11 @@ function processAutoGeneration($is_extension = false) {
 $courses_stmt = $pdo->prepare("SELECT * FROM courses WHERE department_id = ? ORDER BY course_name");
 $courses_stmt->execute([$dept_id]);
 $courses = fetchAllSafe($courses_stmt);
+
+// Fetch all rooms for dropdown
+$rooms_stmt = $pdo->prepare("SELECT * FROM rooms ORDER BY room_name");
+$rooms_stmt->execute();
+$all_rooms = fetchAllSafe($rooms_stmt);
 
 // Fetch current schedules
 $schedules_stmt = $pdo->prepare("
@@ -1270,6 +1312,43 @@ foreach($recent_schedules as $schedule){
             margin-top: 5px;
         }
 
+        /* ================= ROOM SELECTION STYLES ================= */
+        .room-selection {
+            background: rgba(245, 158, 11, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .room-selection h6 {
+            color: var(--text-primary);
+            margin-bottom: 10px;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .room-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .room-option {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .room-details {
+            font-size: 0.85rem;
+            color: var(--text-light);
+            margin-top: 5px;
+            display: flex;
+            justify-content: space-between;
+        }
+
         /* ================= TIP BOX ================= */
         .tip-box {
             margin-top: 15px;
@@ -1343,6 +1422,14 @@ foreach($recent_schedules as $schedule){
             .user-info {
                 width: 100%;
                 justify-content: flex-start;
+            }
+            
+            .room-options {
+                flex-direction: column;
+            }
+            
+            .room-option {
+                min-width: 100%;
             }
         }
 
@@ -1485,19 +1572,6 @@ foreach($recent_schedules as $schedule){
             </div>
         <?php endif; ?>
 
-        <!-- Debug Info (Optional - remove in production) -->
-        <?php if(isset($_GET['debug'])): ?>
-        <div class="debug-info">
-            <strong>Debug Info:</strong><br>
-            Department ID: <?= $dept_id ?><br>
-            Total Courses: <?= count($courses) ?><br>
-            Total Schedules: <?= count($all_schedules) ?><br>
-            Rooms Available: <?= $available_rooms_count ?><br>
-            Instructors in Dept: <?= $active_instructors_count ?><br>
-            Recent Schedules: <?= count($recent_schedules) ?>
-        </div>
-        <?php endif; ?>
-
         <!-- Time Slot Information -->
         <div class="time-slot-info">
             <h5><i class="fas fa-clock"></i> Scheduling Information</h5>
@@ -1505,7 +1579,7 @@ foreach($recent_schedules as $schedule){
             <div><strong>Extension Students (Extension Year 1-5):</strong> Saturday & Sunday only | Time Slots: 2:30-4:00, 4:30-6:00, 8:00-11:00</div>
             <div><strong>Total Weekday Slots:</strong> 15 (5 days × 3 time slots)</div>
             <div><strong>Total Weekend Slots:</strong> 6 (2 days × 3 time slots)</div>
-            <div><strong>Note:</strong> Uses available rooms and instructors from your department</div>
+            <div><strong>Important:</strong> All classes will be scheduled in the SAME room</div>
         </div>
 
         <!-- Course Information -->
@@ -1579,6 +1653,31 @@ foreach($recent_schedules as $schedule){
                         </div>
                     </div>
                     
+                    <!-- Room Selection Section -->
+                    <div class="room-selection">
+                        <h6><i class="fas fa-door-open"></i> Room Selection (All classes will use the same room)</h6>
+                        <div class="room-options">
+                            <div class="room-option">
+                                <select name="room_id" id="room_id" class="form-control">
+                                    <option value="">Auto-select first available classroom</option>
+                                    <?php foreach($all_rooms as $room): 
+                                        $room_type = $room['room_type'];
+                                        $type_display = ucfirst($room_type);
+                                        $capacity = $room['capacity'] ? " - Capacity: {$room['capacity']}" : "";
+                                    ?>
+                                        <option value="<?= $room['room_id'] ?>">
+                                            <?= htmlspecialchars($room['room_name']) ?> (<?= $type_display ?><?= $capacity ?>)
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="room-details">
+                            <span><i class="fas fa-info-circle"></i> Leave empty to auto-select first classroom</span>
+                            <span><i class="fas fa-check-circle"></i> All classes will be in the same room</span>
+                        </div>
+                    </div>
+                    
                     <div class="form-row">
                         <div class="form-group">
                             <button type="submit" class="btn btn-primary" id="generateBtn">
@@ -1591,7 +1690,7 @@ foreach($recent_schedules as $schedule){
                     </div>
                     
                     <div class="tip-box">
-                        <small><i class="fas fa-lightbulb"></i> <strong>Tip:</strong> If scheduling fails, use the "Clear All Schedules" button first to remove any existing schedules that might cause conflicts.</small>
+                        <small><i class="fas fa-lightbulb"></i> <strong>Tip:</strong> All selected courses will be scheduled in the SAME room across all time slots. This ensures consistency and avoids room conflicts.</small>
                     </div>
                 </form>
             </div>
@@ -1831,6 +1930,18 @@ foreach($recent_schedules as $schedule){
                     link.classList.add('active');
                 }
             });
+
+            // Auto-fill room selection with first classroom if available
+            const roomSelect = document.getElementById('room_id');
+            if (roomSelect) {
+                // Find first classroom option
+                for(let i = 0; i < roomSelect.options.length; i++) {
+                    if(roomSelect.options[i].text.includes('(Classroom)')) {
+                        roomSelect.value = roomSelect.options[i].value;
+                        break;
+                    }
+                }
+            }
         });
     </script>
     
