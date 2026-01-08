@@ -71,7 +71,7 @@ function checkExamConflicts($pdo, $exam_date, $start_time, $end_time, $room_id, 
     // Check for room conflicts (same room, same time, same section)
     $room_check = $pdo->prepare("
         SELECT exam_id, course_code, exam_type 
-        FROM freshman_exam_schedules es
+        FROM exam_schedules es
         JOIN courses c ON es.course_id = c.course_id
         WHERE es.room_id = ? 
         AND es.exam_date = ? 
@@ -92,7 +92,7 @@ function checkExamConflicts($pdo, $exam_date, $start_time, $end_time, $room_id, 
     // Check for section conflicts (same section, same time, different room)
     $section_check = $pdo->prepare("
         SELECT exam_id, course_code, exam_type, room_name
-        FROM freshman_exam_schedules es
+        FROM exam_schedules es
         JOIN courses c ON es.course_id = c.course_id
         JOIN rooms r ON es.room_id = r.room_id
         WHERE es.section_number = ? 
@@ -128,7 +128,6 @@ if(isset($_POST['save_exam'])){
         $start_time = $_POST['start_time'];
         $end_time = $_POST['end_time'];
         $room_id = (int)$_POST['room_id'];
-        $instructor_id = !empty($_POST['instructor_id']) ? (int)$_POST['instructor_id'] : null;
         $academic_year = $_POST['academic_year'];
         $semester = $_POST['semester'];
         $max_students = (int)$_POST['max_students'];
@@ -162,49 +161,49 @@ if(isset($_POST['save_exam'])){
                     if($exam_id > 0) {
                         // Update existing exam
                         $stmt = $pdo->prepare("
-                            UPDATE freshman_exam_schedules 
+                            UPDATE exam_schedules 
                             SET course_id = ?, section_number = ?, exam_type = ?, exam_date = ?, 
-                                start_time = ?, end_time = ?, room_id = ?, instructor_id = ?, 
+                                start_time = ?, end_time = ?, room_id = ?, 
                                 academic_year = ?, semester = ?, max_students = ?, is_published = ?
                             WHERE exam_id = ?
                         ");
                         $stmt->execute([
                             $course_id, $section_number, $exam_type, $exam_date,
-                            $start_time, $end_time, $room_id, $instructor_id,
+                            $start_time, $end_time, $room_id,
                             $academic_year, $semester, $max_students, $is_published, $exam_id
                         ]);
                         
                         if($stmt->rowCount() > 0) {
-                            $message = "Exam schedule updated successfully!";
+                            $message = "✅ Exam schedule updated successfully!";
                             $message_type = "success";
                         } else {
-                            $message = "No changes made or exam not found.";
+                            $message = "⚠️ No changes made or exam not found.";
                             $message_type = "warning";
                         }
                     } else {
                         // Insert new exam
                         $stmt = $pdo->prepare("
-                            INSERT INTO freshman_exam_schedules 
+                            INSERT INTO exam_schedules 
                             (course_id, section_number, exam_type, exam_date, start_time, end_time, 
-                             room_id, instructor_id, academic_year, semester, max_students, 
+                             room_id, academic_year, semester, max_students, 
                              is_published, created_by)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         ");
                         $stmt->execute([
                             $course_id, $section_number, $exam_type, $exam_date,
-                            $start_time, $end_time, $room_id, $instructor_id,
+                            $start_time, $end_time, $room_id,
                             $academic_year, $semester, $max_students, $is_published, $_SESSION['user_id']
                         ]);
                         
                         $exam_id = $pdo->lastInsertId();
-                        $message = "Exam schedule created successfully!";
+                        $message = "🎉 Exam schedule created successfully!";
                         $message_type = "success";
                     }
                     
                     $pdo->commit();
                 } catch(PDOException $e) {
                     $pdo->rollBack();
-                    $message = "Database error: " . $e->getMessage();
+                    $message = "❌ Database error: " . $e->getMessage();
                     $message_type = "error";
                 }
             }
@@ -212,42 +211,44 @@ if(isset($_POST['save_exam'])){
     }
 }
 
-// Handle Delete Exam
+// Handle Delete Exam - FIXED: Use current page instead of hardcoded URL
 if(isset($_GET['delete'])){
     $delete_id = (int)$_GET['delete'];
     
     try {
-        $stmt = $pdo->prepare("DELETE FROM freshman_exam_schedules WHERE exam_id = ?");
+        $stmt = $pdo->prepare("DELETE FROM exam_schedules WHERE exam_id = ?");
         $stmt->execute([$delete_id]);
         
         if($stmt->rowCount() > 0) {
-            $_SESSION['message'] = "Exam schedule deleted successfully!";
+            $_SESSION['message'] = "✅ Exam schedule deleted successfully!";
             $_SESSION['message_type'] = "success";
         } else {
-            $_SESSION['message'] = "Exam not found.";
+            $_SESSION['message'] = "❌ Exam not found.";
             $_SESSION['message_type'] = "error";
         }
     } catch (PDOException $e) {
-        $_SESSION['message'] = "Error deleting exam: " . $e->getMessage();
+        $_SESSION['message'] = "❌ Error deleting exam: " . $e->getMessage();
         $_SESSION['message_type'] = "error";
     }
     
-    header("Location: admin_exam_schedules.php");
+    // FIXED: Redirect to current page instead of hardcoded URL
+    $current_page = basename($_SERVER['PHP_SELF']);
+    header("Location: " . $current_page);
     exit;
 }
 
-// Handle Publish/Unpublish Exam
+// Handle Publish/Unpublish Exam - FIXED: Use current page
 if(isset($_GET['publish'])) {
     $exam_id = (int)$_GET['publish'];
     $action = $_GET['action'];
     
     try {
         if($action == 'publish') {
-            $stmt = $pdo->prepare("UPDATE freshman_exam_schedules SET is_published = 1 WHERE exam_id = ?");
-            $msg = "Exam published successfully! Students can now see it.";
+            $stmt = $pdo->prepare("UPDATE exam_schedules SET is_published = 1 WHERE exam_id = ?");
+            $msg = "✅ Exam published successfully! Students can now see it.";
         } elseif($action == 'unpublish') {
-            $stmt = $pdo->prepare("UPDATE freshman_exam_schedules SET is_published = 0 WHERE exam_id = ?");
-            $msg = "Exam unpublished successfully! Students can no longer see it.";
+            $stmt = $pdo->prepare("UPDATE exam_schedules SET is_published = 0 WHERE exam_id = ?");
+            $msg = "✅ Exam unpublished successfully! Students can no longer see it.";
         }
         
         if(isset($stmt)) {
@@ -257,16 +258,18 @@ if(isset($_GET['publish'])) {
                 $_SESSION['message'] = $msg;
                 $_SESSION['message_type'] = "success";
             } else {
-                $_SESSION['message'] = "Exam not found.";
+                $_SESSION['message'] = "❌ Exam not found.";
                 $_SESSION['message_type'] = "error";
             }
         }
     } catch (PDOException $e) {
-        $_SESSION['message'] = "Error: " . $e->getMessage();
+        $_SESSION['message'] = "❌ Error: " . $e->getMessage();
         $_SESSION['message_type'] = "error";
     }
     
-    header("Location: admin_exam_schedules.php");
+    // FIXED: Redirect to current page
+    $current_page = basename($_SERVER['PHP_SELF']);
+    header("Location: " . $current_page);
     exit;
 }
 
@@ -274,7 +277,7 @@ if(isset($_GET['publish'])) {
 if(isset($_POST['bulk_schedule_exam'])){
     // CSRF validation
     if(!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']){
-        $message = "Security token invalid. Please try again.";
+        $message = "❌ Security token invalid. Please try again.";
         $message_type = "error";
     } else {
         $course_ids = isset($_POST['course_ids']) ? $_POST['course_ids'] : [];
@@ -287,10 +290,10 @@ if(isset($_POST['bulk_schedule_exam'])){
         $max_students = (int)$_POST['bulk_max_students'];
         
         if(empty($course_ids)) {
-            $message = "Please select at least one course.";
+            $message = "❌ Please select at least one course.";
             $message_type = "error";
         } elseif(strtotime($end_time) <= strtotime($start_time)) {
-            $message = "End time must be after start time";
+            $message = "❌ End time must be after start time";
             $message_type = "error";
         } else {
             try {
@@ -298,10 +301,16 @@ if(isset($_POST['bulk_schedule_exam'])){
                 
                 $created_count = 0;
                 $conflict_count = 0;
+                $course_details = [];
                 
                 // Get all sections that have this course scheduled
                 foreach($course_ids as $course_id) {
                     $course_id = (int)$course_id;
+                    
+                    // Get course info for display
+                    $course_stmt = $pdo->prepare("SELECT course_code, course_name FROM courses WHERE course_id = ?");
+                    $course_stmt->execute([$course_id]);
+                    $course = $course_stmt->fetch();
                     
                     // Get all sections that have this course
                     $sections_stmt = $pdo->prepare("
@@ -317,17 +326,19 @@ if(isset($_POST['bulk_schedule_exam'])){
                         continue; // No sections found for this course
                     }
                     
-                    // Get course info for room assignment
-                    $course_stmt = $pdo->prepare("SELECT course_code, course_name FROM courses WHERE course_id = ?");
-                    $course_stmt->execute([$course_id]);
-                    $course = $course_stmt->fetch();
+                    // Store course details
+                    $course_details[$course_id] = [
+                        'code' => $course['course_code'],
+                        'name' => $course['course_name'],
+                        'sections' => count($sections)
+                    ];
                     
                     // Get all available rooms
                     $rooms_stmt = $pdo->query("SELECT room_id, room_name, capacity FROM rooms ORDER BY room_name");
                     $rooms = $rooms_stmt->fetchAll();
                     
                     if(empty($rooms)) {
-                        $message = "No rooms available. Please add rooms first.";
+                        $message = "❌ No rooms available. Please add rooms first.";
                         $message_type = "error";
                         $pdo->rollBack();
                         break;
@@ -342,7 +353,7 @@ if(isset($_POST['bulk_schedule_exam'])){
                             // Check if room is available for this exam time
                             $conflict_check = $pdo->prepare("
                                 SELECT COUNT(*) as conflicts
-                                FROM freshman_exam_schedules 
+                                FROM exam_schedules 
                                 WHERE room_id = ? 
                                 AND exam_date = ? 
                                 AND section_number = ?
@@ -354,7 +365,7 @@ if(isset($_POST['bulk_schedule_exam'])){
                             if($conflicts == 0) {
                                 // Room is available, schedule exam
                                 $insert_stmt = $pdo->prepare("
-                                    INSERT INTO freshman_exam_schedules 
+                                    INSERT INTO exam_schedules 
                                     (course_id, section_number, exam_type, exam_date, start_time, end_time, 
                                      room_id, academic_year, semester, max_students, is_published, created_by)
                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
@@ -379,14 +390,50 @@ if(isset($_POST['bulk_schedule_exam'])){
                 
                 $pdo->commit();
                 
+                // Build detailed success message
                 if($created_count > 0) {
-                    $message = "✅ Successfully scheduled $created_count exams!";
+                    $message = "<div style='margin-bottom: 10px;'>";
+                    $message .= "🎉 <strong>Bulk Exam Scheduling Complete!</strong>";
+                    $message .= "</div>";
+                    
+                    $message .= "<div style='background: var(--success-bg); padding: 15px; border-radius: 8px; margin-bottom: 10px;'>";
+                    $message .= "✅ <strong>Successfully scheduled $created_count exams!</strong>";
+                    
+                    // Add course details
+                    $message .= "<div style='margin-top: 10px; font-size: 0.9rem;'>";
+                    $message .= "<strong>Courses scheduled:</strong><br>";
+                    foreach($course_details as $course_id => $details) {
+                        $message .= "• {$details['code']} - {$details['name']} ({$details['sections']} sections)<br>";
+                    }
+                    $message .= "</div>";
+                    
+                    $message .= "<div style='margin-top: 10px;'>";
+                    $message .= "<strong>Exam Details:</strong><br>";
+                    $message .= "• Type: $exam_type<br>";
+                    $message .= "• Date: " . date('F j, Y', strtotime($exam_date)) . "<br>";
+                    $message .= "• Time: " . date('g:i A', strtotime($start_time)) . " - " . date('g:i A', strtotime($end_time)) . "<br>";
+                    $message .= "• Semester: $semester<br>";
+                    $message .= "• Academic Year: $academic_year<br>";
+                    $message .= "</div>";
+                    
                     if($conflict_count > 0) {
-                        $message .= "<br>⚠️ Could not schedule $conflict_count exams due to room conflicts.";
-                        $message_type = "warning";
+                        $message .= "<div style='margin-top: 10px; padding: 10px; background: var(--warning-bg); border-radius: 5px;'>";
+                        $message .= "⚠️ <strong>Note:</strong> Could not schedule $conflict_count exams due to room conflicts.";
+                        $message .= "</div>";
+                        $message_type = "success";
                     } else {
                         $message_type = "success";
                     }
+                    
+                    $message .= "</div>";
+                    
+                    // Add auto-refresh notice
+                    $message .= "<div style='font-size: 0.85rem; color: var(--text-secondary); margin-top: 10px;'>";
+                    $message .= "<i class='fas fa-sync-alt'></i> Page will refresh in 5 seconds to show updated schedule...";
+                    $message .= "</div>";
+                    
+                    // Auto-refresh page after 5 seconds
+                    echo "<script>setTimeout(function() { location.reload(); }, 5000);</script>";
                 } else {
                     $message = "❌ No exams could be scheduled due to room conflicts.";
                     $message_type = "error";
@@ -394,7 +441,7 @@ if(isset($_POST['bulk_schedule_exam'])){
                 
             } catch(PDOException $e) {
                 $pdo->rollBack();
-                $message = "Database error: " . $e->getMessage();
+                $message = "❌ Database error: " . $e->getMessage();
                 $message_type = "error";
             }
         }
@@ -415,19 +462,17 @@ if(isset($_GET['edit'])){
     $edit_id = (int)$_GET['edit'];
     
     $stmt = $pdo->prepare("
-        SELECT es.*, c.course_code, c.course_name, r.room_name, r.capacity,
-               u.username as instructor_name, u.email as instructor_email
-        FROM freshman_exam_schedules es
+        SELECT es.*, c.course_code, c.course_name, r.room_name, r.capacity
+        FROM exam_schedules es
         JOIN courses c ON es.course_id = c.course_id
         JOIN rooms r ON es.room_id = r.room_id
-        LEFT JOIN users u ON es.instructor_id = u.user_id
         WHERE es.exam_id = ?
     ");
     $stmt->execute([$edit_id]);
     $edit_exam = $stmt->fetch();
     
     if(!$edit_exam) {
-        $message = "Exam not found.";
+        $message = "❌ Exam not found.";
         $message_type = "error";
     }
 }
@@ -443,15 +488,6 @@ $freshman_courses = $pdo->query("
 
 $rooms = $pdo->query("SELECT room_id, room_name, capacity FROM rooms ORDER BY room_name")->fetchAll();
 
-// Fetch all instructors
-$instructors = $pdo->query("
-    SELECT user_id, username, email 
-    FROM users 
-    WHERE role = 'instructor' 
-    AND username != 'TBA'
-    ORDER BY username
-")->fetchAll();
-
 // Fetch all sections
 $sections_stmt = $pdo->query("
     SELECT DISTINCT COALESCE(section_number, 1) as section_number 
@@ -460,25 +496,25 @@ $sections_stmt = $pdo->query("
     ORDER BY section_number
 ");
 $all_sections = $sections_stmt->fetchAll(PDO::FETCH_COLUMN);
-// Fetch all exam schedules - CORRECTED VERSION
+
+// Fetch all exam schedules - FIXED QUERY without instructor_id and using schedule_id
 $exams_stmt = $pdo->prepare("
     SELECT es.*, 
            c.course_code, c.course_name,
            r.room_name, r.capacity,
-           u.username as instructor_name,
-           u.email as instructor_email,
-           COUNT(DISTINCT se.student_id) as registered_count
-    FROM freshman_exam_schedules es
+           COUNT(DISTINCT e.student_id) as registered_count
+    FROM exam_schedules es
     JOIN courses c ON es.course_id = c.course_id
     JOIN rooms r ON es.room_id = r.room_id
-    LEFT JOIN users u ON es.instructor_id = u.user_id
-    LEFT JOIN student_enrollments se ON se.schedule_id IN (
-        SELECT schedule_id 
-        FROM schedule s 
-        WHERE s.course_id = es.course_id 
-        AND COALESCE(s.section_number, 1) = es.section_number
-        AND s.year = 'freshman'
-    )
+    LEFT JOIN enrollments e ON e.course_id = es.course_id 
+        AND e.year = 'freshman'
+        AND e.schedule_id IN (
+            SELECT schedule_id 
+            FROM schedule 
+            WHERE course_id = es.course_id 
+            AND COALESCE(section_number, 1) = es.section_number
+            AND year = 'freshman'
+        )
     WHERE (c.is_freshman = 1 OR es.course_id IN (SELECT course_id FROM schedule WHERE year = 'freshman'))
     GROUP BY es.exam_id
     ORDER BY es.exam_date DESC, es.start_time, es.section_number
@@ -504,7 +540,7 @@ foreach($exams as $exam) {
 // Count exams by type
 $exam_type_counts = [];
 foreach($exam_types as $type) {
-    $count_stmt = $pdo->prepare("SELECT COUNT(*) FROM freshman_exam_schedules WHERE exam_type = ?");
+    $count_stmt = $pdo->prepare("SELECT COUNT(*) FROM exam_schedules WHERE exam_type = ?");
     $count_stmt->execute([$type]);
     $exam_type_counts[$type] = $count_stmt->fetchColumn();
 }
@@ -512,7 +548,7 @@ foreach($exam_types as $type) {
 // Count exams by section
 $section_counts = [];
 foreach($all_sections as $section) {
-    $count_stmt = $pdo->prepare("SELECT COUNT(*) FROM freshman_exam_schedules WHERE section_number = ?");
+    $count_stmt = $pdo->prepare("SELECT COUNT(*) FROM exam_schedules WHERE section_number = ?");
     $count_stmt->execute([$section]);
     $section_counts[$section] = $count_stmt->fetchColumn();
 }
@@ -668,7 +704,6 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
     color: var(--text-sidebar);
     margin-bottom: 25px;
     font-size: 22px;
-    padding: 0 20px;
 }
 
 .sidebar a { 
@@ -781,16 +816,14 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
 
 /* ================= Message Styles ================= */
 .message {
-    padding: 15px 20px;
-    border-radius: 8px;
+    padding: 20px;
+    border-radius: 10px;
     margin-bottom: 25px;
     font-weight: 500;
-    display: flex;
-    align-items: center;
-    gap: 12px;
     animation: slideIn 0.3s ease;
     box-shadow: 0 4px 6px var(--shadow-color);
     border-left: 4px solid;
+    position: relative;
 }
 
 @keyframes slideIn {
@@ -824,6 +857,12 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
 
 .message i {
     font-size: 1.2rem;
+    margin-right: 10px;
+}
+
+.message strong {
+    display: inline-block;
+    margin-bottom: 5px;
 }
 
 /* ================= Stats Cards ================= */
@@ -1641,19 +1680,6 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
                         </select>
                         <small id="roomCapacity" style="display:block; margin-top:0.5rem; color: var(--text-secondary);"></small>
                     </div>
-                    
-                    <div class="form-group">
-                        <label for="instructor_id">Supervising Instructor (Optional)</label>
-                        <select class="form-control" id="instructor_id" name="instructor_id">
-                            <option value="">No Instructor</option>
-                            <?php foreach($instructors as $instructor): ?>
-                                <option value="<?= $instructor['user_id'] ?>" 
-                                    <?= ($edit_exam['instructor_id'] ?? '') == $instructor['user_id'] ? 'selected' : '' ?>>
-                                    <?= htmlspecialchars($instructor['username']) ?> (<?= htmlspecialchars($instructor['email']) ?>)
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
                 </div>
                 
                 <div class="form-row">
@@ -1725,8 +1751,7 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
         <!-- Display Error/Success Messages -->
         <?php if($message): ?>
             <div class="message <?= $message_type ?>">
-                <i class="fas fa-<?= $message_type === 'error' ? 'exclamation-circle' : ($message_type === 'warning' ? 'exclamation-triangle' : 'check-circle') ?>"></i>
-                <?= nl2br(htmlspecialchars($message)) ?>
+                <?= $message ?>
             </div>
         <?php endif; ?>
 
@@ -1917,7 +1942,6 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
                                 <th>Exam Type</th>
                                 <th>Date & Time</th>
                                 <th>Room</th>
-                                <th>Instructor</th>
                                 <th>Capacity</th>
                                 <th>Status</th>
                                 <th>Actions</th>
@@ -1966,18 +1990,6 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
                                         <div style="color: var(--text-secondary); font-size: 0.9rem;">
                                             Capacity: <?= $exam['capacity'] ?>
                                         </div>
-                                    </td>
-                                    <td>
-                                        <?php if($exam['instructor_name']): ?>
-                                            <div style="color: var(--text-primary);">
-                                                <?= htmlspecialchars($exam['instructor_name']) ?>
-                                            </div>
-                                            <div style="color: var(--text-secondary); font-size: 0.9rem;">
-                                                <?= htmlspecialchars($exam['instructor_email']) ?>
-                                            </div>
-                                        <?php else: ?>
-                                            <span class="badge badge-warning">Not Assigned</span>
-                                        <?php endif; ?>
                                     </td>
                                     <td>
                                         <div style="font-weight: 600; color: var(--text-primary);">
@@ -2121,7 +2133,6 @@ document.addEventListener('DOMContentLoaded', function() {
             'extendedProps' => [
                 'course' => $exam['course_name'],
                 'room' => $exam['room_name'],
-                'instructor' => $exam['instructor_name'] || 'Not Assigned',
                 'published' => $exam['is_published'] == 1,
                 'section' => $exam['section_number']
             ]
@@ -2145,12 +2156,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const title = info.event.title;
             const course = info.event.extendedProps.course;
             const room = info.event.extendedProps.room;
-            const instructor = info.event.extendedProps.instructor;
             const published = info.event.extendedProps.published;
             const section = info.event.extendedProps.section;
             
             const status = published ? 'Published' : 'Not Published';
-            info.el.title = `${title}\nCourse: ${course}\nRoom: ${room}\nInstructor: ${instructor}\nSection: ${section}\nStatus: ${status}`;
+            info.el.title = `${title}\nCourse: ${course}\nRoom: ${room}\nSection: ${section}\nStatus: ${status}`;
             
             // Add custom styling
             info.el.style.borderRadius = '6px';
@@ -2205,13 +2215,13 @@ document.getElementById('examForm').addEventListener('submit', function(e) {
     
     if(startTime >= endTime) {
         e.preventDefault();
-        alert('End time must be after start time.');
+        alert('❌ End time must be after start time.');
         return false;
     }
     
     if(examDate < today) {
         e.preventDefault();
-        alert('Exam date cannot be in the past.');
+        alert('❌ Exam date cannot be in the past.');
         return false;
     }
     
@@ -2228,25 +2238,25 @@ document.getElementById('bulkExamForm').addEventListener('submit', function(e) {
     
     if(startTime >= endTime) {
         e.preventDefault();
-        alert('End time must be after start time.');
+        alert('❌ End time must be after start time.');
         return false;
     }
     
     if(examDate < today) {
         e.preventDefault();
-        alert('Exam date cannot be in the past.');
+        alert('❌ Exam date cannot be in the past.');
         return false;
     }
     
     if(selectedCourses === 0) {
         e.preventDefault();
-        alert('Please select at least one course.');
+        alert('❌ Please select at least one course.');
         return false;
     }
     
     const confirmation = confirm(
         `📚 Bulk Exam Scheduling:\n\n` +
-        `This will schedule ${selectedCourses} exams for ALL sections of selected courses.\n` +
+        `This will schedule exams for ALL sections of ${selectedCourses} course(s).\n` +
         `The system will automatically assign available rooms.\n\n` +
         `Continue?`
     );

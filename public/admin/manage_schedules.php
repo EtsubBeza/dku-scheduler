@@ -111,12 +111,12 @@ if(isset($_GET['delete_all']) && $view_mode){
             exit;
         }
         
-        // First delete all enrollments
+        // First delete all enrollments from enrollments table
         try {
-            // Check if student_enrollments table exists
-            $table_check = $pdo->query("SHOW TABLES LIKE 'student_enrollments'");
+            // Check if enrollments table exists
+            $table_check = $pdo->query("SHOW TABLES LIKE 'enrollments'");
             if($table_check->fetch()) {
-                $pdo->query("DELETE FROM student_enrollments WHERE schedule_id IN (SELECT schedule_id FROM schedule WHERE year = 'freshman')");
+                $pdo->query("DELETE FROM enrollments WHERE schedule_id IN (SELECT schedule_id FROM schedule WHERE year = 'freshman')");
             }
         } catch (Exception $e) {
             // Table might not exist or foreign key constraint
@@ -130,7 +130,7 @@ if(isset($_GET['delete_all']) && $view_mode){
         $pdo->commit();
         
         // Set success message
-        $_SESSION['message'] = "✅ Successfully deleted all $total_schedules freshman schedules!";
+        $_SESSION['message'] = "✅ Successfully deleted all $total_schedules freshman schedules and their enrollments!";
         $_SESSION['message_type'] = "success";
         header("Location: ?view=enrollments");
         exit;
@@ -156,11 +156,11 @@ if(isset($_GET['delete_schedule']) && !$view_mode){
         try {
             $pdo->beginTransaction();
             
-            // First delete enrollments (if foreign key constraints exist)
+            // First delete enrollments from enrollments table
             try {
-                $pdo->prepare("DELETE FROM student_enrollments WHERE schedule_id = ?")->execute([$schedule_id]);
+                $pdo->prepare("DELETE FROM enrollments WHERE schedule_id = ?")->execute([$schedule_id]);
             } catch (Exception $e) {
-                // Table might not exist or no foreign key constraint
+                // Table might not exist
                 error_log("Note: Could not delete enrollments: " . $e->getMessage());
             }
             
@@ -330,9 +330,6 @@ if(isset($_POST['batch_schedule']) && !$view_mode){
                                     $start_time = $slot[0];
                                     $end_time = $slot[1];
                                     
-                                    // Check room availability (skip for TBA instructor)
-                                    // We'll skip instructor check since we're using TBA
-                                    
                                     try {
                                         // Insert schedule with TBA instructor and section number
                                         $stmt = $pdo->prepare("INSERT INTO schedule 
@@ -365,7 +362,6 @@ if(isset($_POST['batch_schedule']) && !$view_mode){
                                     $section_created_sessions++;
                                     $total_created++;
                                     $course_slot_counts[$course_index]++;
-                                    $course_scheduled_this_round = true;
                                     
                                     $scheduled_on_day[$day][] = $course_id;
                                     $occupied_slots[$day][$slot_index] = true;
@@ -390,23 +386,25 @@ if(isset($_POST['batch_schedule']) && !$view_mode){
                                         'instructor_name' => 'TBA'
                                     ];
                                     
-                                    // Enroll students in this schedule
+                                    // Enroll students in this schedule using enrollments table
                                     foreach($student_ids as $student_id) {
                                         $student_id = (int)$student_id;
                                         
-                                        // Check if student_enrollments table exists
+                                        // Check if enrollments table exists
                                         try {
-                                            $table_check = $pdo->query("SHOW TABLES LIKE 'student_enrollments'");
+                                            $table_check = $pdo->query("SHOW TABLES LIKE 'enrollments'");
                                             if($table_check->fetch()) {
-                                                $enrollment_check = $pdo->prepare("SELECT enrollment_id FROM student_enrollments 
+                                                // Check if already enrolled
+                                                $enrollment_check = $pdo->prepare("SELECT enrollment_id FROM enrollments 
                                                     WHERE student_id=? AND schedule_id=?");
                                                 $enrollment_check->execute([$student_id, $schedule_id]);
                                                 
                                                 if(!$enrollment_check->fetch()) {
-                                                    $enroll_stmt = $pdo->prepare("INSERT INTO student_enrollments 
-                                                        (student_id, schedule_id, enrollment_date, status) 
-                                                        VALUES (?,?,NOW(),'enrolled')");
-                                                    $enroll_stmt->execute([$student_id, $schedule_id]);
+                                                    // Insert into enrollments table with both schedule_id and course_id
+                                                    $enroll_stmt = $pdo->prepare("INSERT INTO enrollments 
+                                                        (student_id, schedule_id, course_id, enrolled_at) 
+                                                        VALUES (?,?,?,NOW())");
+                                                    $enroll_stmt->execute([$student_id, $schedule_id, $course_id]);
                                                 }
                                             }
                                         } catch (Exception $e) {
@@ -447,7 +445,7 @@ if(isset($_POST['batch_schedule']) && !$view_mode){
                     foreach($section_results as $result) {
                         $message .= "Classroom Section {$result['section_number']}:\n";
                         $message .= "  🏫 Classroom: {$result['room_name']}\n";
-                        $message .= "  👥 Students: {$result['student_count']}\n";
+                        $message .= "  👥 Students enrolled: {$result['student_count']}\n";
                         $message .= "  📚 Courses scheduled: {$result['courses_scheduled']}/" . count($course_ids) . "\n";
                         $message .= "  ⏰ Sessions created: {$result['created_sessions']}/15\n\n";
                     }
@@ -504,7 +502,7 @@ if (!$column_check) {
     }
 }
 
-// Fetch existing schedules with section_number information
+// Fetch existing schedules with enrollment count from enrollments table
 $existing_schedules = [];
 try {
     $schedules_query = "
@@ -525,15 +523,15 @@ try {
             COALESCE(u.username, 'TBA') as instructor_name,
             COALESCE(u.email, 'Not Assigned') as instructor_email,
             COALESCE(
-                (SELECT COUNT(DISTINCT se.student_id) 
-                 FROM student_enrollments se 
-                 WHERE se.schedule_id = s.schedule_id),
+                (SELECT COUNT(DISTINCT e.student_id) 
+                 FROM enrollments e 
+                 WHERE e.schedule_id = s.schedule_id),
                 0
             ) as enrolled_students,
             (SELECT GROUP_CONCAT(DISTINCT u2.username SEPARATOR ', ') 
-             FROM student_enrollments se2 
-             JOIN users u2 ON se2.student_id = u2.user_id 
-             WHERE se2.schedule_id = s.schedule_id 
+             FROM enrollments e2 
+             JOIN users u2 ON e2.student_id = u2.user_id 
+             WHERE e2.schedule_id = s.schedule_id 
              LIMIT 3) as sample_students
         FROM schedule s
         JOIN courses c ON s.course_id = c.course_id
@@ -582,13 +580,13 @@ if ($view_mode && isset($_GET['schedule_id'])) {
     $schedule_details = $schedule_stmt->fetch();
     
     if ($schedule_details) {
-        // Get enrolled students
+        // Get enrolled students from enrollments table
         $enrollments_stmt = $pdo->prepare("
-            SELECT u.user_id, u.username, u.email, u.year, d.department_name, se.enrollment_date, se.status
-            FROM student_enrollments se
-            JOIN users u ON se.student_id = u.user_id
+            SELECT u.user_id, u.username, u.email, u.year, d.department_name, e.enrolled_at
+            FROM enrollments e
+            JOIN users u ON e.student_id = u.user_id
             LEFT JOIN departments d ON u.department_id = d.department_id
-            WHERE se.schedule_id = ?
+            WHERE e.schedule_id = ?
             ORDER BY u.username
         ");
         $enrollments_stmt->execute([$schedule_id]);
@@ -2370,7 +2368,6 @@ input[type="checkbox"]:checked + .student-info .student-name {
                                 <th>Year</th>
                                 <th>Department</th>
                                 <th>Enrollment Date</th>
-                                <th>Status</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -2380,12 +2377,7 @@ input[type="checkbox"]:checked + .student-info .student-name {
                                     <td><?= htmlspecialchars($enrollment['email']) ?></td>
                                     <td><?= htmlspecialchars(ucfirst($enrollment['year'])) ?></td>
                                     <td><?= htmlspecialchars($enrollment['department_name'] ?? 'N/A') ?></td>
-                                    <td><?= date('M d, Y', strtotime($enrollment['enrollment_date'])) ?></td>
-                                    <td>
-                                        <span class="status-badge status-<?= $enrollment['status'] ?>">
-                                            <?= ucfirst($enrollment['status']) ?>
-                                        </span>
-                                    </td>
+                                    <td><?= date('M d, Y', strtotime($enrollment['enrolled_at'])) ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -2445,7 +2437,7 @@ input[type="checkbox"]:checked + .student-info .student-name {
                             <span class="section-badge section-<?= (($section_number - 1) % 5) + 1 ?>" style="font-size: 1.2rem; padding: 8px 16px;">
                                 Section <?= $section_number ?>
                             </span>
-                            <span style="font-size: 1rem; color: var(--text-secondary);">
+                            <span style="font-size: 1rem; color: var(--text-secondary); margin-left: 10px;">
                                 (<?= count(array_filter($existing_schedules, function($s) use ($section_number) { 
                                     $section_num = isset($s['section_number']) ? $s['section_number'] : 1;
                                     return $section_num == $section_number; 

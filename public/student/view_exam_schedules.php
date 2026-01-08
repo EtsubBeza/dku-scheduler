@@ -15,7 +15,14 @@ $student_id = $_SESSION['user_id'];
 $message = "";
 $message_type = "success";
 
-// Fetch current user info - check for year column
+// Helper function to display messages
+function showMessage($type, $text) {
+    global $message, $message_type;
+    $message = $text;
+    $message_type = $type;
+}
+
+// Fetch current user info
 try {
     $user_stmt = $pdo->prepare("SELECT username, profile_picture, email, year FROM users WHERE user_id = ?");
     $user_stmt->execute([$_SESSION['user_id']]);
@@ -26,25 +33,31 @@ try {
         exit;
     }
     
-    // Get student year from database
+    // Get student year from database and normalize case
     $student_year = $user['year'] ?? '1';
-    
-    // Determine student type based on year value
-    if ($student_year == 'freshman') {
-        $student_type = 'freshman';
-        $display_year = 'Freshman';
-        $is_freshman = true;
-    } elseif (substr($student_year, 0, 1) === 'E') {
+    $student_year_normalized = strtolower(trim($student_year)); // Normalize to lowercase
+
+    error_log("DEBUG: Student ID: $student_id, Year from DB: $student_year, Normalized: $student_year_normalized");
+
+    // Determine student type and display year
+    if (substr($student_year_normalized, 0, 1) === 'e') {
+        // Extension student: E1, E2, etc. (case insensitive)
         $student_type = 'extension';
-        $display_year = substr($student_year, 1); // Remove 'E' prefix
-        $is_freshman = false;
+        $display_year = substr($student_year, 1); // Remove 'E' prefix (original case)
+        $year_for_exam_match = $student_year_normalized; // e1, e2, etc. (lowercase)
+    } elseif ($student_year_normalized === 'freshman') {
+        // Regular freshman student
+        $student_type = 'regular';
+        $display_year = 'Freshman'; // Show capital F for display
+        $year_for_exam_match = 'freshman'; // Use lowercase for matching exams
     } else {
+        // Regular student (year 1, 2, 3, 4)
         $student_type = 'regular';
         $display_year = $student_year;
-        $is_freshman = ($student_year == '1') ? true : false;
+        $year_for_exam_match = $student_year; // 1, 2, 3, 4
     }
     
-    error_log("DEBUG: Student Year from DB: $student_year, Student Type: $student_type, Display Year: $display_year, Is Freshman: " . ($is_freshman ? 'Yes' : 'No'));
+    error_log("DEBUG: Student Type: $student_type, Display Year: $display_year, Year for Exam Match: $year_for_exam_match");
     
 } catch (PDOException $e) {
     showMessage('error', "Error loading user info: " . $e->getMessage());
@@ -52,7 +65,7 @@ try {
     $student_type = 'regular';
     $student_year = '1';
     $display_year = '1';
-    $is_freshman = true;
+    $year_for_exam_match = '1';
     $user = ['username' => 'Student', 'profile_picture' => '', 'email' => ''];
 }
 
@@ -66,42 +79,25 @@ $default_profile = 'default_profile.png';
 
 // Check multiple possible locations
 if(!empty($profile_picture)) {
-    // Try absolute path first
     if(file_exists($uploads_dir . $profile_picture)) {
         $profile_img_path = '../uploads/' . $profile_picture;
-    }
-    // Try relative path from current directory
-    else if(file_exists('uploads/' . $profile_picture)) {
+    } else if(file_exists('uploads/' . $profile_picture)) {
         $profile_img_path = 'uploads/' . $profile_picture;
-    }
-    // Try direct uploads path
-    else if(file_exists('../uploads/' . $profile_picture)) {
+    } else if(file_exists('../uploads/' . $profile_picture)) {
         $profile_img_path = '../uploads/' . $profile_picture;
-    }
-    // Try ../../uploads path
-    else if(file_exists('../../uploads/' . $profile_picture)) {
+    } else if(file_exists('../../uploads/' . $profile_picture)) {
         $profile_img_path = '../../uploads/' . $profile_picture;
-    }
-    else {
-        // Use default if file doesn't exist
+    } else {
         $profile_img_path = '../assets/' . $default_profile;
     }
 } else {
-    // Use default if no profile picture
     $profile_img_path = '../assets/' . $default_profile;
 }
 
-// Helper function to display messages
-function showMessage($type, $text) {
-    global $message, $message_type;
-    $message = $text;
-    $message_type = $type;
-}
-
-// Get student's current academic year and semester from enrollments
+// Get student's current academic year from enrollments
 try {
     $academic_info_stmt = $pdo->prepare("
-        SELECT DISTINCT s.academic_year, s.semester 
+        SELECT DISTINCT s.academic_year 
         FROM enrollments e
         JOIN schedule s ON e.schedule_id = s.schedule_id
         WHERE e.student_id = ?
@@ -111,26 +107,49 @@ try {
     $academic_info = $academic_info_stmt->fetch();
     
     $academic_year = $academic_info['academic_year'] ?? '2026-2027';
-    $semester = $academic_info['semester'] ?? '1st Semester';
+    
+    // Determine semester based on current month
+    // Assume: 1st Semester: August-January, 2nd Semester: February-July
+    $current_month = date('n');
+    
+    if ($current_month >= 8 || $current_month <= 1) {
+        $semester = '1st Semester';
+    } else {
+        $semester = '2nd Semester';
+    }
+    
+    error_log("DEBUG: Academic Year: $academic_year, Current Month: $current_month, Semester: $semester");
+    
 } catch (PDOException $e) {
     $academic_year = '2026-2027';
     $semester = '1st Semester';
     error_log("Academic info error: " . $e->getMessage());
 }
 
-// First get all courses the student is enrolled in
+// Get all courses the student is enrolled in
 try {
-    $enrolled_courses_stmt = $pdo->prepare("
-        SELECT DISTINCT s.course_id 
-        FROM enrollments e
-        JOIN schedule s ON e.schedule_id = s.schedule_id
-        WHERE e.student_id = ?
-    ");
-    $enrolled_courses_stmt->execute([$student_id]);
-    $enrolled_course_ids = $enrolled_courses_stmt->fetchAll(PDO::FETCH_COLUMN, 0);
+    // First, let's check if student exists in enrollments at all
+    $check_enrollment_stmt = $pdo->prepare("SELECT COUNT(*) as count FROM enrollments WHERE student_id = ?");
+    $check_enrollment_stmt->execute([$student_id]);
+    $enrollment_count = $check_enrollment_stmt->fetch()['count'];
     
-    error_log("DEBUG: Student ID: $student_id, Student Type: $student_type, Student Year: $student_year, Display Year: $display_year, Is Freshman: " . ($is_freshman ? 'Yes' : 'No'));
-    error_log("DEBUG: Enrolled Course IDs: " . implode(', ', $enrolled_course_ids));
+    if ($enrollment_count > 0) {
+        // Student has enrollments, get the course IDs
+        $enrolled_courses_stmt = $pdo->prepare("
+            SELECT DISTINCT s.course_id 
+            FROM enrollments e
+            JOIN schedule s ON e.schedule_id = s.schedule_id
+            WHERE e.student_id = ?
+        ");
+        $enrolled_courses_stmt->execute([$student_id]);
+        $enrolled_course_ids = $enrolled_courses_stmt->fetchAll(PDO::FETCH_COLUMN, 0);
+    } else {
+        // Student has no enrollments - show a helpful message
+        $enrolled_course_ids = [];
+        showMessage('warning', "You are not enrolled in any courses. Please contact your advisor to get enrolled.");
+    }
+    
+    error_log("DEBUG: Enrollment count: $enrollment_count, Enrolled Course IDs: " . implode(', ', $enrolled_course_ids));
     
 } catch (PDOException $e) {
     showMessage('error', "Error loading enrolled courses: " . $e->getMessage());
@@ -138,198 +157,105 @@ try {
     $enrolled_course_ids = [];
 }
 
-// Get exam schedules based on student type
+// Get exam schedules from exam_schedules table
 try {
-    if ($is_freshman) {
-        // Freshman students use freshman_exam_schedules table
-        if (empty($enrolled_course_ids)) {
-            $exams = [];
-        } else {
-            $placeholders = str_repeat('?,', count($enrolled_course_ids) - 1) . '?';
-            
-            $exams_stmt = $pdo->prepare("
-                SELECT DISTINCT 
-                    es.exam_id, 
-                    es.course_id, 
-                    es.exam_type, 
-                    es.exam_date, 
-                    es.start_time, 
-                    es.end_time,
-                    es.room_id, 
-                    es.instructor_id, 
-                    es.max_students, 
-                    es.is_published, 
-                    es.academic_year, 
-                    es.semester,
-                    es.section_number,
-                    c.course_code, 
-                    c.course_name,
-                    r.room_name, 
-                    r.capacity,
-                    u.username as instructor_name
-                FROM freshman_exam_schedules es
-                JOIN courses c ON es.course_id = c.course_id
-                LEFT JOIN rooms r ON es.room_id = r.room_id
-                LEFT JOIN users u ON es.instructor_id = u.user_id
-                WHERE es.course_id IN ($placeholders)
-                AND es.is_published = 1
-                AND es.academic_year = ?
-                AND es.semester = ?
-                ORDER BY es.exam_date, es.start_time
-            ");
-            
-            $params = array_merge($enrolled_course_ids, [$academic_year, $semester]);
-            $exams_stmt->execute($params);
-            $exams = $exams_stmt->fetchAll();
-            
-            // Add student_type and year for consistency
-            foreach($exams as &$exam) {
-                $exam['student_type'] = 'freshman';
-                $exam['year'] = '1';
-                $exam['supervisor_name'] = $exam['instructor_name'];
-            }
-        }
+    if (empty($enrolled_course_ids)) {
+        $exams = [];
     } else {
-        // Regular/Extension students use exam_schedules table
-        if (empty($enrolled_course_ids)) {
-            $exams = [];
-        } else {
-            $placeholders = str_repeat('?,', count($enrolled_course_ids) - 1) . '?';
-            
-            // For regular students, we need to handle year matching properly
-            $year_to_match = $student_year;
-            
-            $exams_stmt = $pdo->prepare("
-                SELECT DISTINCT 
-                    es.exam_id, 
-                    es.course_id, 
-                    es.exam_type, 
-                    es.exam_date, 
-                    es.start_time, 
-                    es.end_time,
-                    es.room_id, 
-                    es.supervisor_id, 
-                    es.max_students, 
-                    es.is_published, 
-                    es.academic_year, 
-                    es.semester,
-                    es.instructions,
-                    es.status,
-                    es.student_type,
-                    es.year,
-                    c.course_code, 
-                    c.course_name,
-                    r.room_name, 
-                    r.capacity,
-                    u.username as supervisor_name
-                FROM exam_schedules es
-                JOIN courses c ON es.course_id = c.course_id
-                LEFT JOIN rooms r ON es.room_id = r.room_id
-                LEFT JOIN users u ON es.supervisor_id = u.user_id
-                WHERE es.course_id IN ($placeholders)
-                AND es.is_published = 1
-                AND es.academic_year = ?
-                AND es.semester = ?
-                AND (
-                    -- Exams available to all student types (NULL or empty)
-                    (es.student_type IS NULL OR es.student_type = '') OR
-                    
-                    -- Exact match for this student's type
-                    es.student_type = ? OR
-                    
-                    -- If no student_type set on exam
-                    es.student_type IS NULL
-                )
-                AND (
-                    -- Exams available to all years (NULL or empty)
-                    (es.year IS NULL OR es.year = '') OR
-                    
-                    -- Exact match for this student's year
-                    es.year = ? OR
-                    
-                    -- For extension students with E prefix
-                    ? LIKE CONCAT('%', es.year, '%') OR
-                    
-                    -- If no year set on exam
-                    es.year IS NULL
-                )
-                ORDER BY es.exam_date, es.start_time
-            ");
-            
-            $params = array_merge($enrolled_course_ids, [
-                $academic_year, 
-                $semester,
-                $student_type,
-                $student_year,
-                $student_year
-            ]);
-            
-            $exams_stmt->execute($params);
-            $exams = $exams_stmt->fetchAll();
-            
-            // Add section_number for consistency
-            foreach($exams as &$exam) {
-                $exam['section_number'] = 'N/A';
-                $exam['instructor_name'] = $exam['supervisor_name'];
-            }
+        $placeholders = str_repeat('?,', count($enrolled_course_ids) - 1) . '?';
+        
+        // FIXED QUERY - Handle both 'freshman' and '1' for freshman students
+        $exams_stmt = $pdo->prepare("
+            SELECT DISTINCT 
+                es.exam_id, 
+                es.course_id, 
+                es.exam_type, 
+                es.exam_date, 
+                es.start_time, 
+                es.end_time,
+                es.room_id, 
+                es.supervisor_id, 
+                es.max_students, 
+                es.is_published, 
+                es.academic_year, 
+                es.semester,
+                es.instructions,
+                es.status,
+                es.student_type,
+                es.year,
+                c.course_code, 
+                c.course_name,
+                r.room_name, 
+                r.capacity,
+                u.username as supervisor_name
+            FROM exam_schedules es
+            JOIN courses c ON es.course_id = c.course_id
+            LEFT JOIN rooms r ON es.room_id = r.room_id
+            LEFT JOIN users u ON es.supervisor_id = u.user_id
+            WHERE es.course_id IN ($placeholders)
+            AND es.is_published = 1
+            AND (es.academic_year = ? OR es.academic_year IS NULL OR es.academic_year = '')
+            AND (
+                es.semester IS NULL OR 
+                es.semester = '' OR
+                es.semester = ?
+            )
+            AND (
+                -- Match student_type exactly OR exam has no student_type restriction
+                es.student_type IS NULL OR 
+                es.student_type = '' OR
+                LOWER(TRIM(es.student_type)) = LOWER(?)
+            )
+            AND (
+                -- For freshman students, check both 'freshman' and '1'
+                es.year IS NULL OR 
+                es.year = '' OR
+                LOWER(TRIM(es.year)) = LOWER(?) OR
+                (LOWER(TRIM(?)) = 'freshman' AND (LOWER(TRIM(es.year)) = '1' OR es.year = '1'))
+            )
+            ORDER BY es.exam_date, es.start_time
+        ");
+        
+        $params = array_merge($enrolled_course_ids, [
+            $academic_year, 
+            $semester,  // Only 1st Semester or 2nd Semester
+            $student_type,
+            $year_for_exam_match,
+            $year_for_exam_match  // Extra parameter for freshman/1 check
+        ]);
+        
+        $exams_stmt->execute($params);
+        $exams = $exams_stmt->fetchAll();
+        
+        // Add section_number for consistency (not in exam_schedules table)
+        foreach($exams as &$exam) {
+            $exam['section_number'] = 'N/A';
+            $exam['instructor_name'] = $exam['supervisor_name'];
         }
     }
     
     error_log("DEBUG: Found " . count($exams) . " exams for student");
+    error_log("DEBUG: Query params - Academic Year: $academic_year, Semester: $semester, Student Type: $student_type, Year for Exam Match: $year_for_exam_match");
     
-    // Debug output
-    $debug_info = "<div style='background:#f0f9ff; padding:15px; margin:15px 0; border-radius:8px; border:2px solid #3b82f6; font-family:monospace;'>";
-    $debug_info .= "<h4 style='color:#1e40af; margin-top:0;'>Debug Information</h4>";
-    $debug_info .= "<strong>Student Info:</strong><br>";
-    $debug_info .= "- ID: " . htmlspecialchars($student_id) . "<br>";
-    $debug_info .= "- Year from DB: " . htmlspecialchars($student_year) . "<br>";
-    $debug_info .= "- Type (determined): " . htmlspecialchars($student_type) . "<br>";
-    $debug_info .= "- Display Year: " . htmlspecialchars($display_year) . "<br>";
-    $debug_info .= "- Is Freshman: " . ($is_freshman ? 'Yes' : 'No') . "<br>";
-    $debug_info .= "- Academic Year: " . htmlspecialchars($academic_year) . "<br>";
-    $debug_info .= "- Semester: " . htmlspecialchars($semester) . "<br><br>";
-    
-    $debug_info .= "<strong>Student's Enrolled Courses:</strong><br>";
-    if(empty($enrolled_course_ids)) {
-        $debug_info .= "No courses found<br>";
-    } else {
-        // Get course names for debug
-        $course_names_stmt = $pdo->prepare("
-            SELECT course_id, course_code, course_name 
-            FROM courses 
-            WHERE course_id IN (" . str_repeat('?,', count($enrolled_course_ids) - 1) . '?' . ")
+    // Debug: Check what exams exist for freshman
+    if ($student_year_normalized === 'freshman' && empty($exams)) {
+        $debug_stmt = $pdo->prepare("
+            SELECT es.year, es.student_type, es.semester, es.academic_year, c.course_code, es.exam_type
+            FROM exam_schedules es
+            JOIN courses c ON es.course_id = c.course_id
+            WHERE es.course_id IN (SELECT DISTINCT course_id FROM schedule WHERE schedule_id IN (SELECT schedule_id FROM enrollments WHERE student_id = ?))
+            AND es.is_published = 1
+            LIMIT 10
         ");
-        $course_names_stmt->execute($enrolled_course_ids);
-        $course_names = $course_names_stmt->fetchAll();
-        
-        $debug_info .= "Enrolled in " . count($course_names) . " course(s):<br>";
-        foreach($course_names as $course) {
-            $debug_info .= "- " . htmlspecialchars($course['course_code']) . ": " . htmlspecialchars($course['course_name']) . " (ID: {$course['course_id']})<br>";
-        }
+        $debug_stmt->execute([$student_id]);
+        $debug_exams = $debug_stmt->fetchAll();
+        error_log("DEBUG: Available exams for student courses: " . json_encode($debug_exams));
     }
-    
-    $debug_info .= "<br><strong>Exams Found for Student:</strong><br>";
-    if(empty($exams)) {
-        $debug_info .= "No exams found for student. Check:<br>";
-        $debug_info .= "1. Student is enrolled in courses<br>";
-        $debug_info .= "2. Exams are published for those courses<br>";
-        $debug_info .= "3. Exams match academic year ($academic_year) and semester ($semester)<br>";
-        $debug_info .= "4. For regular/extension: Exams match student type ($student_type) and year ($student_year)<br>";
-    } else {
-        $debug_info .= "Found " . count($exams) . " exam(s):<br>";
-        foreach($exams as $exam) {
-            $type = $exam['student_type'] ?? 'Not specified';
-            $year = $exam['year'] ?? 'Not specified';
-            $debug_info .= "- {$exam['course_code']} ({$exam['exam_type']}) on {$exam['exam_date']} (Type: {$type}, Year: {$year})<br>";
-        }
-    }
-    $debug_info .= "</div>";
     
 } catch (PDOException $e) {
     showMessage('error', "Error loading exam schedules: " . $e->getMessage());
     error_log("Exam schedule error: " . $e->getMessage());
     $exams = [];
-    $debug_info = "";
 }
 
 // Fetch exam statistics for student
@@ -343,52 +269,41 @@ try {
     } else {
         $placeholders = str_repeat('?,', count($enrolled_course_ids) - 1) . '?';
         
-        if ($is_freshman) {
-            $stats_stmt = $pdo->prepare("
-                SELECT 
-                    COUNT(DISTINCT es.exam_id) as total_exams,
-                    SUM(CASE WHEN es.exam_date >= CURDATE() THEN 1 ELSE 0 END) as upcoming_exams,
-                    COUNT(DISTINCT es.exam_type) as exam_types_count
-                FROM freshman_exam_schedules es
-                WHERE es.course_id IN ($placeholders)
-                AND es.is_published = 1
-                AND es.academic_year = ?
-                AND es.semester = ?
-            ");
-            
-            $params = array_merge($enrolled_course_ids, [$academic_year, $semester]);
-        } else {
-            $stats_stmt = $pdo->prepare("
-                SELECT 
-                    COUNT(DISTINCT es.exam_id) as total_exams,
-                    SUM(CASE WHEN es.exam_date >= CURDATE() THEN 1 ELSE 0 END) as upcoming_exams,
-                    COUNT(DISTINCT es.exam_type) as exam_types_count
-                FROM exam_schedules es
-                WHERE es.course_id IN ($placeholders)
-                AND es.is_published = 1
-                AND es.academic_year = ?
-                AND es.semester = ?
-                AND (
-                    (es.student_type IS NULL OR es.student_type = '') OR
-                    es.student_type = ? OR
-                    es.student_type IS NULL
-                )
-                AND (
-                    (es.year IS NULL OR es.year = '') OR
-                    es.year = ? OR
-                    ? LIKE CONCAT('%', es.year, '%') OR
-                    es.year IS NULL
-                )
-            ");
-            
-            $params = array_merge($enrolled_course_ids, [
-                $academic_year, 
-                $semester,
-                $student_type,
-                $student_year,
-                $student_year
-            ]);
-        }
+        $stats_stmt = $pdo->prepare("
+            SELECT 
+                COUNT(DISTINCT es.exam_id) as total_exams,
+                SUM(CASE WHEN es.exam_date >= CURDATE() THEN 1 ELSE 0 END) as upcoming_exams,
+                COUNT(DISTINCT es.exam_type) as exam_types_count
+            FROM exam_schedules es
+            WHERE es.course_id IN ($placeholders)
+            AND es.is_published = 1
+            AND (es.academic_year = ? OR es.academic_year IS NULL OR es.academic_year = '')
+            AND (
+                es.semester IS NULL OR 
+                es.semester = '' OR
+                es.semester = ?
+            )
+            AND (
+                es.student_type IS NULL OR 
+                es.student_type = '' OR
+                LOWER(TRIM(es.student_type)) = LOWER(?)
+            )
+            AND (
+                -- For freshman students, check both 'freshman' and '1'
+                es.year IS NULL OR 
+                es.year = '' OR
+                LOWER(TRIM(es.year)) = LOWER(?) OR
+                (LOWER(TRIM(?)) = 'freshman' AND (LOWER(TRIM(es.year)) = '1' OR es.year = '1'))
+            )
+        ");
+        
+        $params = array_merge($enrolled_course_ids, [
+            $academic_year, 
+            $semester,
+            $student_type,
+            $year_for_exam_match,
+            $year_for_exam_match  // Extra parameter for freshman/1 check
+        ]);
         
         $stats_stmt->execute($params);
         $stats = $stats_stmt->fetch();
@@ -417,60 +332,45 @@ try {
     } else {
         $placeholders = str_repeat('?,', count($enrolled_course_ids) - 1) . '?';
         
-        if ($is_freshman) {
-            $upcoming_stmt = $pdo->prepare("
-                SELECT DISTINCT es.exam_id, es.course_id, es.exam_type, es.exam_date, es.start_time, es.end_time,
-                       c.course_code, c.course_name, r.room_name, es.section_number,
-                       'freshman' as student_type, '1' as year
-                FROM freshman_exam_schedules es
-                JOIN courses c ON es.course_id = c.course_id
-                LEFT JOIN rooms r ON es.room_id = r.room_id
-                WHERE es.course_id IN ($placeholders)
-                AND es.is_published = 1
-                AND es.academic_year = ?
-                AND es.semester = ?
-                AND es.exam_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)
-                ORDER BY es.exam_date, es.start_time
-                LIMIT 5
-            ");
-            
-            $params = array_merge($enrolled_course_ids, [$academic_year, $semester]);
-        } else {
-            $upcoming_stmt = $pdo->prepare("
-                SELECT DISTINCT es.exam_id, es.course_id, es.exam_type, es.exam_date, es.start_time, es.end_time,
-                       c.course_code, c.course_name, r.room_name, es.student_type, es.year,
-                       'N/A' as section_number
-                FROM exam_schedules es
-                JOIN courses c ON es.course_id = c.course_id
-                LEFT JOIN rooms r ON es.room_id = r.room_id
-                WHERE es.course_id IN ($placeholders)
-                AND es.is_published = 1
-                AND es.academic_year = ?
-                AND es.semester = ?
-                AND es.exam_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)
-                AND (
-                    (es.student_type IS NULL OR es.student_type = '') OR
-                    es.student_type = ? OR
-                    es.student_type IS NULL
-                )
-                AND (
-                    (es.year IS NULL OR es.year = '') OR
-                    es.year = ? OR
-                    ? LIKE CONCAT('%', es.year, '%') OR
-                    es.year IS NULL
-                )
-                ORDER BY es.exam_date, es.start_time
-                LIMIT 5
-            ");
-            
-            $params = array_merge($enrolled_course_ids, [
-                $academic_year, 
-                $semester,
-                $student_type,
-                $student_year,
-                $student_year
-            ]);
-        }
+        $upcoming_stmt = $pdo->prepare("
+            SELECT DISTINCT es.exam_id, es.course_id, es.exam_type, es.exam_date, es.start_time, es.end_time,
+                   c.course_code, c.course_name, r.room_name, es.student_type, es.year,
+                   'N/A' as section_number
+            FROM exam_schedules es
+            JOIN courses c ON es.course_id = c.course_id
+            LEFT JOIN rooms r ON es.room_id = r.room_id
+            WHERE es.course_id IN ($placeholders)
+            AND es.is_published = 1
+            AND (es.academic_year = ? OR es.academic_year IS NULL OR es.academic_year = '')
+            AND (
+                es.semester IS NULL OR 
+                es.semester = '' OR
+                es.semester = ?
+            )
+            AND es.exam_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)
+            AND (
+                es.student_type IS NULL OR 
+                es.student_type = '' OR
+                LOWER(TRIM(es.student_type)) = LOWER(?)
+            )
+            AND (
+                -- For freshman students, check both 'freshman' and '1'
+                es.year IS NULL OR 
+                es.year = '' OR
+                LOWER(TRIM(es.year)) = LOWER(?) OR
+                (LOWER(TRIM(?)) = 'freshman' AND (LOWER(TRIM(es.year)) = '1' OR es.year = '1'))
+            )
+            ORDER BY es.exam_date, es.start_time
+            LIMIT 5
+        ");
+        
+        $params = array_merge($enrolled_course_ids, [
+            $academic_year, 
+            $semester,
+            $student_type,
+            $year_for_exam_match,
+            $year_for_exam_match  // Extra parameter for freshman/1 check
+        ]);
         
         $upcoming_stmt->execute($params);
         $upcoming_exams = $upcoming_stmt->fetchAll();
@@ -503,12 +403,11 @@ foreach($exams as $exam) {
     $baseColor = $colorMap[$exam['exam_type']] ?? '#6b7280';
     
     // Different colors for different student types
-    if (isset($exam['student_type'])) {
-        if ($exam['student_type'] == 'extension') {
-            $baseColor = '#8b5cf6'; // Purple for extension
-        } elseif ($exam['student_type'] == 'freshman') {
-            $baseColor = '#06b6d4'; // Cyan for freshman
-        }
+    $exam_student_type = $exam['student_type'] ?? 'regular';
+    if ($exam_student_type == 'extension') {
+        $baseColor = '#8b5cf6'; // Purple for extension
+    } elseif (strtolower($exam['year'] ?? '') == 'freshman' || $exam['year'] == '1') {
+        $baseColor = '#06b6d4'; // Cyan for freshman
     }
     
     // Check if exam is past or today
@@ -517,31 +416,21 @@ foreach($exams as $exam) {
     $is_past = $exam_timestamp < $current_time;
     $is_today = date('Y-m-d', $exam_timestamp) == date('Y-m-d');
     
-    // Use different shades for past/today exams
-    if ($is_past) {
-        $color = $baseColor; // Keep original for past
-    } else if ($is_today) {
-        $color = $baseColor; // Keep original for today
-    } else {
-        $color = $baseColor; // Keep original for future
-    }
-    
     $calendar_events[] = [
         'id' => $exam['exam_id'],
-        'title' => $exam['course_code'] . ' - ' . $exam['exam_type'] . 
-                  (isset($exam['section_number']) && $exam['section_number'] != 'N/A' ? ' (Sec ' . $exam['section_number'] . ')' : ''),
+        'title' => $exam['course_code'] . ' - ' . $exam['exam_type'],
         'start' => $exam['exam_date'] . 'T' . $exam['start_time'],
         'end' => $exam['exam_date'] . 'T' . $exam['end_time'],
-        'backgroundColor' => $color,
-        'borderColor' => $color,
+        'backgroundColor' => $baseColor,
+        'borderColor' => $baseColor,
         'textColor' => '#ffffff',
         'extendedProps' => [
             'course' => $exam['course_name'],
             'room' => $exam['room_name'] ?? 'Not Assigned',
-            'instructor' => $exam['instructor_name'] ?? $exam['supervisor_name'] ?? 'Not Assigned',
+            'instructor' => $exam['supervisor_name'] ?? 'Not Assigned',
             'type' => $exam['exam_type'],
-            'section' => $exam['section_number'] ?? 'N/A',
-            'student_type' => $exam['student_type'] ?? 'Not specified',
+            'section' => 'N/A',
+            'student_type' => $exam['student_type'] ?? 'regular',
             'year' => $exam['year'] ?? 'Not specified',
             'academic_year' => $exam['academic_year'],
             'semester' => $exam['semester']
@@ -563,7 +452,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 <!-- Include Dark Mode CSS -->
 <link rel="stylesheet" href="../../assets/css/darkmode.css">
 <style>
-/* [Keep all CSS styles from previous code - they remain the same] */
+/* [Keep all the same CSS styles from previous version] */
 * { box-sizing: border-box; margin:0; padding:0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
 
 /* ================= Topbar for Hamburger ================= */
@@ -1243,21 +1132,20 @@ $current_page = basename($_SERVER['PHP_SELF']);
     font-size: 0.9rem;
 }
 
-/* Debug info box */
-.debug-info-box {
-    background: #f0f9ff;
-    border: 2px solid #3b82f6;
+/* Freshman info note */
+.freshman-note {
+    background: rgba(6, 182, 212, 0.1);
+    border: 1px solid rgba(6, 182, 212, 0.2);
     border-radius: 8px;
-    padding: 15px;
-    margin: 15px 0;
-    font-family: monospace;
-    font-size: 0.9rem;
+    padding: 12px 15px;
+    margin-top: 10px;
+    font-size: 0.85rem;
+    color: #06b6d4;
 }
 
-.debug-info-box h4 {
-    color: #1e40af;
-    margin-top: 0;
-    margin-bottom: 10px;
+.freshman-note i {
+    color: #06b6d4;
+    margin-right: 8px;
 }
 
 /* Dark mode specific adjustments */
@@ -1370,6 +1258,12 @@ $current_page = basename($_SERVER['PHP_SELF']);
                             (<?= htmlspecialchars($academic_year) ?> - <?= htmlspecialchars($semester) ?>)
                         </span>
                     </div>
+                    <?php if($student_year_normalized === 'freshman'): ?>
+                    <div class="freshman-note">
+                        <i class="fas fa-info-circle"></i>
+                        Note: Showing exams for Freshman students (also matching exams marked as Year 1)
+                    </div>
+                    <?php endif; ?>
                 </div>
                 <div class="user-info">
                     <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile" id="headerProfilePic">
@@ -1400,6 +1294,9 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <span class="student-year-badge <?= $student_type ?>">
                         <?= ucfirst($student_type) ?> Year <?= htmlspecialchars($display_year) ?>
                     </span>
+                    <span style="margin-left: 10px; font-size: 0.9rem;">
+                        <i class="fas fa-calendar"></i> <?= htmlspecialchars($academic_year) ?> - <?= htmlspecialchars($semester) ?>
+                    </span>
                 </div>
             </div>
 
@@ -1410,12 +1307,15 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <h4>Exam Filter Information</h4>
                     <p>Showing exams for <strong><?= ucfirst($student_type) ?> Year <?= htmlspecialchars($display_year) ?></strong> students 
                     in <strong><?= htmlspecialchars($academic_year) ?> - <?= htmlspecialchars($semester) ?></strong>. 
-                    <?php if($is_freshman): ?>
-                        Freshman students see exams from the freshman exam schedule table.
-                    <?php else: ?>
-                        Regular/Extension students see exams filtered by student type and year.
+                    Exams are filtered by student type and year from the unified exam schedule system.</p>
+                    <?php if($student_year_normalized === 'freshman'): ?>
+                    <p><i class="fas fa-info-circle" style="color: #06b6d4;"></i> <strong>Freshman Note:</strong> Also matching exams marked as "Year 1" for compatibility.</p>
                     <?php endif; ?>
+                    <?php if(empty($enrolled_course_ids)): ?>
+                    <p style="color: #ef4444; margin-top: 5px;">
+                        <i class="fas fa-exclamation-triangle"></i> You are not enrolled in any courses. Please contact your advisor.
                     </p>
+                    <?php endif; ?>
                 </div>
             </div>
 
@@ -1446,73 +1346,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 <div id="examCalendar"></div>
             </div>
 
-            <!-- Upcoming Exams Section -->
-            <?php if(!empty($upcoming_exams)): ?>
-            <div class="exam-section">
-                <h2 style="margin-bottom: 20px; color: var(--text-primary);">Upcoming Exams (Next 7 Days)</h2>
-                <div class="table-container">
-                    <table class="exam-table">
-                        <thead>
-                            <tr>
-                                <th>Course</th>
-                                <th>Exam Type</th>
-                                <th>Student Type</th>
-                                <th>Date</th>
-                                <th>Time</th>
-                                <th>Room</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach($upcoming_exams as $exam): 
-                                $exam_timestamp = strtotime($exam['exam_date'] . ' ' . $exam['start_time']);
-                                $is_today = date('Y-m-d', $exam_timestamp) == date('Y-m-d');
-                                $exam_student_type = $exam['student_type'] ?? 'Not specified';
-                                $exam_year = $exam['year'] ?? '';
-                            ?>
-                            <tr class="upcoming-exam">
-                                <td>
-                                    <strong><?= htmlspecialchars($exam['course_code']) ?></strong><br>
-                                    <small style="color: var(--text-secondary);"><?= htmlspecialchars($exam['course_name']) ?></small>
-                                </td>
-                                <td>
-                                    <span class="badge badge-primary"><?= htmlspecialchars($exam['exam_type']) ?></span>
-                                </td>
-                                <td>
-                                    <?php if($exam_student_type && $exam_student_type !== 'Not specified'): ?>
-                                        <span class="student-type-badge <?= $exam_student_type ?>">
-                                            <?= ucfirst($exam_student_type) ?>
-                                            <?php if($exam_year): ?>
-                                                <span class="year-badge-table <?= $exam_student_type ?>">
-                                                    Year <?= htmlspecialchars($exam_year) ?>
-                                                </span>
-                                            <?php endif; ?>
-                                        </span>
-                                    <?php else: ?>
-                                        <span class="badge badge-secondary">All Students</span>
-                                    <?php endif; ?>
-                                </td>
-                                <td><?= date('M d, Y', strtotime($exam['exam_date'])) ?></td>
-                                <td>
-                                    <?= date('h:i A', strtotime($exam['start_time'])) ?> - 
-                                    <?= date('h:i A', strtotime($exam['end_time'])) ?>
-                                </td>
-                                <td><?= htmlspecialchars($exam['room_name'] ?? 'TBA') ?></td>
-                                <td>
-                                    <?php if($is_today): ?>
-                                        <span class="badge badge-warning">Today</span>
-                                    <?php else: ?>
-                                        <span class="badge badge-success">Upcoming</span>
-                                    <?php endif; ?>
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            <?php endif; ?>
-
             <!-- All Exam Schedules Table -->
             <div class="exam-section">
                 <h2 style="margin-bottom: 20px; color: var(--text-primary);">All Exam Schedules</h2>
@@ -1537,7 +1370,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
                                     $exam_timestamp = strtotime($exam['exam_date'] . ' ' . $exam['start_time']);
                                     $is_today = date('Y-m-d', $exam_timestamp) == date('Y-m-d');
                                     $is_past = $exam_timestamp < $current_time;
-                                    $is_upcoming = $exam_timestamp > $current_time;
                                     $row_class = '';
                                     
                                     if ($is_today) {
@@ -1587,7 +1419,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                                             </small>
                                         </td>
                                         <td><?= htmlspecialchars($exam['room_name'] ?? 'TBA') ?></td>
-                                        <td><?= htmlspecialchars($exam['supervisor_name'] ?? $exam['instructor_name'] ?? 'TBA') ?></td>
+                                        <td><?= htmlspecialchars($exam['supervisor_name'] ?? 'TBA') ?></td>
                                         <td>
                                             <span class="badge <?= $status_class ?>"><?= $status ?></span>
                                         </td>
@@ -1599,15 +1431,16 @@ $current_page = basename($_SERVER['PHP_SELF']);
                                         <div class="empty-state">
                                             <i class="fas fa-calendar-times"></i>
                                             <h3>No Exam Schedules Found</h3>
-                                            <p>You don't have any exam schedules for your enrolled courses in <?= htmlspecialchars($academic_year) ?> - <?= htmlspecialchars($semester) ?>.</p>
-                                            <?php if($student_type == 'extension'): ?>
+                                            <?php if(empty($enrolled_course_ids)): ?>
+                                                <p>You are not enrolled in any courses. Please contact your advisor to get enrolled in courses first.</p>
+                                            <?php else: ?>
+                                                <p>You don't have any exam schedules for your enrolled courses in <?= htmlspecialchars($academic_year) ?> - <?= htmlspecialchars($semester) ?>.</p>
                                                 <p style="margin-top: 10px; font-size: 0.9rem;">
-                                                    <i class="fas fa-info-circle"></i> Extension students: Make sure your student type is set correctly in your profile.
+                                                    <i class="fas fa-info-circle"></i> Showing exams for <?= ucfirst($student_type) ?> Year <?= htmlspecialchars($display_year) ?> students.
+                                                    <?php if($student_year_normalized === 'freshman'): ?>
+                                                    <br><i class="fas fa-info-circle" style="color: #06b6d4;"></i> Also checking for exams marked as "Year 1".
+                                                    <?php endif; ?>
                                                 </p>
-                                            <?php endif; ?>
-                                            <!-- Debug info - only show if you need to troubleshoot -->
-                                            <?php if(isset($debug_info)): ?>
-                                                <?= $debug_info ?>
                                             <?php endif; ?>
                                         </div>
                                     </td>
@@ -1685,7 +1518,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 const room = info.event.extendedProps.room;
                 const instructor = info.event.extendedProps.instructor;
                 const type = info.event.extendedProps.type;
-                const section = info.event.extendedProps.section;
                 const studentType = info.event.extendedProps.student_type;
                 const year = info.event.extendedProps.year;
                 const academicYear = info.event.extendedProps.academic_year;
@@ -1700,18 +1532,12 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     studentTypeInfo = `👨‍🎓 Student Type: ${studentType} Year ${year}\n`;
                 }
                 
-                let sectionInfo = '';
-                if (section !== 'N/A') {
-                    sectionInfo = `📋 Section: ${section}\n`;
-                }
-                
                 // Create a simple alert
                 alert(
                     `📚 ${info.event.title}\n\n` +
                     `📖 Course: ${course}\n` +
                     studentTypeInfo +
                     `📅 Academic Year: ${academicYear} - ${semester}\n` +
-                    sectionInfo +
                     `📅 Date: ${date}\n` +
                     `⏰ Time: ${startTime} - ${endTime}\n` +
                     `🚪 Room: ${room}\n` +
@@ -1745,7 +1571,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 // Add border for extension student exams
                 if (studentType === 'extension') {
                     info.el.style.borderLeft = '3px solid #8b5cf6';
-                } else if (studentType === 'freshman') {
+                } else if (studentType === 'freshman' || year === '1') {
                     info.el.style.borderLeft = '3px solid #06b6d4';
                 }
             },

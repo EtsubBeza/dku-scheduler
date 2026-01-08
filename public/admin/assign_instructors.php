@@ -211,7 +211,7 @@ $sections_query = "
     JOIN courses c ON s.course_id = c.course_id
     JOIN rooms r ON s.room_id = r.room_id
     LEFT JOIN users u ON s.instructor_id = u.user_id
-    LEFT JOIN student_enrollments se ON s.schedule_id = se.schedule_id
+    LEFT JOIN enrollments se ON s.schedule_id = se.schedule_id
     WHERE (s.year = 'freshman' OR c.is_freshman = 1)
     GROUP BY s.course_id, s.section_number, s.academic_year, s.semester
     HAVING s.instructor_id IS NULL OR s.instructor_id = 0 OR u.username = 'TBA'

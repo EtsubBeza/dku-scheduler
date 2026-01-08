@@ -518,10 +518,11 @@ $current_page = basename($_SERVER['PHP_SELF']);
     <a href="manage_schedules.php" class="<?= $current_page=='manage_schedules.php'?'active':'' ?>">
         <i class="fas fa-calendar-alt"></i> Manage Schedule
     </a>
+   
     <a href="assign_instructors.php" class="<?= $current_page=='assign_instructors.php'?'active':'' ?>">
         <i class="fas fa-user-graduate"></i> Assign Instructors
     </a>
-    <a href="admin_exam_schedules.php" class="<?= $current_page=='admin_exam_schedules.php'?'active':'' ?>">
+    <a href="manage_exam_schedules.php" class="<?= $current_page=='manage_exam_schedules.php'?'active':'' ?>">
         <i class="fas fa-clipboard-list"></i> Exam Scheduling
     </a>
     <a href="manage_announcements.php" class="<?= $current_page=='manage_announcements.php'?'active':'' ?>">
