@@ -379,7 +379,176 @@ try {
     color:#fff;
     font-weight:bold;
 }
+/* ================= Sidebar with Scrollability ================= */
+.sidebar {
+    position: fixed;
+    top:0; left:0;
+    height:100vh;
+    width:240px;
+    background: var(--bg-sidebar);
+    padding: 30px 0 20px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    box-shadow:2px 0 10px rgba(0,0,0,0.2);
+    z-index:1000;
+    overflow:hidden; /* Hide overflow from main container */
+    transition: transform 0.3s ease;
+}
 
+/* Scrollable sidebar content */
+.sidebar-content {
+    flex: 1;
+    width: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Custom scrollbar styling for sidebar */
+.sidebar-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sidebar-content::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+}
+
+.sidebar-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+}
+
+.sidebar-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.4);
+}
+
+/* For Firefox */
+.sidebar-content {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.3) rgba(255, 255, 255, 0.1);
+}
+
+.sidebar.hidden { transform:translateX(-100%); }
+
+.sidebar-profile {
+    text-align: center;
+    margin-bottom: 25px;
+    padding: 0 20px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.2);
+    width: 100%;
+    position: sticky;
+    top: 0;
+    background: var(--bg-sidebar);
+    z-index: 10;
+    padding-top: 10px;
+    margin-top: -10px;
+}
+
+.sidebar-profile img {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-bottom: 10px;
+    border: 2px solid #1abc9c;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+.sidebar-profile p {
+    color: var(--text-sidebar);
+    font-weight: bold;
+    margin: 0;
+    font-size: 16px;
+}
+
+.sidebar h2 {
+    color: var(--text-sidebar);
+    text-align:center;
+    width:100%;
+    margin-bottom:25px;
+    font-size:22px;
+    padding: 0 20px;
+    position: sticky;
+    top: 181px; /* Adjust based on profile height */
+    background: var(--bg-sidebar);
+    z-index: 10;
+}
+
+/* Navigation container */
+.sidebar nav {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+.sidebar a {
+    padding:12px 20px;
+    text-decoration:none;
+    font-size:16px;
+    color:var(--text-sidebar);
+    width:100%;
+    transition: background 0.3s, color 0.3s;
+    border-radius:6px;
+    margin:3px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    position: relative;
+}
+.sidebar a.active, .sidebar a:hover {
+    background:#1abc9c;
+    color:#fff;
+    font-weight:bold;
+}
+
+/* Pending badge */
+.pending-badge {
+    position: absolute;
+    right: 15px;
+    background: #ef4444;
+    color: white;
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-weight: bold;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+/* Logout button - pushes to bottom */
+.sidebar a[href="../logout.php"] {
+    margin-top: auto; /* This pushes it to bottom of flex container */
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Adjust for mobile */
+@media screen and (max-width: 768px){
+    .sidebar { 
+        transform: translateX(-100%); 
+        width: 250px; 
+    }
+    .sidebar.active { transform: translateX(0); }
+    
+    .sidebar-profile, .sidebar h2 {
+        position: relative;
+        top: 0;
+        margin-top: 0;
+        padding-top: 0;
+    }
+    
+    .sidebar a[href="../logout.php"] {
+        margin-top: 0; /* Reset for mobile */
+    }
+}
 /* Pending badge */
 .pending-badge {
     position: absolute;
@@ -874,53 +1043,59 @@ try {
 
  <!-- Sidebar -->
 <div class="sidebar" id="sidebar">
-    <div class="sidebar-profile">
-        <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic"
-             onerror="this.onerror=null; this.src='../assets/default_profile.png';">
-        <p><?= htmlspecialchars($current_user['username']) ?></p>
+    <!-- Scrollable content wrapper -->
+    <div class="sidebar-content">
+        <div class="sidebar-profile">
+            <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic"
+                 onerror="this.onerror=null; this.src='../assets/default_profile.png';">
+            <p><?= htmlspecialchars($current_user['username']) ?></p>
+        </div>
+        <h2>Admin Panel</h2>
+        
+        <!-- Navigation Container -->
+        <nav>
+            <a href="dashboard.php" class="<?= $current_page=='dashboard.php'?'active':'' ?>">
+                <i class="fas fa-home"></i> Dashboard
+            </a>
+            <a href="manage_users.php" class="<?= $current_page=='manage_users.php'?'active':'' ?>">
+                <i class="fas fa-users"></i> Manage Users
+            </a>
+            <a href="approve_users.php" class="<?= $current_page=='approve_users.php'?'active':'' ?>">
+                <i class="fas fa-user-check"></i> Approve Users
+                <?php if($pending_approvals > 0): ?>
+                    <span class="pending-badge"><?= $pending_approvals ?></span>
+                <?php endif; ?>
+            </a>
+            <a href="manage_departments.php" class="<?= $current_page=='manage_departments.php'?'active':'' ?>">
+                <i class="fas fa-building"></i> Manage Departments
+            </a>
+            <a href="manage_courses.php" class="<?= $current_page=='manage_courses.php'?'active':'' ?>">
+                <i class="fas fa-book"></i> Manage Courses
+            </a>
+            <a href="manage_rooms.php" class="<?= $current_page=='manage_rooms.php'?'active':'' ?>">
+                <i class="fas fa-door-closed"></i> Manage Rooms
+            </a>
+            <a href="manage_schedules.php" class="<?= $current_page=='manage_schedules.php'?'active':'' ?>">
+                <i class="fas fa-calendar-alt"></i> Manage Schedule
+            </a>
+            <a href="assign_instructors.php" class="<?= $current_page=='assign_instructors.php'?'active':'' ?>">
+                <i class="fas fa-user-graduate"></i> Assign Instructors
+            </a>
+            <a href="admin_exam_schedules.php" class="<?= $current_page=='admin_exam_schedules.php'?'active':'' ?>">
+                <i class="fas fa-clipboard-list"></i> Exam Scheduling
+            </a>
+            <a href="manage_announcements.php" class="<?= $current_page=='manage_announcements.php'?'active':'' ?>">
+                <i class="fas fa-bullhorn"></i> Manage Announcements
+            </a>
+            <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
+                <i class="fas fa-user-edit"></i> Edit Profile
+            </a>
+            <a href="../logout.php">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </nav>
     </div>
-    <h2>Admin Panel</h2>
-    <a href="dashboard.php" class="<?= $current_page=='dashboard.php'?'active':'' ?>">
-        <i class="fas fa-home"></i> Dashboard
-    </a>
-    <a href="manage_users.php" class="<?= $current_page=='manage_users.php'?'active':'' ?>">
-        <i class="fas fa-users"></i> Manage Users
-    </a>
-    <a href="approve_users.php" class="<?= $current_page=='approve_users.php'?'active':'' ?>">
-        <i class="fas fa-user-check"></i> Approve Users
-        <?php if($pending_approvals > 0): ?>
-            <span class="pending-badge"><?= $pending_approvals ?></span>
-        <?php endif; ?>
-    </a>
-    <a href="manage_departments.php" class="<?= $current_page=='manage_departments.php'?'active':'' ?>">
-        <i class="fas fa-building"></i> Manage Departments
-    </a>
-    <a href="manage_courses.php" class="<?= $current_page=='manage_courses.php'?'active':'' ?>">
-        <i class="fas fa-book"></i> Manage Courses
-    </a>
-    <a href="manage_rooms.php" class="<?= $current_page=='manage_rooms.php'?'active':'' ?>">
-        <i class="fas fa-door-closed"></i> Manage Rooms
-    </a>
-    <a href="manage_schedules.php" class="<?= $current_page=='manage_schedules.php'?'active':'' ?>">
-        <i class="fas fa-calendar-alt"></i> Manage Schedule
-    </a>
-     <a href="assign_instructors.php" class="<?= $current_page=='assign_instructors.php'?'active':'' ?>">
-        <i class="fas fa-user-graduate"></i> Assign Instructors
-    </a>
-      <a href="admin_exam_schedules.php" class="<?= $current_page=='admin_exam_schedules.php'?'active':'' ?>">
-        <i class="fas fa-clipboard-list"></i> Exam Scheduling
-    </a>
-    <a href="manage_announcements.php" class="<?= $current_page=='manage_announcements.php'?'active':'' ?>">
-        <i class="fas fa-bullhorn"></i> Manage Announcements
-    </a>
-    <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
-        <i class="fas fa-user-edit"></i> Edit Profile
-    </a>
-    <a href="../logout.php">
-        <i class="fas fa-sign-out-alt"></i> Logout
-    </a>
 </div>
-
     <!-- Main Content -->
     <div class="main-content">
         <div class="content-wrapper">

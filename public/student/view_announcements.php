@@ -92,6 +92,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
     padding:15px 20px;
     z-index:1200;
     justify-content:space-between; align-items:center;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
 }
 .menu-btn {
     font-size:26px;
@@ -105,31 +106,98 @@ $current_page = basename($_SERVER['PHP_SELF']);
 }
 .menu-btn:hover { background:#159b81; transform:translateY(-2px); }
 
-/* ================= Sidebar ================= */
+/* ================= Scrollable Sidebar ================= */
 .sidebar {
     position: fixed; top:0; left:0;
-    width:250px; height:100%;
+    width:250px; height:100vh;
     background:var(--bg-sidebar); color:var(--text-sidebar);
     z-index:1100;
     transition: transform 0.3s ease;
     padding: 20px 0;
+    overflow-y: auto; /* Enable vertical scrolling */
+    overflow-x: hidden; /* Prevent horizontal scrolling */
+    display: flex;
+    flex-direction: column;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
 }
-.sidebar.hidden { transform:translateX(-260px); }
+
+/* Custom scrollbar for WebKit browsers */
+.sidebar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+    transition: background 0.3s;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
+}
+
+[data-theme="dark"] .sidebar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+[data-theme="dark"] .sidebar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.sidebar.hidden { 
+    transform:translateX(-260px); 
+}
+
 .sidebar a { 
-    display:block; 
-    padding:12px 20px; 
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding:14px 20px; 
     color:var(--text-sidebar); 
     text-decoration:none; 
-    transition: background 0.3s; 
-    border-bottom: 1px solid rgba(255,255,255,0.1);
+    transition: all 0.3s; 
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    margin: 2px 10px;
+    border-radius: 8px;
+    font-size: 15px;
+    flex-shrink: 0;
 }
-.sidebar a:hover, .sidebar a.active { background:#1abc9c; color:white; }
+.sidebar a:hover { 
+    background:rgba(255,255,255,0.1); 
+    color:white;
+    transform: translateX(5px);
+}
+.sidebar a.active { 
+    background:#1abc9c; 
+    color:white;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(26, 188, 156, 0.3);
+}
+
+.sidebar a i {
+    font-size: 18px;
+    width: 24px;
+    text-align: center;
+}
 
 .sidebar-profile {
     text-align: center;
-    margin-bottom: 20px;
+    margin-bottom: 25px;
     padding: 0 20px 20px;
-    border-bottom: 1px solid rgba(255,255,255,0.2);
+    border-bottom: 1px solid rgba(255,255,255,0.15);
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: var(--bg-sidebar);
+    backdrop-filter: blur(5px);
 }
 
 .sidebar-profile img {
@@ -137,16 +205,22 @@ $current_page = basename($_SERVER['PHP_SELF']);
     height: 100px;
     border-radius: 50%;
     object-fit: cover;
-    margin-bottom: 10px;
-    border: 2px solid #1abc9c;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    margin-bottom: 12px;
+    border: 3px solid #1abc9c;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    transition: transform 0.3s;
+}
+
+.sidebar-profile img:hover {
+    transform: scale(1.05);
 }
 
 .sidebar-profile p {
     color: var(--text-sidebar);
     font-weight: bold;
     margin: 0;
-    font-size: 16px;
+    font-size: 17px;
+    letter-spacing: 0.5px;
 }
 
 /* Sidebar title */
@@ -156,15 +230,84 @@ $current_page = basename($_SERVER['PHP_SELF']);
     margin-bottom: 25px;
     font-size: 22px;
     padding: 0 20px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 165px;
+    z-index: 4;
+    background: var(--bg-sidebar);
+    padding: 15px 20px;
+    margin: 0;
+}
+
+/* Optional fade effect at bottom when scrolling */
+.sidebar::after {
+    content: '';
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 250px;
+    height: 40px;
+    background: linear-gradient(to bottom, transparent, var(--bg-sidebar) 90%);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+    z-index: 3;
+}
+
+.sidebar.scrolled::after {
+    opacity: 1;
 }
 
 /* ================= Overlay ================= */
 .overlay {
     position: fixed; top:0; left:0; width:100%; height:100%;
-    background: rgba(0,0,0,0.4); z-index:1050;
-    display:none; opacity:0; transition: opacity 0.3s ease;
+    background: rgba(0,0,0,0.5); 
+    z-index:1099;
+    display:none; 
+    opacity:0; 
+    transition: opacity 0.3s ease;
+    backdrop-filter: blur(3px);
 }
-.overlay.active { display:block; opacity:1; }
+.overlay.active { 
+    display:block; 
+    opacity:1; 
+}
+
+/* ================= Main content ================= */
+.main-content {
+    margin-left: 250px;
+    padding:25px 30px;
+    min-height:100vh;
+    background: var(--bg-primary);
+    transition: all 0.3s ease;
+}
+
+/* ================= Responsive ================= */
+@media (max-width: 768px) {
+    .topbar { 
+        display: flex; 
+    }
+    .sidebar { 
+        width: 280px;
+        transform: translateX(-100%); 
+    }
+    .sidebar.active { 
+        transform: translateX(0); 
+        box-shadow: 5px 0 25px rgba(0,0,0,0.3);
+    }
+    .main-content { 
+        margin-left: 0; 
+        padding: 15px; 
+    }
+    .sidebar::after {
+        width: 280px;
+    }
+    .overlay.active {
+        z-index: 1000;
+    }
+}
+
+/* The rest of your CSS (Content Wrapper, Announcements, etc.) remains exactly the same... */
 
 /* ================= Main content ================= */
 .main-content {
@@ -527,7 +670,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 </style>
 </head>
 <body>
-    <!-- Topbar for Mobile -->
+     <!-- Topbar for Mobile -->
     <div class="topbar">
         <button class="menu-btn" onclick="toggleSidebar()">☰</button>
         <h2>Announcements</h2>
@@ -536,13 +679,15 @@ $current_page = basename($_SERVER['PHP_SELF']);
     <!-- Overlay for Mobile -->
     <div class="overlay" onclick="toggleSidebar()"></div>
 
-    <!-- Sidebar - SAME AS OTHER PAGES -->
-    <div class="sidebar">
+    <!-- Scrollable Sidebar -->
+    <div class="sidebar" id="sidebar">
         <div class="sidebar-profile">
             <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic">
             <p><?= htmlspecialchars($user['username'] ?? 'Student') ?></p>
         </div>
+        
         <h2>Student Dashboard</h2>
+        
         <a href="student_dashboard.php" class="<?= $current_page=='student_dashboard.php'?'active':'' ?>">
             <i class="fas fa-home"></i> Dashboard
         </a>
@@ -562,7 +707,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <i class="fas fa-sign-out-alt"></i> Logout
         </a>
     </div>
-
     <!-- Main Content -->
     <div class="main-content">
         <div class="content-wrapper">

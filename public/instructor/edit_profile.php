@@ -237,7 +237,190 @@ $current_page = basename($_SERVER['PHP_SELF']);
     color:#fff;
     font-weight:bold;
 }
+/* ================= Updated Sidebar ================= */
+.sidebar {
+    position: fixed;
+    top:0; 
+    left:0;
+    height:100vh;
+    width:240px;
+    background: var(--bg-sidebar);
+    padding: 30px 0 20px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    box-shadow:2px 0 10px rgba(0,0,0,0.2);
+    z-index:1000;
+    overflow-y: auto;
+    transition: transform 0.3s ease;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
 
+/* Custom scrollbar for sidebar */
+.sidebar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 3px;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
+}
+
+[data-theme="dark"] .sidebar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+[data-theme="dark"] .sidebar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.sidebar.hidden { 
+    transform:translateX(-100%); 
+}
+
+/* Sidebar Profile */
+.sidebar-profile {
+    text-align: center;
+    margin-bottom: 25px;
+    padding: 0 20px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.2);
+    flex-shrink: 0; /* Prevent shrinking */
+    width: 100%;
+}
+
+.sidebar-profile img {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-bottom: 10px;
+    border: 2px solid #1abc9c;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+.sidebar-profile p {
+    color: var(--text-sidebar);
+    font-weight: bold;
+    margin: 0;
+    font-size: 16px;
+}
+
+.sidebar h2 {
+    color: var(--text-sidebar);
+    text-align:center;
+    width:100%;
+    margin-bottom:25px;
+    font-size:22px;
+    padding: 0 20px;
+}
+
+.sidebar a {
+    padding:12px 20px;
+    text-decoration:none;
+    font-size:16px;
+    color:var(--text-sidebar);
+    width:100%;
+    transition: background 0.3s, color 0.3s;
+    border-radius:6px;
+    margin:3px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.sidebar a:last-child {
+    border-bottom: none;
+}
+
+.sidebar a.active, .sidebar a:hover {
+    background:#1abc9c;
+    color:#fff;
+    font-weight:bold;
+    padding-left: 25px;
+}
+
+/* Optional: Add fade effect at bottom when scrolling */
+.sidebar::after {
+    content: '';
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 30px;
+    width: 240px;
+    background: linear-gradient(to bottom, transparent, var(--bg-sidebar));
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+    z-index: 1001;
+}
+
+.sidebar.scrolled::after {
+    opacity: 1;
+}
+
+/* ================= Overlay ================= */
+.overlay {
+    position: fixed; 
+    top:0; 
+    left:0; 
+    width:100%; 
+    height:100%;
+    background: rgba(0,0,0,0.4); 
+    z-index:999;
+    display:none; 
+    opacity:0; 
+    transition: opacity 0.3s ease;
+}
+
+.overlay.active { 
+    display:block; 
+    opacity:1; 
+}
+
+/* ================= Main content ================= */
+.main-content {
+    margin-left:240px;
+    padding:30px;
+    flex-grow:1;
+    min-height:100vh;
+    background: var(--bg-primary);
+    border-radius:12px;
+    margin-top:20px;
+    margin-bottom:20px;
+    width: calc(100% - 240px);
+    transition: all 0.3s ease;
+}
+
+@media screen and (max-width: 768px){
+    .sidebar { 
+        transform: translateX(-100%); 
+        width: 280px;
+    }
+    .sidebar.active { 
+        transform: translateX(0); 
+    }
+    .main-content { 
+        margin-left: 0; 
+        padding: 15px; 
+        width: 100%; 
+        margin-top: 0;
+    }
+    .sidebar::after {
+        width: 280px;
+    }
+}
 /* ================= Overlay ================= */
 .overlay {
     position: fixed; top:0; left:0; width:100%; height:100%;

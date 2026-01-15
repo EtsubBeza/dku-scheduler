@@ -33,35 +33,30 @@ try {
         exit;
     }
     
-    // Get student year from database and normalize case
+    // Get student year from database
     $student_year = $user['year'] ?? '1';
-    $student_year_normalized = strtolower(trim($student_year)); // Normalize to lowercase
-
-    error_log("DEBUG: Student ID: $student_id, Year from DB: $student_year, Normalized: $student_year_normalized");
+    $student_year_trimmed = trim($student_year);
 
     // Determine student type and display year
-    if (substr($student_year_normalized, 0, 1) === 'e') {
-        // Extension student: E1, E2, etc. (case insensitive)
+    if (strtoupper(substr($student_year_trimmed, 0, 1)) === 'E') {
+        // Extension student: E1, E2, etc.
         $student_type = 'extension';
-        $display_year = substr($student_year, 1); // Remove 'E' prefix (original case)
-        $year_for_exam_match = $student_year_normalized; // e1, e2, etc. (lowercase)
-    } elseif ($student_year_normalized === 'freshman') {
+        $display_year = substr($student_year_trimmed, 1); // Remove 'E' prefix
+        $year_for_exam_match = $student_year_trimmed; // E1, E2, etc.
+    } elseif (strtolower($student_year_trimmed) === 'freshman') {
         // Regular freshman student
         $student_type = 'regular';
-        $display_year = 'Freshman'; // Show capital F for display
-        $year_for_exam_match = 'freshman'; // Use lowercase for matching exams
+        $display_year = 'Freshman';
+        $year_for_exam_match = 'freshman';
     } else {
-        // Regular student (year 1, 2, 3, 4)
+        // Regular student (year 1, 2, 3, 4, 5)
         $student_type = 'regular';
-        $display_year = $student_year;
-        $year_for_exam_match = $student_year; // 1, 2, 3, 4
+        $display_year = $student_year_trimmed;
+        $year_for_exam_match = $student_year_trimmed;
     }
-    
-    error_log("DEBUG: Student Type: $student_type, Display Year: $display_year, Year for Exam Match: $year_for_exam_match");
     
 } catch (PDOException $e) {
     showMessage('error', "Error loading user info: " . $e->getMessage());
-    error_log("User info error: " . $e->getMessage());
     $student_type = 'regular';
     $student_year = '1';
     $display_year = '1';
@@ -70,103 +65,62 @@ try {
 }
 
 // Determine profile picture path
-$uploads_dir = __DIR__ . '/../uploads/';
-$assets_dir = __DIR__ . '/../assets/';
-
-// Check if profile picture exists in uploads directory
-$profile_picture = $user['profile_picture'] ?? '';
 $default_profile = 'default_profile.png';
+$profile_img_path = '../assets/' . $default_profile;
 
-// Check multiple possible locations
-if(!empty($profile_picture)) {
-    if(file_exists($uploads_dir . $profile_picture)) {
-        $profile_img_path = '../uploads/' . $profile_picture;
-    } else if(file_exists('uploads/' . $profile_picture)) {
-        $profile_img_path = 'uploads/' . $profile_picture;
-    } else if(file_exists('../uploads/' . $profile_picture)) {
-        $profile_img_path = '../uploads/' . $profile_picture;
-    } else if(file_exists('../../uploads/' . $profile_picture)) {
-        $profile_img_path = '../../uploads/' . $profile_picture;
-    } else {
-        $profile_img_path = '../assets/' . $default_profile;
+if(!empty($user['profile_picture'])) {
+    $possible_paths = [
+        '../uploads/' . $user['profile_picture'],
+        'uploads/' . $user['profile_picture'],
+        '../../uploads/' . $user['profile_picture'],
+        '../assets/' . $user['profile_picture']
+    ];
+    
+    foreach($possible_paths as $path) {
+        if(file_exists($path)) {
+            $profile_img_path = $path;
+            break;
+        }
     }
-} else {
-    $profile_img_path = '../assets/' . $default_profile;
 }
 
-// Get student's current academic year from enrollments
+// Get student's enrolled courses
 try {
-    $academic_info_stmt = $pdo->prepare("
-        SELECT DISTINCT s.academic_year 
+    $enrolled_courses_stmt = $pdo->prepare("
+        SELECT DISTINCT c.course_id, c.course_code, c.course_name
         FROM enrollments e
         JOIN schedule s ON e.schedule_id = s.schedule_id
+        JOIN courses c ON s.course_id = c.course_id
         WHERE e.student_id = ?
-        LIMIT 1
     ");
-    $academic_info_stmt->execute([$student_id]);
-    $academic_info = $academic_info_stmt->fetch();
+    $enrolled_courses_stmt->execute([$student_id]);
+    $enrolled_courses = $enrolled_courses_stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    $academic_year = $academic_info['academic_year'] ?? '2026-2027';
-    
-    // Determine semester based on current month
-    // Assume: 1st Semester: August-January, 2nd Semester: February-July
-    $current_month = date('n');
-    
-    if ($current_month >= 8 || $current_month <= 1) {
-        $semester = '1st Semester';
-    } else {
-        $semester = '2nd Semester';
-    }
-    
-    error_log("DEBUG: Academic Year: $academic_year, Current Month: $current_month, Semester: $semester");
-    
-} catch (PDOException $e) {
-    $academic_year = '2026-2027';
-    $semester = '1st Semester';
-    error_log("Academic info error: " . $e->getMessage());
-}
-
-// Get all courses the student is enrolled in
-try {
-    // First, let's check if student exists in enrollments at all
-    $check_enrollment_stmt = $pdo->prepare("SELECT COUNT(*) as count FROM enrollments WHERE student_id = ?");
-    $check_enrollment_stmt->execute([$student_id]);
-    $enrollment_count = $check_enrollment_stmt->fetch()['count'];
-    
-    if ($enrollment_count > 0) {
-        // Student has enrollments, get the course IDs
-        $enrolled_courses_stmt = $pdo->prepare("
-            SELECT DISTINCT s.course_id 
-            FROM enrollments e
-            JOIN schedule s ON e.schedule_id = s.schedule_id
-            WHERE e.student_id = ?
-        ");
-        $enrolled_courses_stmt->execute([$student_id]);
-        $enrolled_course_ids = $enrolled_courses_stmt->fetchAll(PDO::FETCH_COLUMN, 0);
-    } else {
-        // Student has no enrollments - show a helpful message
-        $enrolled_course_ids = [];
+    if (empty($enrolled_courses)) {
         showMessage('warning', "You are not enrolled in any courses. Please contact your advisor to get enrolled.");
     }
     
-    error_log("DEBUG: Enrollment count: $enrollment_count, Enrolled Course IDs: " . implode(', ', $enrolled_course_ids));
+    $enrolled_course_ids = array_column($enrolled_courses, 'course_id');
     
 } catch (PDOException $e) {
     showMessage('error', "Error loading enrolled courses: " . $e->getMessage());
-    error_log("Enrolled courses error: " . $e->getMessage());
+    $enrolled_courses = [];
     $enrolled_course_ids = [];
 }
 
 // Get exam schedules from exam_schedules table
 try {
-    if (empty($enrolled_course_ids)) {
+    if (empty($enrolled_courses)) {
         $exams = [];
+        $all_exams = [];
     } else {
-        $placeholders = str_repeat('?,', count($enrolled_course_ids) - 1) . '?';
+        // Get course IDs
+        $course_ids = array_column($enrolled_courses, 'course_id');
+        $placeholders = str_repeat('?,', count($course_ids) - 1) . '?';
         
-        // FIXED QUERY - Handle both 'freshman' and '1' for freshman students
+        // Get ALL published active exams for enrolled courses
         $exams_stmt = $pdo->prepare("
-            SELECT DISTINCT 
+            SELECT DISTINCT
                 es.exam_id, 
                 es.course_id, 
                 es.exam_type, 
@@ -187,134 +141,98 @@ try {
                 c.course_name,
                 r.room_name, 
                 r.capacity,
-                u.username as supervisor_name
+                u.username as supervisor_name,
+                u.full_name as supervisor_full_name,
+                es.section_number
             FROM exam_schedules es
             JOIN courses c ON es.course_id = c.course_id
             LEFT JOIN rooms r ON es.room_id = r.room_id
             LEFT JOIN users u ON es.supervisor_id = u.user_id
             WHERE es.course_id IN ($placeholders)
             AND es.is_published = 1
-            AND (es.academic_year = ? OR es.academic_year IS NULL OR es.academic_year = '')
-            AND (
-                es.semester IS NULL OR 
-                es.semester = '' OR
-                es.semester = ?
-            )
-            AND (
-                -- Match student_type exactly OR exam has no student_type restriction
-                es.student_type IS NULL OR 
-                es.student_type = '' OR
-                LOWER(TRIM(es.student_type)) = LOWER(?)
-            )
-            AND (
-                -- For freshman students, check both 'freshman' and '1'
-                es.year IS NULL OR 
-                es.year = '' OR
-                LOWER(TRIM(es.year)) = LOWER(?) OR
-                (LOWER(TRIM(?)) = 'freshman' AND (LOWER(TRIM(es.year)) = '1' OR es.year = '1'))
-            )
+            AND es.status = 'active'
             ORDER BY es.exam_date, es.start_time
         ");
         
-        $params = array_merge($enrolled_course_ids, [
-            $academic_year, 
-            $semester,  // Only 1st Semester or 2nd Semester
-            $student_type,
-            $year_for_exam_match,
-            $year_for_exam_match  // Extra parameter for freshman/1 check
-        ]);
+        $exams_stmt->execute($course_ids);
+        $all_exams = $exams_stmt->fetchAll();
         
-        $exams_stmt->execute($params);
-        $exams = $exams_stmt->fetchAll();
-        
-        // Add section_number for consistency (not in exam_schedules table)
-        foreach($exams as &$exam) {
-            $exam['section_number'] = 'N/A';
-            $exam['instructor_name'] = $exam['supervisor_name'];
+        // Now filter exams based on student type and year
+        $exams = [];
+        foreach($all_exams as $exam) {
+            $exam_student_type = $exam['student_type'] ?? '';
+            $exam_year = $exam['year'] ?? '';
+            
+            // Check if exam matches student
+            $matches = false;
+            
+            // Case 1: Exam has no student type/year restrictions (shows to everyone)
+            if (empty($exam_student_type) && empty($exam_year)) {
+                $matches = true;
+            }
+            // Case 2: Exam for all students of a specific type (all years)
+            elseif (!empty($exam_student_type) && empty($exam_year)) {
+                if ($exam_student_type === $student_type) {
+                    $matches = true;
+                }
+            }
+            // Case 3: Exam for specific type and year
+            elseif (!empty($exam_student_type) && !empty($exam_year)) {
+                if ($exam_student_type === $student_type && $exam_year == $year_for_exam_match) {
+                    $matches = true;
+                }
+            }
+            // Case 4: Special case for 'freshman' students
+            elseif ($student_year_trimmed === 'freshman' && $exam_student_type === 'regular' && $exam_year === 'freshman') {
+                $matches = true;
+            }
+            
+            if ($matches) {
+                $exams[] = $exam;
+            }
         }
-    }
-    
-    error_log("DEBUG: Found " . count($exams) . " exams for student");
-    error_log("DEBUG: Query params - Academic Year: $academic_year, Semester: $semester, Student Type: $student_type, Year for Exam Match: $year_for_exam_match");
-    
-    // Debug: Check what exams exist for freshman
-    if ($student_year_normalized === 'freshman' && empty($exams)) {
-        $debug_stmt = $pdo->prepare("
-            SELECT es.year, es.student_type, es.semester, es.academic_year, c.course_code, es.exam_type
-            FROM exam_schedules es
-            JOIN courses c ON es.course_id = c.course_id
-            WHERE es.course_id IN (SELECT DISTINCT course_id FROM schedule WHERE schedule_id IN (SELECT schedule_id FROM enrollments WHERE student_id = ?))
-            AND es.is_published = 1
-            LIMIT 10
-        ");
-        $debug_stmt->execute([$student_id]);
-        $debug_exams = $debug_stmt->fetchAll();
-        error_log("DEBUG: Available exams for student courses: " . json_encode($debug_exams));
     }
     
 } catch (PDOException $e) {
     showMessage('error', "Error loading exam schedules: " . $e->getMessage());
-    error_log("Exam schedule error: " . $e->getMessage());
     $exams = [];
+    $all_exams = [];
 }
 
 // Fetch exam statistics for student
 try {
-    if (empty($enrolled_course_ids)) {
+    if (empty($exams)) {
         $stats = [
             'total_exams' => 0,
             'upcoming_exams' => 0,
             'exam_types_count' => 0
         ];
     } else {
-        $placeholders = str_repeat('?,', count($enrolled_course_ids) - 1) . '?';
+        // Count statistics from filtered exams
+        $total_exams = count($exams);
+        $upcoming_exams = 0;
+        $exam_types = [];
         
-        $stats_stmt = $pdo->prepare("
-            SELECT 
-                COUNT(DISTINCT es.exam_id) as total_exams,
-                SUM(CASE WHEN es.exam_date >= CURDATE() THEN 1 ELSE 0 END) as upcoming_exams,
-                COUNT(DISTINCT es.exam_type) as exam_types_count
-            FROM exam_schedules es
-            WHERE es.course_id IN ($placeholders)
-            AND es.is_published = 1
-            AND (es.academic_year = ? OR es.academic_year IS NULL OR es.academic_year = '')
-            AND (
-                es.semester IS NULL OR 
-                es.semester = '' OR
-                es.semester = ?
-            )
-            AND (
-                es.student_type IS NULL OR 
-                es.student_type = '' OR
-                LOWER(TRIM(es.student_type)) = LOWER(?)
-            )
-            AND (
-                -- For freshman students, check both 'freshman' and '1'
-                es.year IS NULL OR 
-                es.year = '' OR
-                LOWER(TRIM(es.year)) = LOWER(?) OR
-                (LOWER(TRIM(?)) = 'freshman' AND (LOWER(TRIM(es.year)) = '1' OR es.year = '1'))
-            )
-        ");
-        
-        $params = array_merge($enrolled_course_ids, [
-            $academic_year, 
-            $semester,
-            $student_type,
-            $year_for_exam_match,
-            $year_for_exam_match  // Extra parameter for freshman/1 check
-        ]);
-        
-        $stats_stmt->execute($params);
-        $stats = $stats_stmt->fetch();
-        
-        if (!$stats) {
-            $stats = [
-                'total_exams' => 0,
-                'upcoming_exams' => 0,
-                'exam_types_count' => 0
-            ];
+        foreach($exams as $exam) {
+            // Check if exam is upcoming
+            $exam_date = $exam['exam_date'];
+            $current_date = date('Y-m-d');
+            if ($exam_date >= $current_date) {
+                $upcoming_exams++;
+            }
+            
+            // Count unique exam types
+            $exam_type = $exam['exam_type'];
+            if (!in_array($exam_type, $exam_types)) {
+                $exam_types[] = $exam_type;
+            }
         }
+        
+        $stats = [
+            'total_exams' => $total_exams,
+            'upcoming_exams' => $upcoming_exams,
+            'exam_types_count' => count($exam_types)
+        ];
     }
 } catch (PDOException $e) {
     $stats = [
@@ -322,66 +240,6 @@ try {
         'upcoming_exams' => 0,
         'exam_types_count' => 0
     ];
-    error_log("Stats error: " . $e->getMessage());
-}
-
-// Fetch upcoming exams (next 7 days)
-try {
-    if (empty($enrolled_course_ids)) {
-        $upcoming_exams = [];
-    } else {
-        $placeholders = str_repeat('?,', count($enrolled_course_ids) - 1) . '?';
-        
-        $upcoming_stmt = $pdo->prepare("
-            SELECT DISTINCT es.exam_id, es.course_id, es.exam_type, es.exam_date, es.start_time, es.end_time,
-                   c.course_code, c.course_name, r.room_name, es.student_type, es.year,
-                   'N/A' as section_number
-            FROM exam_schedules es
-            JOIN courses c ON es.course_id = c.course_id
-            LEFT JOIN rooms r ON es.room_id = r.room_id
-            WHERE es.course_id IN ($placeholders)
-            AND es.is_published = 1
-            AND (es.academic_year = ? OR es.academic_year IS NULL OR es.academic_year = '')
-            AND (
-                es.semester IS NULL OR 
-                es.semester = '' OR
-                es.semester = ?
-            )
-            AND es.exam_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)
-            AND (
-                es.student_type IS NULL OR 
-                es.student_type = '' OR
-                LOWER(TRIM(es.student_type)) = LOWER(?)
-            )
-            AND (
-                -- For freshman students, check both 'freshman' and '1'
-                es.year IS NULL OR 
-                es.year = '' OR
-                LOWER(TRIM(es.year)) = LOWER(?) OR
-                (LOWER(TRIM(?)) = 'freshman' AND (LOWER(TRIM(es.year)) = '1' OR es.year = '1'))
-            )
-            ORDER BY es.exam_date, es.start_time
-            LIMIT 5
-        ");
-        
-        $params = array_merge($enrolled_course_ids, [
-            $academic_year, 
-            $semester,
-            $student_type,
-            $year_for_exam_match,
-            $year_for_exam_match  // Extra parameter for freshman/1 check
-        ]);
-        
-        $upcoming_stmt->execute($params);
-        $upcoming_exams = $upcoming_stmt->fetchAll();
-    }
-    
-    if (!$upcoming_exams) {
-        $upcoming_exams = [];
-    }
-} catch (PDOException $e) {
-    $upcoming_exams = [];
-    error_log("Upcoming exams error: " . $e->getMessage());
 }
 
 // Prepare calendar events data for JavaScript
@@ -404,17 +262,13 @@ foreach($exams as $exam) {
     
     // Different colors for different student types
     $exam_student_type = $exam['student_type'] ?? 'regular';
+    $exam_year = $exam['year'] ?? '';
+    
     if ($exam_student_type == 'extension') {
         $baseColor = '#8b5cf6'; // Purple for extension
-    } elseif (strtolower($exam['year'] ?? '') == 'freshman' || $exam['year'] == '1') {
+    } elseif ($exam_year == 'freshman') {
         $baseColor = '#06b6d4'; // Cyan for freshman
     }
-    
-    // Check if exam is past or today
-    $current_time = time();
-    $exam_timestamp = strtotime($exam['exam_date'] . ' ' . $exam['start_time']);
-    $is_past = $exam_timestamp < $current_time;
-    $is_today = date('Y-m-d', $exam_timestamp) == date('Y-m-d');
     
     $calendar_events[] = [
         'id' => $exam['exam_id'],
@@ -427,9 +281,8 @@ foreach($exams as $exam) {
         'extendedProps' => [
             'course' => $exam['course_name'],
             'room' => $exam['room_name'] ?? 'Not Assigned',
-            'instructor' => $exam['supervisor_name'] ?? 'Not Assigned',
+            'instructor' => $exam['supervisor_full_name'] ?? $exam['supervisor_name'] ?? 'Not Assigned',
             'type' => $exam['exam_type'],
-            'section' => 'N/A',
             'student_type' => $exam['student_type'] ?? 'regular',
             'year' => $exam['year'] ?? 'Not specified',
             'academic_year' => $exam['academic_year'],
@@ -441,66 +294,156 @@ foreach($exams as $exam) {
 // Sidebar active page
 $current_page = basename($_SERVER['PHP_SELF']);
 ?>
+
 <!DOCTYPE html>
 <html lang="en" data-theme="<?= $darkMode ? 'dark' : 'light' ?>">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Exam Schedule | Student Dashboard</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <!-- FullCalendar CSS -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css">
-<!-- Include Dark Mode CSS -->
-<link rel="stylesheet" href="../../assets/css/darkmode.css">
 <style>
-/* [Keep all the same CSS styles from previous version] */
-* { box-sizing: border-box; margin:0; padding:0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+/* ================= CSS VARIABLES ================= */
+:root {
+    --bg-primary: #f9fafb;
+    --bg-secondary: #f3f4f6;
+    --bg-card: #ffffff;
+    --bg-sidebar: #1f2937;
+    --bg-input: #ffffff;
+    --text-primary: #111827;
+    --text-light: #6b7280;
+    --text-sidebar: #e5e7eb;
+    --border-color: #d1d5db;
+    --shadow-color: rgba(0, 0, 0, 0.1);
+    --hover-color: rgba(99, 102, 241, 0.05);
+    --table-header: #f9fafb;
+    --today-bg: #fffbeb;
+    --success-bg: #d1fae5;
+    --success-text: #065f46;
+    --error-bg: #fee2e2;
+    --error-text: #991b1b;
+    --warning-bg: #fef3c7;
+    --warning-text: #92400e;
+    --badge-primary-bg: #dbeafe;
+    --badge-primary-text: #1e40af;
+    --badge-success-bg: #d1fae5;
+    --badge-success-text: #065f46;
+    --badge-warning-bg: #fef3c7;
+    --badge-warning-text: #92400e;
+    --badge-danger-bg: #fee2e2;
+    --badge-danger-text: #991b1b;
+    --badge-secondary-bg: #f3f4f6;
+    --badge-secondary-text: #4b5563;
+}
 
-/* ================= Topbar for Hamburger ================= */
+/* Dark mode overrides */
+.dark-mode {
+    --bg-primary: #111827;
+    --bg-secondary: #1f2937;
+    --bg-card: #1f2937;
+    --bg-sidebar: #111827;
+    --bg-input: #374151;
+    --text-primary: #f9fafb;
+    --text-light: #d1d5db;
+    --text-sidebar: #f3f4f6;
+    --border-color: #4b5563;
+    --shadow-color: rgba(0, 0, 0, 0.3);
+    --hover-color: rgba(99, 102, 241, 0.1);
+    --table-header: #374151;
+    --today-bg: rgba(245, 158, 11, 0.1);
+    --success-bg: rgba(16, 185, 129, 0.1);
+    --success-text: #10b981;
+    --error-bg: rgba(239, 68, 68, 0.1);
+    --error-text: #ef4444;
+    --warning-bg: rgba(245, 158, 11, 0.1);
+    --warning-text: #f59e0b;
+    --badge-primary-bg: rgba(59, 130, 246, 0.1);
+    --badge-primary-text: #93c5fd;
+    --badge-success-bg: rgba(16, 185, 129, 0.1);
+    --badge-success-text: #10b981;
+    --badge-warning-bg: rgba(245, 158, 11, 0.1);
+    --badge-warning-text: #f59e0b;
+    --badge-danger-bg: rgba(239, 68, 68, 0.1);
+    --badge-danger-text: #ef4444;
+    --badge-secondary-bg: rgba(156, 163, 175, 0.1);
+    --badge-secondary-text: #9ca3af;
+}
+
+/* ================= RESET & BASE STYLES ================= */
+* { 
+    box-sizing: border-box; 
+    margin:0; 
+    padding:0; 
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+}
+
+body {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    transition: background 0.3s ease, color 0.3s ease;
+    overflow-x: hidden;
+}
+
+/* ================= TOPBAR FOR MOBILE ================= */
 .topbar {
     display: none;
-    position: fixed; top:0; left:0; width:100%;
-    background:var(--bg-sidebar); color:var(--text-sidebar);
+    position: fixed;
+    top:0;
+    left:0;
+    width:100%;
+    background:var(--bg-sidebar);
+    color:var(--text-sidebar);
     padding:15px 20px;
     z-index:1200;
-    justify-content:space-between; align-items:center;
+    justify-content:space-between;
+    align-items:center;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
 }
+
 .menu-btn {
     font-size:26px;
     background:#1abc9c;
-    border:none; color:var(--text-sidebar);
+    border:none;
+    color:var(--text-sidebar);
     cursor:pointer;
     padding:10px 14px;
     border-radius:8px;
     font-weight:600;
     transition: background 0.3s, transform 0.2s;
 }
-.menu-btn:hover { background:#159b81; transform:translateY(-2px); }
 
-/* ================= Sidebar ================= */
+.menu-btn:hover {
+    background:#159b81;
+    transform:translateY(-2px);
+}
+
+/* ================= SIDEBAR ================= */
 .sidebar {
-    position: fixed; top:0; left:0;
-    width:250px; height:100%;
-    background:var(--bg-sidebar); color:var(--text-sidebar);
+    position: fixed;
+    top:0;
+    left:0;
+    width:250px;
+    height:100%;
+    background:var(--bg-sidebar);
+    color:var(--text-sidebar);
     z-index:1100;
     transition: transform 0.3s ease;
-    padding: 20px 0;
+    display: flex;
+    flex-direction: column;
 }
-.sidebar.hidden { transform:translateX(-260px); }
-.sidebar a { 
-    display:block; 
-    padding:12px 20px; 
-    color:var(--text-sidebar); 
-    text-decoration:none; 
-    transition: background 0.3s; 
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-}
-.sidebar a:hover, .sidebar a.active { background:#1abc9c; color:white; }
 
+.sidebar.hidden { 
+    transform:translateX(-260px); 
+}
+
+/* Sidebar Profile */
 .sidebar-profile {
     text-align: center;
-    margin-bottom: 20px;
-    padding: 0 20px 20px;
+    padding: 20px;
     border-bottom: 1px solid rgba(255,255,255,0.2);
+    flex-shrink: 0;
 }
 
 .sidebar-profile img {
@@ -576,29 +519,88 @@ $current_page = basename($_SERVER['PHP_SELF']);
     color: white;
 }
 
-/* Sidebar title */
+/* Sidebar Title */
 .sidebar h2 {
     text-align: center;
     color: var(--text-sidebar);
-    margin-bottom: 25px;
+    padding: 15px 20px;
     font-size: 22px;
-    padding: 0 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.2);
+    flex-shrink: 0;
+    margin: 0;
 }
 
-/* ================= Overlay ================= */
+/* Scrollable Navigation Links */
+.sidebar-nav {
+    flex: 1;
+    overflow-y: auto;
+    padding-bottom: 20px;
+}
+
+/* Style the scrollbar */
+.sidebar-nav::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sidebar-nav::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 3px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* Navigation Links */
+.sidebar a { 
+    display: block; 
+    padding: 12px 20px; 
+    color: var(--text-sidebar); 
+    text-decoration: none; 
+    transition: background 0.3s; 
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.sidebar a:hover, .sidebar a.active { 
+    background: #1abc9c; 
+    color: white; 
+}
+
+.sidebar a i {
+    width: 25px;
+    text-align: center;
+    margin-right: 10px;
+}
+
+/* ================= OVERLAY ================= */
 .overlay {
-    position: fixed; top:0; left:0; width:100%; height:100%;
-    background: rgba(0,0,0,0.4); z-index:1050;
-    display:none; opacity:0; transition: opacity 0.3s ease;
+    position: fixed;
+    top:0;
+    left:0;
+    width:100%;
+    height:100%;
+    background: rgba(0,0,0,0.4);
+    z-index:1050;
+    display:none;
+    opacity:0;
+    transition: opacity 0.3s ease;
 }
-.overlay.active { display:block; opacity:1; }
 
-/* ================= Main content ================= */
+.overlay.active {
+    display:block;
+    opacity:1;
+}
+
+/* ================= MAIN CONTENT ================= */
 .main-content {
     margin-left: 250px;
     padding:20px;
     min-height:100vh;
-    background: var(--bg-primary);
     transition: all 0.3s ease;
 }
 
@@ -611,7 +613,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
     min-height: calc(100vh - 40px);
 }
 
-/* Header Styles */
+/* ================= HEADER STYLES ================= */
 .header {
     display: flex;
     justify-content: space-between;
@@ -627,38 +629,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
     font-weight: 700;
 }
 
-.user-info {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    background: var(--bg-secondary);
-    padding: 12px 18px;
-    border-radius: 12px;
-    border: 1px solid var(--border-color);
-}
-
-.user-info img {
-    width: 45px;
-    height: 45px;
-    border-radius: 50%;
-    object-fit: cover;
-}
-
-.user-info div div {
-    font-weight: 600;
-    color: var(--text-primary);
-}
-
-.user-info small {
-    color: var(--text-secondary);
-    font-size: 0.875rem;
-}
-
 /* Welcome Section */
-.welcome-section {
-    margin-bottom: 30px;
-}
-
 .welcome-section h1 {
     font-size: 2.2rem;
     font-weight: 700;
@@ -706,39 +677,51 @@ $current_page = basename($_SERVER['PHP_SELF']);
     border-color: rgba(6, 182, 212, 0.2);
 }
 
-/* ================= Student Info Box ================= */
-.student-info-box {
-    background: rgba(99, 102, 241, 0.1);
-    padding: 15px 20px;
-    border-radius: 10px;
-    margin-bottom: 20px;
-    border-left: 4px solid #6366f1;
+/* Freshman Note */
+.freshman-note {
+    background: rgba(6, 182, 212, 0.1);
+    border: 1px solid rgba(6, 182, 212, 0.2);
+    border-radius: 8px;
+    padding: 12px 15px;
+    margin-top: 10px;
+    font-size: 0.85rem;
+    color: #06b6d4;
+}
+
+.freshman-note i {
+    color: #06b6d4;
+    margin-right: 8px;
+}
+
+/* User Info */
+.user-info {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
+    background: var(--bg-secondary);
+    padding: 12px 18px;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+}
+
+.user-info img {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.user-info div div {
+    font-weight: 600;
     color: var(--text-primary);
 }
 
-.student-info-box i {
-    color: #6366f1;
-    font-size: 1.2rem;
+.user-info small {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
 }
 
-.student-year-badge {
-    display: inline-block;
-    padding: 4px 12px;
-    color: white;
-    border-radius: 15px;
-    font-size: 0.9rem;
-    font-weight: 600;
-    margin-left: 10px;
-}
-
-.student-year-badge.regular { background: #3b82f6; }
-.student-year-badge.extension { background: #8b5cf6; }
-.student-year-badge.freshman { background: #06b6d4; }
-
-/* ================= Stats Cards ================= */
+/* ================= STATS CARDS ================= */
 .stats-cards {
     display: flex;
     gap: 20px;
@@ -760,7 +743,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
 .stat-card:hover {
     transform: translateY(-5px);
-    box-shadow: 0 8px 15px var(--shadow-lg);
+    box-shadow: 0 8px 15px var(--shadow-color);
 }
 
 .stat-card h3 {
@@ -788,7 +771,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .stat-card .fa-clock.icon { color: #10b981; }
 .stat-card .fa-file-alt.icon { color: #f59e0b; }
 
-/* ================= Calendar Card ================= */
+/* ================= CALENDAR CARD ================= */
 .calendar-card {
     background: var(--bg-card);
     border-radius: 12px;
@@ -796,6 +779,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
     box-shadow: 0 4px 6px var(--shadow-color);
     border: 1px solid var(--border-color);
     margin-top: 30px;
+    margin-bottom: 30px;
 }
 
 .calendar-header {
@@ -818,7 +802,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
     background: var(--bg-card);
 }
 
-/* FullCalendar Custom Styling - Dark Mode Support */
+/* FullCalendar Custom Styling */
 .fc {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
@@ -895,7 +879,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
     border-color: var(--border-color) !important;
 }
 
-/* ================= Exam Table ================= */
+/* ================= EXAM TABLE ================= */
 .exam-section {
     margin-top: 30px;
 }
@@ -936,6 +920,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
     background: var(--hover-color);
 }
 
+/* Exam row styling */
 .exam-table .today-exam {
     background: var(--today-bg) !important;
     border-left: 4px solid #f59e0b;
@@ -951,7 +936,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
     border-left: 4px solid #94a3b8;
 }
 
-/* Badge styles for dark mode */
+/* ================= BADGE STYLES ================= */
 .badge {
     display: inline-block;
     padding: 4px 10px;
@@ -1045,7 +1030,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
     color: white;
 }
 
-/* Message styling for dark mode */
+/* ================= MESSAGE STYLING ================= */
 .message {
     padding: 15px;
     border-radius: 8px;
@@ -1059,22 +1044,22 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .message.success {
     background: var(--success-bg);
     color: var(--success-text);
-    border-color: var(--success-border);
+    border-color: #10b981;
 }
 
 .message.error {
     background: var(--error-bg);
     color: var(--error-text);
-    border-color: var(--error-border);
+    border-color: #ef4444;
 }
 
 .message.warning {
     background: var(--warning-bg);
     color: var(--warning-text);
-    border-color: var(--warning-border);
+    border-color: #f59e0b;
 }
 
-/* Empty state for dark mode */
+/* ================= EMPTY STATE ================= */
 .empty-state {
     text-align: center;
     padding: 40px 20px;
@@ -1099,82 +1084,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
     margin: 0 auto;
 }
 
-/* Student info alert */
-.student-info-alert {
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 10px;
-    padding: 15px;
-    margin-bottom: 20px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.student-info-alert i {
-    font-size: 1.2rem;
-    color: #f59e0b;
-}
-
-.student-info-alert div {
-    flex: 1;
-}
-
-.student-info-alert h4 {
-    margin: 0 0 5px 0;
-    color: var(--text-primary);
-    font-size: 1rem;
-}
-
-.student-info-alert p {
-    margin: 0;
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-}
-
-/* Freshman info note */
-.freshman-note {
-    background: rgba(6, 182, 212, 0.1);
-    border: 1px solid rgba(6, 182, 212, 0.2);
-    border-radius: 8px;
-    padding: 12px 15px;
-    margin-top: 10px;
-    font-size: 0.85rem;
-    color: #06b6d4;
-}
-
-.freshman-note i {
-    color: #06b6d4;
-    margin-right: 8px;
-}
-
-/* Dark mode specific adjustments */
-[data-theme="dark"] .stat-card .number {
-    color: var(--text-primary);
-}
-
-[data-theme="dark"] .exam-table th {
-    color: var(--text-sidebar);
-}
-
-[data-theme="dark"] .exam-table td {
-    color: var(--text-primary);
-}
-
-[data-theme="dark"] .exam-table tr:hover {
-    background: rgba(255, 255, 255, 0.05);
-}
-
-/* Calendar dark mode fixes */
-[data-theme="dark"] .fc .fc-daygrid-day.fc-day-today {
-    background-color: rgba(245, 158, 11, 0.1) !important;
-}
-
-[data-theme="dark"] .fc-theme-standard .fc-scrollgrid {
-    border-color: var(--border-color) !important;
-}
-
-/* ================= Responsive ================= */
+/* ================= RESPONSIVE ================= */
 @media (max-width: 768px) {
     .topbar { display: flex; }
     .sidebar { transform: translateX(-100%); }
@@ -1186,7 +1096,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
     .stats-cards { flex-direction: column; }
     .stat-card { min-width: auto; }
     .table-container { overflow-x: auto; }
-    .exam-table { min-width: 600px; }
+    .exam-table { min-width: 800px; }
     .fc-toolbar {
         flex-direction: column !important;
         gap: 10px !important;
@@ -1197,6 +1107,25 @@ $current_page = basename($_SERVER['PHP_SELF']);
     #examCalendar {
         padding: 10px;
     }
+}
+
+/* ================= CUSTOM SCROLLBAR ================= */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+    background: #6366f1;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #4f46e5;
 }
 </style>
 </head>
@@ -1223,25 +1152,29 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 </span>
             </div>
         </div>
+        
         <h2>Student Dashboard</h2>
-        <a href="student_dashboard.php" class="<?= $current_page=='student_dashboard.php'?'active':'' ?>">
-            <i class="fas fa-home"></i> Dashboard
-        </a>
-        <a href="my_schedule.php" class="<?= $current_page=='my_schedule.php'?'active':'' ?>">
-            <i class="fas fa-calendar-alt"></i> My Schedule
-        </a>
-        <a href="view_exam_schedules.php" class="<?= $current_page=='view_exam_schedules.php'?'active':'' ?>">
-            <i class="fas fa-clipboard-list"></i> Exam Schedule
-        </a>
-        <a href="view_announcements.php" class="<?= $current_page=='view_announcements.php'?'active':'' ?>">
-            <i class="fas fa-bullhorn"></i> Announcements
-        </a>
-        <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
-            <i class="fas fa-user-edit"></i> Edit Profile
-        </a>
-        <a href="../logout.php">
-            <i class="fas fa-sign-out-alt"></i> Logout
-        </a>
+        
+        <div class="sidebar-nav">
+            <a href="student_dashboard.php" class="<?= $current_page=='student_dashboard.php'?'active':'' ?>">
+                <i class="fas fa-home"></i> Dashboard
+            </a>
+            <a href="my_schedule.php" class="<?= $current_page=='my_schedule.php'?'active':'' ?>">
+                <i class="fas fa-calendar-alt"></i> My Schedule
+            </a>
+            <a href="view_exam_schedules.php" class="<?= $current_page=='view_exam_schedules.php'?'active':'' ?>">
+                <i class="fas fa-clipboard-list"></i> Exam Schedule
+            </a>
+            <a href="view_announcements.php" class="<?= $current_page=='view_announcements.php'?'active':'' ?>">
+                <i class="fas fa-bullhorn"></i> Announcements
+            </a>
+            <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
+                <i class="fas fa-user-edit"></i> Edit Profile
+            </a>
+            <a href="../logout.php">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </div>
     </div>
 
     <!-- Main Content -->
@@ -1254,14 +1187,11 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <div class="student-type-display <?= $student_type ?>">
                         <i class="fas fa-<?= $student_type == 'regular' ? 'user-graduate' : ($student_type == 'extension' ? 'user-tie' : 'user') ?>"></i>
                         <?= ucfirst($student_type) ?> Student - Year <?= htmlspecialchars($display_year) ?>
-                        <span style="margin-left: 10px; font-size: 0.8rem;">
-                            (<?= htmlspecialchars($academic_year) ?> - <?= htmlspecialchars($semester) ?>)
-                        </span>
                     </div>
-                    <?php if($student_year_normalized === 'freshman'): ?>
+                    <?php if($student_year_trimmed === 'freshman'): ?>
                     <div class="freshman-note">
                         <i class="fas fa-info-circle"></i>
-                        Note: Showing exams for Freshman students (also matching exams marked as Year 1)
+                        Note: Showing exams for Freshman students
                     </div>
                     <?php endif; ?>
                 </div>
@@ -1284,40 +1214,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <?= htmlspecialchars($message) ?>
                 </div>
             <?php endif; ?>
-
-            <!-- Student Info Box -->
-            <div class="student-info-box">
-                <i class="fas fa-user-graduate"></i>
-                <div>
-                    <strong>Student Information:</strong> 
-                    <?= htmlspecialchars($user['username'] ?? 'Student') ?>
-                    <span class="student-year-badge <?= $student_type ?>">
-                        <?= ucfirst($student_type) ?> Year <?= htmlspecialchars($display_year) ?>
-                    </span>
-                    <span style="margin-left: 10px; font-size: 0.9rem;">
-                        <i class="fas fa-calendar"></i> <?= htmlspecialchars($academic_year) ?> - <?= htmlspecialchars($semester) ?>
-                    </span>
-                </div>
-            </div>
-
-            <!-- Academic Info Alert -->
-            <div class="student-info-alert">
-                <i class="fas fa-info-circle"></i>
-                <div>
-                    <h4>Exam Filter Information</h4>
-                    <p>Showing exams for <strong><?= ucfirst($student_type) ?> Year <?= htmlspecialchars($display_year) ?></strong> students 
-                    in <strong><?= htmlspecialchars($academic_year) ?> - <?= htmlspecialchars($semester) ?></strong>. 
-                    Exams are filtered by student type and year from the unified exam schedule system.</p>
-                    <?php if($student_year_normalized === 'freshman'): ?>
-                    <p><i class="fas fa-info-circle" style="color: #06b6d4;"></i> <strong>Freshman Note:</strong> Also matching exams marked as "Year 1" for compatibility.</p>
-                    <?php endif; ?>
-                    <?php if(empty($enrolled_course_ids)): ?>
-                    <p style="color: #ef4444; margin-top: 5px;">
-                        <i class="fas fa-exclamation-triangle"></i> You are not enrolled in any courses. Please contact your advisor.
-                    </p>
-                    <?php endif; ?>
-                </div>
-            </div>
 
             <!-- Quick Stats Cards -->
             <div class="stats-cards">
@@ -1359,6 +1255,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                                 <th>Date & Time</th>
                                 <th>Room</th>
                                 <th>Supervisor</th>
+                                <th>Academic Year</th>
                                 <th>Status</th>
                             </tr>
                         </thead>
@@ -1419,7 +1316,11 @@ $current_page = basename($_SERVER['PHP_SELF']);
                                             </small>
                                         </td>
                                         <td><?= htmlspecialchars($exam['room_name'] ?? 'TBA') ?></td>
-                                        <td><?= htmlspecialchars($exam['supervisor_name'] ?? 'TBA') ?></td>
+                                        <td><?= htmlspecialchars($exam['supervisor_full_name'] ?? $exam['supervisor_name'] ?? 'Not Assigned') ?></td>
+                                        <td>
+                                            <?= htmlspecialchars($exam['academic_year'] ?? 'N/A') ?><br>
+                                            <small style="color: var(--text-secondary);"><?= htmlspecialchars($exam['semester'] ?? '') ?></small>
+                                        </td>
                                         <td>
                                             <span class="badge <?= $status_class ?>"><?= $status ?></span>
                                         </td>
@@ -1427,19 +1328,16 @@ $current_page = basename($_SERVER['PHP_SELF']);
                                 <?php endforeach; ?>
                             <?php else: ?>
                                 <tr>
-                                    <td colspan="7">
+                                    <td colspan="8">
                                         <div class="empty-state">
                                             <i class="fas fa-calendar-times"></i>
                                             <h3>No Exam Schedules Found</h3>
-                                            <?php if(empty($enrolled_course_ids)): ?>
+                                            <?php if(empty($enrolled_courses)): ?>
                                                 <p>You are not enrolled in any courses. Please contact your advisor to get enrolled in courses first.</p>
                                             <?php else: ?>
-                                                <p>You don't have any exam schedules for your enrolled courses in <?= htmlspecialchars($academic_year) ?> - <?= htmlspecialchars($semester) ?>.</p>
+                                                <p>No exam schedules found for your enrolled courses.</p>
                                                 <p style="margin-top: 10px; font-size: 0.9rem;">
                                                     <i class="fas fa-info-circle"></i> Showing exams for <?= ucfirst($student_type) ?> Year <?= htmlspecialchars($display_year) ?> students.
-                                                    <?php if($student_year_normalized === 'freshman'): ?>
-                                                    <br><i class="fas fa-info-circle" style="color: #06b6d4;"></i> Also checking for exams marked as "Year 1".
-                                                    <?php endif; ?>
                                                 </p>
                                             <?php endif; ?>
                                         </div>
@@ -1455,8 +1353,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
     <!-- FullCalendar JS -->
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
-    <!-- Include darkmode.js -->
-    <script src="../../assets/js/darkmode.js"></script>
     <script>
     function toggleSidebar() {
         const sidebar = document.querySelector('.sidebar');
@@ -1465,40 +1361,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
         overlay.classList.toggle('active');
     }
 
-    // Set active state for current page
     document.addEventListener('DOMContentLoaded', function() {
-        const currentPage = window.location.pathname.split('/').pop();
-        const navLinks = document.querySelectorAll('.sidebar a');
-        
-        navLinks.forEach(link => {
-            const linkPage = link.getAttribute('href');
-            if (linkPage === currentPage) {
-                link.classList.add('active');
-            }
-        });
-        
-        // Add animation to stats cards
-        const statCards = document.querySelectorAll('.stat-card');
-        statCards.forEach((card, index) => {
-            card.style.opacity = '0';
-            card.style.transform = 'translateY(20px)';
-            setTimeout(() => {
-                card.style.transition = 'all 0.5s ease';
-                card.style.opacity = '1';
-                card.style.transform = 'translateY(0)';
-            }, index * 200);
-        });
-    });
-
-    // Confirm logout
-    document.querySelector('a[href="../logout.php"]').addEventListener('click', function(e) {
-        if(!confirm('Are you sure you want to logout?')) {
-            e.preventDefault();
-        }
-    });
-
-    // Initialize FullCalendar
-    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize FullCalendar
         const calendarEl = document.getElementById('examCalendar');
         
         // Prepare events from PHP data
@@ -1528,11 +1392,10 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 const date = info.event.start ? info.event.start.toLocaleDateString([], {weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'}) : '';
                 
                 let studentTypeInfo = '';
-                if (studentType !== 'Not specified') {
-                    studentTypeInfo = `👨‍🎓 Student Type: ${studentType} Year ${year}\n`;
+                if (studentType && studentType !== 'Not specified') {
+                    studentTypeInfo = `👨‍🎓 Student Type: ${studentType} ${year ? 'Year ' + year : ''}\n`;
                 }
                 
-                // Create a simple alert
                 alert(
                     `📚 ${info.event.title}\n\n` +
                     `📖 Course: ${course}\n` +
@@ -1555,8 +1418,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 const year = info.event.extendedProps.year;
                 
                 let studentTypeInfo = '';
-                if (studentType !== 'Not specified') {
-                    studentTypeInfo = `Student Type: ${studentType} Year ${year}\n`;
+                if (studentType && studentType !== 'Not specified') {
+                    studentTypeInfo = `Student Type: ${studentType} ${year ? 'Year ' + year : ''}\n`;
                 }
                 
                 info.el.title = `${title}\nCourse: ${course}\n${studentTypeInfo}Room: ${room}\nSupervisor: ${instructor}`;
@@ -1567,18 +1430,11 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 info.el.style.padding = '4px 8px';
                 info.el.style.fontSize = '0.85rem';
                 info.el.style.margin = '2px 0';
-                
-                // Add border for extension student exams
-                if (studentType === 'extension') {
-                    info.el.style.borderLeft = '3px solid #8b5cf6';
-                } else if (studentType === 'freshman' || year === '1') {
-                    info.el.style.borderLeft = '3px solid #06b6d4';
-                }
             },
             editable: false,
             selectable: false,
             height: 'auto',
-            contentHeight: 450,
+            contentHeight: 500,
             dayMaxEvents: 3,
             eventTimeFormat: {
                 hour: '2-digit',
@@ -1591,13 +1447,28 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 week: 'Week',
                 day: 'Day'
             },
-            themeSystem: 'standard',
-            dayCellContent: function(e) {
-                e.dayNumberText = e.dayNumberText.replace('日', '');
-            }
+            themeSystem: 'standard'
         });
         
         calendar.render();
+        
+        // Set active state for current page
+        const currentPage = window.location.pathname.split('/').pop();
+        const navLinks = document.querySelectorAll('.sidebar a');
+        
+        navLinks.forEach(link => {
+            const linkPage = link.getAttribute('href');
+            if (linkPage === currentPage) {
+                link.classList.add('active');
+            }
+        });
+    });
+    
+    // Confirm logout
+    document.querySelector('a[href="../logout.php"]')?.addEventListener('click', function(e) {
+        if(!confirm('Are you sure you want to logout?')) {
+            e.preventDefault();
+        }
     });
     
     // Auto-close messages after 5 seconds
@@ -1614,12 +1485,12 @@ $current_page = basename($_SERVER['PHP_SELF']);
         });
     }, 5000);
     
-    // Fallback for broken profile pictures
-    function handleImageError(img) {
-        img.onerror = null;
-        img.src = '../assets/default_profile.png';
-        return true;
-    }
+    // Profile picture fallback
+    document.querySelectorAll('img[alt="Profile Picture"], img[alt="Profile"]').forEach(img => {
+        img.onerror = function() {
+            this.src = '../assets/default_profile.png';
+        };
+    });
     </script>
 </body>
 </html>

@@ -1,0 +1,214 @@
+/* Dark Mode CSS Variables */
+:root {
+    /* Light mode (default) */
+    --bg-primary: #ffffff;
+    --bg-secondary: #f3f4f6;
+    --bg-sidebar: #2c3e50;
+    --bg-card: #ffffff;
+    --bg-input: #ffffff;
+    --text-primary: #111827;
+    --text-secondary: #4b5563;
+    --text-light: #6b7280;
+    --text-sidebar: #ecf0f1;
+    --border-color: #d1d5db;
+    --shadow-color: rgba(0, 0, 0, 0.1);
+    --hover-color: #f9fafb;
+    --table-header: #34495e;
+    --table-stripe: #f2f2f2;
+    --success-bg: #dcfce7;
+    --success-text: #166534;
+    --error-bg: #fee2e2;
+    --error-text: #991b1b;
+    --warning-bg: #fef3c7;
+    --warning-text: #92400e;
+    --info-bg: #dbeafe;
+    --info-text: #1e40af;
+}
+
+[data-theme="dark"] {
+    /* Dark mode */
+    --bg-primary: #121212;
+    --bg-secondary: #1e1e1e;
+    --bg-sidebar: #1a1a1a;
+    --bg-card: #2d2d2d;
+    --bg-input: #2d2d2d;
+    --text-primary: #e0e0e0;
+    --text-secondary: #b0b0b0;
+    --text-light: #888888;
+    --text-sidebar: #e0e0e0;
+    --border-color: #404040;
+    --shadow-color: rgba(0, 0, 0, 0.3);
+    --hover-color: #3d3d3d;
+    --table-header: #2d2d2d;
+    --table-stripe: #363636;
+    --success-bg: #064e3b;
+    --success-text: #a7f3d0;
+    --error-bg: #7f1d1d;
+    --error-text: #fecaca;
+    --warning-bg: #78350f;
+    --warning-text: #fde68a;
+    --info-bg: #1e3a8a;
+    --info-text: #bfdbfe;
+}
+
+/* Dark mode classes */
+.dark-mode {
+    color-scheme: dark;
+}
+
+/* Theme toggle button */
+.theme-toggle {
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin: 10px auto;
+    font-size: 18px;
+}
+
+.theme-toggle:hover {
+    background: var(--hover-color);
+    transform: scale(1.05);
+    box-shadow: 0 2px 8px var(--shadow-color);
+}
+
+.theme-toggle-container {
+    display: flex;
+    justify-content: center;
+    margin-top: 10px;
+}
+
+/* Floating toggle for pages without sidebar */
+.floating-toggle {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1000;
+    box-shadow: 0 4px 12px var(--shadow-color);
+}
+
+/* Apply CSS variables to existing elements */
+body {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+.sidebar {
+    background: var(--bg-sidebar) !important;
+}
+
+.sidebar a {
+    color: var(--text-sidebar) !important;
+}
+
+.sidebar a:hover {
+    background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.sidebar a.active {
+    background: #1abc9c !important;
+}
+
+.main-content {
+    background: var(--bg-primary);
+}
+
+.card {
+    background: var(--bg-card);
+    color: var(--text-primary);
+}
+
+.user-form {
+    background: var(--bg-card);
+}
+
+.user-form input,
+.user-form select {
+    background: var(--bg-input);
+    color: var(--text-primary);
+    border-color: var(--border-color);
+}
+
+.user-form input:focus,
+.user-form select:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+}
+
+.user-table th {
+    background: var(--table-header) !important;
+}
+
+.user-table tr:nth-child(even) {
+    background: var(--table-stripe);
+}
+
+.user-table tr:hover {
+    background: var(--hover-color);
+}
+
+.message.success {
+    background: var(--success-bg);
+    color: var(--success-text);
+    border-color: var(--success-text);
+}
+
+.message.error {
+    background: var(--error-bg);
+    color: var(--error-text);
+    border-color: var(--error-text);
+}
+
+.message.warning {
+    background: var(--warning-bg);
+    color: var(--warning-text);
+    border-color: var(--warning-text);
+}
+
+.message.info {
+    background: var(--info-bg);
+    color: var(--info-text);
+    border-color: var(--info-text);
+}
+
+.topbar {
+    background: var(--bg-sidebar) !important;
+    color: var(--text-sidebar) !important;
+}
+
+.form-group label {
+    color: var(--text-primary);
+}
+
+.button-action {
+    color: white !important;
+}
+
+/* Update role badges for dark mode */
+[data-theme="dark"] .role-admin {
+    background: #7f1d1d;
+}
+
+[data-theme="dark"] .role-student {
+    background: #064e3b;
+}
+
+[data-theme="dark"] .role-instructor {
+    background: #1e3a8a;
+}
+
+[data-theme="dark"] .role-department_head {
+    background: #4c1d95;
+}
+
+[data-theme="dark"] .year-badge {
+    background: #1e3a8a;
+    color: #bfdbfe;
+}

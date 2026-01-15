@@ -415,6 +415,105 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
 }
 .sidebar a:hover, .sidebar a.active { background:#1abc9c; color:white; }
 
+/* ================= Sidebar Scrollability ================= */
+.sidebar { 
+    position: fixed; 
+    top:0; left:0; 
+    width:250px; 
+    height:100%; 
+    background:var(--bg-sidebar); 
+    color:var(--text-sidebar);
+    z-index:1100;
+    transition: transform 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* Hide overflow from main container */
+}
+
+/* Scrollable sidebar content */
+.sidebar-scrollable {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 20px 0;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Custom scrollbar for sidebar */
+.sidebar-scrollable::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sidebar-scrollable::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+}
+
+.sidebar-scrollable::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+}
+
+.sidebar-scrollable::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.4);
+}
+
+/* For Firefox */
+.sidebar-scrollable {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.3) rgba(255, 255, 255, 0.1);
+}
+
+/* Keep profile and header fixed */
+.sidebar-profile, .sidebar h2 {
+    position: sticky;
+    top: 0;
+    background: var(--bg-sidebar);
+    z-index: 10;
+    padding-top: 10px;
+    margin-top: -10px;
+}
+
+.sidebar h2 {
+    top: 181px; /* Adjust based on profile section height */
+}
+
+/* Navigation container */
+.sidebar nav {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0; /* Allow shrinking */
+}
+
+/* Make logout button stay at bottom */
+
+/* Ensure active link is visible */
+.sidebar a.active {
+    position: relative;
+    z-index: 5;
+}
+
+/* Adjust for mobile */
+@media (max-width: 768px) {
+    .sidebar.active {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .sidebar-profile, .sidebar h2 {
+        position: relative;
+        top: 0;
+        margin-top: 0;
+    }
+    
+    .sidebar a[href="../logout.php"] {
+        position: relative;
+        bottom: auto;
+        margin-top: 0;
+    }
+}
 .pending-badge {
     background: #ef4444;
     color: white;
@@ -928,53 +1027,59 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
 
 <!-- Sidebar -->
 <div class="sidebar" id="sidebar">
-    <div class="sidebar-profile">
-        <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic"
-             onerror="this.onerror=null; this.src='../assets/default_profile.png';">
-        <p><?= htmlspecialchars($current_user['username']) ?></p>
+    <!-- Scrollable content wrapper -->
+    <div class="sidebar-scrollable">
+        <div class="sidebar-profile">
+            <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic"
+                 onerror="this.onerror=null; this.src='../assets/default_profile.png';">
+            <p><?= htmlspecialchars($current_user['username']) ?></p>
+        </div>
+        <h2>Admin Panel</h2>
+        
+        <!-- Navigation Container -->
+        <nav>
+            <a href="dashboard.php" class="<?= $current_page=='dashboard.php'?'active':'' ?>">
+                <i class="fas fa-home"></i> Dashboard
+            </a>
+            <a href="manage_users.php" class="<?= $current_page=='manage_users.php'?'active':'' ?>">
+                <i class="fas fa-users"></i> Manage Users
+            </a>
+            <a href="approve_users.php" class="<?= $current_page=='approve_users.php'?'active':'' ?>">
+                <i class="fas fa-user-check"></i> Approve Users
+                <?php if($pending_approvals > 0): ?>
+                    <span class="pending-badge"><?= $pending_approvals ?></span>
+                <?php endif; ?>
+            </a>
+            <a href="manage_departments.php" class="<?= $current_page=='manage_departments.php'?'active':'' ?>">
+                <i class="fas fa-building"></i> Manage Departments
+            </a>
+            <a href="manage_courses.php" class="<?= $current_page=='manage_courses.php'?'active':'' ?>">
+                <i class="fas fa-book"></i> Manage Courses
+            </a>
+            <a href="manage_rooms.php" class="<?= $current_page=='manage_rooms.php'?'active':'' ?>">
+                <i class="fas fa-door-closed"></i> Manage Rooms
+            </a>
+            <a href="manage_schedules.php">
+                <i class="fas fa-calendar-alt"></i> Manage Schedule
+            </a>
+            <a href="assign_instructors.php" class="active">
+                <i class="fas fa-chalkboard-teacher"></i> Assign Instructors
+            </a>
+            <a href="manage_exam_schedules.php" class="<?= $current_page=='manage_exam_schedules.php'?'active':'' ?>">
+                <i class="fas fa-clipboard-list"></i> Exam Scheduling
+            </a>
+            <a href="manage_announcements.php" class="<?= $current_page=='manage_announcements.php'?'active':'' ?>">
+                <i class="fas fa-bullhorn"></i> Manage Announcements
+            </a>
+            <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
+                <i class="fas fa-user-edit"></i> Edit Profile
+            </a>
+            <a href="../logout.php">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </nav>
     </div>
-    <h2>Admin Panel</h2>
-    <a href="dashboard.php" class="<?= $current_page=='dashboard.php'?'active':'' ?>">
-        <i class="fas fa-home"></i> Dashboard
-    </a>
-    <a href="manage_users.php" class="<?= $current_page=='manage_users.php'?'active':'' ?>">
-        <i class="fas fa-users"></i> Manage Users
-    </a>
-    <a href="approve_users.php" class="<?= $current_page=='approve_users.php'?'active':'' ?>">
-        <i class="fas fa-user-check"></i> Approve Users
-        <?php if($pending_approvals > 0): ?>
-            <span class="pending-badge"><?= $pending_approvals ?></span>
-        <?php endif; ?>
-    </a>
-    <a href="manage_departments.php" class="<?= $current_page=='manage_departments.php'?'active':'' ?>">
-        <i class="fas fa-building"></i> Manage Departments
-    </a>
-    <a href="manage_courses.php" class="<?= $current_page=='manage_courses.php'?'active':'' ?>">
-        <i class="fas fa-book"></i> Manage Courses
-    </a>
-    <a href="manage_rooms.php" class="<?= $current_page=='manage_rooms.php'?'active':'' ?>">
-        <i class="fas fa-door-closed"></i> Manage Rooms
-    </a>
-    <a href="manage_schedules.php">
-        <i class="fas fa-calendar-alt"></i> Manage Schedule
-    </a>
-    <a href="assign_instructors.php" class="active">
-        <i class="fas fa-chalkboard-teacher"></i> Assign Instructors
-    </a>
-      <a href="admin_exam_schedules.php" class="<?= $current_page=='admin_exam_schedules.php'?'active':'' ?>">
-        <i class="fas fa-clipboard-list"></i> Exam Scheduling
-    </a>
-    <a href="manage_announcements.php" class="<?= $current_page=='manage_announcements.php'?'active':'' ?>">
-        <i class="fas fa-bullhorn"></i> Manage Announcements
-    </a>
-    <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
-        <i class="fas fa-user-edit"></i> Edit Profile
-    </a>
-    <a href="../logout.php">
-        <i class="fas fa-sign-out-alt"></i> Logout
-    </a>
 </div>
-
 <!-- Main Content -->
 <div class="main-content">
     <div class="content-wrapper">

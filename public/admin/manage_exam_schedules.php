@@ -133,6 +133,10 @@ if(isset($_POST['save_exam'])){
         $max_students = (int)$_POST['max_students'];
         $is_published = isset($_POST['is_published']) ? 1 : 0;
         
+        // For freshman students, we need to set student_type and year
+        $student_type = 'regular'; // Freshman are regular students
+        $year = 'freshman'; // This will be 'freshman' in the database
+        
         // Validate inputs
         if(strtotime($end_time) <= strtotime($start_time)) {
             $message = "End time must be after start time";
@@ -159,18 +163,20 @@ if(isset($_POST['save_exam'])){
                     $pdo->beginTransaction();
                     
                     if($exam_id > 0) {
-                        // Update existing exam
+                        // Update existing exam - ADDED student_type and year
                         $stmt = $pdo->prepare("
                             UPDATE exam_schedules 
                             SET course_id = ?, section_number = ?, exam_type = ?, exam_date = ?, 
                                 start_time = ?, end_time = ?, room_id = ?, 
-                                academic_year = ?, semester = ?, max_students = ?, is_published = ?
+                                academic_year = ?, semester = ?, max_students = ?, 
+                                student_type = ?, year = ?, is_published = ?
                             WHERE exam_id = ?
                         ");
                         $stmt->execute([
                             $course_id, $section_number, $exam_type, $exam_date,
                             $start_time, $end_time, $room_id,
-                            $academic_year, $semester, $max_students, $is_published, $exam_id
+                            $academic_year, $semester, $max_students,
+                            $student_type, $year, $is_published, $exam_id
                         ]);
                         
                         if($stmt->rowCount() > 0) {
@@ -181,18 +187,19 @@ if(isset($_POST['save_exam'])){
                             $message_type = "warning";
                         }
                     } else {
-                        // Insert new exam
+                        // Insert new exam - ADDED student_type and year
                         $stmt = $pdo->prepare("
                             INSERT INTO exam_schedules 
                             (course_id, section_number, exam_type, exam_date, start_time, end_time, 
                              room_id, academic_year, semester, max_students, 
-                             is_published, created_by)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                             student_type, year, is_published, created_by)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         ");
                         $stmt->execute([
                             $course_id, $section_number, $exam_type, $exam_date,
                             $start_time, $end_time, $room_id,
-                            $academic_year, $semester, $max_students, $is_published, $_SESSION['user_id']
+                            $academic_year, $semester, $max_students,
+                            $student_type, $year, $is_published, $_SESSION['user_id']
                         ]);
                         
                         $exam_id = $pdo->lastInsertId();
@@ -289,6 +296,10 @@ if(isset($_POST['bulk_schedule_exam'])){
         $semester = $_POST['bulk_semester'];
         $max_students = (int)$_POST['bulk_max_students'];
         
+        // For freshman students
+        $student_type = 'regular';
+        $year = 'freshman';
+        
         if(empty($course_ids)) {
             $message = "❌ Please select at least one course.";
             $message_type = "error";
@@ -363,17 +374,19 @@ if(isset($_POST['bulk_schedule_exam'])){
                             $conflicts = $conflict_check->fetchColumn();
                             
                             if($conflicts == 0) {
-                                // Room is available, schedule exam
+                                // Room is available, schedule exam - ADDED student_type and year
                                 $insert_stmt = $pdo->prepare("
                                     INSERT INTO exam_schedules 
                                     (course_id, section_number, exam_type, exam_date, start_time, end_time, 
-                                     room_id, academic_year, semester, max_students, is_published, created_by)
-                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+                                     room_id, academic_year, semester, max_students, 
+                                     student_type, year, is_published, created_by)
+                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
                                 ");
                                 $insert_stmt->execute([
                                     $course_id, $section_number, $exam_type, $exam_date,
                                     $start_time, $end_time, $room['room_id'],
-                                    $academic_year, $semester, $max_students, $_SESSION['user_id']
+                                    $academic_year, $semester, $max_students,
+                                    $student_type, $year, $_SESSION['user_id']
                                 ]);
                                 
                                 $created_count++;
@@ -414,6 +427,7 @@ if(isset($_POST['bulk_schedule_exam'])){
                     $message .= "• Time: " . date('g:i A', strtotime($start_time)) . " - " . date('g:i A', strtotime($end_time)) . "<br>";
                     $message .= "• Semester: $semester<br>";
                     $message .= "• Academic Year: $academic_year<br>";
+                    $message .= "• Student Type: Regular (Freshman)<br>";
                     $message .= "</div>";
                     
                     if($conflict_count > 0) {
@@ -497,7 +511,7 @@ $sections_stmt = $pdo->query("
 ");
 $all_sections = $sections_stmt->fetchAll(PDO::FETCH_COLUMN);
 
-// Fetch all exam schedules - FIXED QUERY without instructor_id and using schedule_id
+// Fetch all exam schedules for freshman - UPDATED to include student_type and year
 $exams_stmt = $pdo->prepare("
     SELECT es.*, 
            c.course_code, c.course_name,
@@ -515,7 +529,8 @@ $exams_stmt = $pdo->prepare("
             AND COALESCE(section_number, 1) = es.section_number
             AND year = 'freshman'
         )
-    WHERE (c.is_freshman = 1 OR es.course_id IN (SELECT course_id FROM schedule WHERE year = 'freshman'))
+    WHERE (es.student_type = 'regular' AND es.year = 'freshman')
+       OR (es.student_type IS NULL AND es.year IS NULL)
     GROUP BY es.exam_id
     ORDER BY es.exam_date DESC, es.start_time, es.section_number
 ");
@@ -540,7 +555,12 @@ foreach($exams as $exam) {
 // Count exams by type
 $exam_type_counts = [];
 foreach($exam_types as $type) {
-    $count_stmt = $pdo->prepare("SELECT COUNT(*) FROM exam_schedules WHERE exam_type = ?");
+    $count_stmt = $pdo->prepare("
+        SELECT COUNT(*) 
+        FROM exam_schedules 
+        WHERE exam_type = ? 
+        AND (student_type = 'regular' AND year = 'freshman' OR student_type IS NULL)
+    ");
     $count_stmt->execute([$type]);
     $exam_type_counts[$type] = $count_stmt->fetchColumn();
 }
@@ -548,7 +568,12 @@ foreach($exam_types as $type) {
 // Count exams by section
 $section_counts = [];
 foreach($all_sections as $section) {
-    $count_stmt = $pdo->prepare("SELECT COUNT(*) FROM exam_schedules WHERE section_number = ?");
+    $count_stmt = $pdo->prepare("
+        SELECT COUNT(*) 
+        FROM exam_schedules 
+        WHERE section_number = ? 
+        AND (student_type = 'regular' AND year = 'freshman' OR student_type IS NULL)
+    ");
     $count_stmt->execute([$section]);
     $section_counts[$section] = $count_stmt->fetchColumn();
 }
@@ -719,6 +744,162 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
     position: relative;
 }
 .sidebar a:hover, .sidebar a.active { background:#1abc9c; color:white; }
+/* ================= Sidebar with Scrollability ================= */
+.sidebar { 
+    position: fixed; 
+    top:0; left:0; 
+    width:250px; 
+    height:100%; 
+    background:var(--bg-sidebar); 
+    color:var(--text-sidebar);
+    z-index:1100;
+    transition: transform 0.3s ease;
+    padding: 20px 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Scrollable sidebar content */
+.sidebar-scrollable {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Custom scrollbar styling for sidebar */
+.sidebar-scrollable::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sidebar-scrollable::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+}
+
+.sidebar-scrollable::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+}
+
+.sidebar-scrollable::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.4);
+}
+
+/* For Firefox */
+.sidebar-scrollable {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.3) rgba(255, 255, 255, 0.1);
+}
+
+.sidebar.hidden { transform:translateX(-260px); }
+
+.sidebar-profile {
+    text-align: center;
+    margin-bottom: 25px;
+    padding: 0 20px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.2);
+    position: sticky;
+    top: 0;
+    background: var(--bg-sidebar);
+    z-index: 10;
+    padding-top: 10px;
+    margin-top: -10px;
+}
+
+.sidebar-profile img {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-bottom: 10px;
+    border: 2px solid #1abc9c;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+.sidebar-profile p {
+    color: var(--text-sidebar);
+    font-weight: bold;
+    margin: 0;
+    font-size: 16px;
+}
+
+.sidebar h2 {
+    text-align: center;
+    color: var(--text-sidebar);
+    margin-bottom: 25px;
+    font-size: 22px;
+    padding: 0 20px;
+    position: sticky;
+    top: 181px;
+    background: var(--bg-sidebar);
+    z-index: 10;
+}
+
+/* Navigation container */
+.sidebar nav {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar a { 
+    display:block; 
+    padding:12px 20px; 
+    color:var(--text-sidebar); 
+    text-decoration:none; 
+    transition: background 0.3s; 
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    position: relative;
+}
+.sidebar a:hover, .sidebar a.active { background:#1abc9c; color:white; }
+
+.pending-badge {
+    position: absolute;
+    right: 15px;
+    background: #ef4444;
+    color: white;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    margin-left: auto;
+}
+
+/* Logout button - pushes to bottom */
+.sidebar a[href="../logout.php"] {
+    margin-top: auto;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Adjust for mobile */
+@media(max-width: 768px){
+    .topbar{ display:flex; }
+    .sidebar { 
+        transform:translateX(-100%); 
+        width: 250px;
+    }
+    .sidebar.active { transform:translateX(0); }
+    
+    .sidebar-profile, .sidebar h2 {
+        position: relative;
+        top: 0;
+        margin-top: 0;
+        padding-top: 0;
+    }
+    
+    .sidebar a[href="../logout.php"] {
+        margin-top: 0;
+    }
+}
 
 .pending-badge {
     background: #ef4444;
@@ -1087,6 +1268,42 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
 
 .exam-table tr:last-child td {
     border-bottom: none;
+}
+
+/* Student Type Badge */
+.student-type-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-left: 5px;
+}
+
+.student-type-badge.regular {
+    background: rgba(59, 130, 246, 0.1);
+    color: #3b82f6;
+    border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.student-type-badge.freshman {
+    background: rgba(6, 182, 212, 0.1);
+    color: #06b6d4;
+    border: 1px solid rgba(6, 182, 212, 0.2);
+}
+
+/* Year Badge */
+.year-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    margin-left: 5px;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    background: #06b6d4;
+    color: white;
 }
 
 /* ================= Button Styles ================= */
@@ -1543,51 +1760,58 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
 
 <!-- Sidebar -->
 <div class="sidebar" id="sidebar">
-    <div class="sidebar-profile">
-        <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic"
-             onerror="this.onerror=null; this.src='../assets/default_profile.png';">
-        <p><?= htmlspecialchars($current_user['username']) ?></p>
+    <!-- Scrollable content wrapper -->
+    <div class="sidebar-scrollable">
+        <div class="sidebar-profile">
+            <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic"
+                 onerror="this.onerror=null; this.src='../assets/default_profile.png';">
+            <p><?= htmlspecialchars($current_user['username']) ?></p>
+        </div>
+        <h2>Admin Panel</h2>
+        
+        <!-- Navigation Container -->
+        <nav>
+            <a href="dashboard.php" class="<?= $current_page=='dashboard.php'?'active':'' ?>">
+                <i class="fas fa-home"></i> Dashboard
+            </a>
+            <a href="manage_users.php" class="<?= $current_page=='manage_users.php'?'active':'' ?>">
+                <i class="fas fa-users"></i> Manage Users
+            </a>
+            <a href="approve_users.php" class="<?= $current_page=='approve_users.php'?'active':'' ?>">
+                <i class="fas fa-user-check"></i> Approve Users
+                <?php if($pending_approvals > 0): ?>
+                    <span class="pending-badge"><?= $pending_approvals ?></span>
+                <?php endif; ?>
+            </a>
+            <a href="manage_departments.php" class="<?= $current_page=='manage_departments.php'?'active':'' ?>">
+                <i class="fas fa-building"></i> Manage Departments
+            </a>
+            <a href="manage_courses.php" class="<?= $current_page=='manage_courses.php'?'active':'' ?>">
+                <i class="fas fa-book"></i> Manage Courses
+            </a>
+            <a href="manage_rooms.php" class="<?= $current_page=='manage_rooms.php'?'active':'' ?>">
+                <i class="fas fa-door-closed"></i> Manage Rooms
+            </a>
+            <a href="manage_schedules.php">
+                <i class="fas fa-calendar-alt"></i> Manage Schedule
+            </a>
+            <a href="assign_instructors.php">
+                <i class="fas fa-chalkboard-teacher"></i> Assign Instructors
+            </a>
+            <a href="admin_exam_schedules.php" class="active">
+                <i class="fas fa-clipboard-list"></i> Exam Scheduling
+            </a>
+            <a href="manage_announcements.php">
+                <i class="fas fa-bullhorn"></i> Manage Announcements
+            </a>
+            <a href="edit_profile.php">
+                <i class="fas fa-user-edit"></i> Edit Profile
+            </a>
+            <a href="../logout.php">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </nav>
     </div>
-    <h2>Admin Panel</h2>
-    <a href="dashboard.php" class="<?= $current_page=='dashboard.php'?'active':'' ?>">
-        <i class="fas fa-home"></i> Dashboard
-    </a>
-    <a href="manage_users.php" class="<?= $current_page=='manage_users.php'?'active':'' ?>">
-        <i class="fas fa-users"></i> Manage Users
-    </a>
-    <a href="approve_users.php" class="<?= $current_page=='approve_users.php'?'active':'' ?>">
-        <i class="fas fa-user-check"></i> Approve Users
-        <?php if($pending_approvals > 0): ?>
-            <span class="pending-badge"><?= $pending_approvals ?></span>
-        <?php endif; ?>
-    </a>
-    <a href="manage_departments.php" class="<?= $current_page=='manage_departments.php'?'active':'' ?>">
-        <i class="fas fa-building"></i> Manage Departments
-    </a>
-    <a href="manage_courses.php" class="<?= $current_page=='manage_courses.php'?'active':'' ?>">
-        <i class="fas fa-book"></i> Manage Courses
-    </a>
-    <a href="manage_rooms.php" class="<?= $current_page=='manage_rooms.php'?'active':'' ?>">
-        <i class="fas fa-door-closed"></i> Manage Rooms
-    </a>
-    <a href="manage_schedules.php">
-        <i class="fas fa-calendar-alt"></i> Manage Schedule
-    </a>
-    <a href="assign_instructors.php">
-        <i class="fas fa-chalkboard-teacher"></i> Assign Instructors
-    </a>
-    <a href="admin_exam_schedules.php" class="active">
-        <i class="fas fa-clipboard-list"></i> Exam Scheduling
-    </a>
-    <a href="manage_announcements.php">
-        <i class="fas fa-bullhorn"></i> Manage Announcements
-    </a>
-    <a href="edit_profile.php">
-        <i class="fas fa-user-edit"></i> Edit Profile
-    </a>
-    <a href="../logout.php">
-        <i class="fas fa-sign-out-alt"></i> Logout
-    </a>
 </div>
 
 <!-- Exam Modal -->
@@ -1603,6 +1827,10 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
             <form method="POST" id="examForm">
                 <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
                 <input type="hidden" name="exam_id" value="<?= $edit_exam['exam_id'] ?? '' ?>">
+                
+                <!-- Hidden fields for student type and year -->
+                <input type="hidden" name="student_type" value="regular">
+                <input type="hidden" name="year" value="freshman">
                 
                 <div class="form-row">
                     <div class="form-group">
@@ -1716,6 +1944,14 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
                     </small>
                 </div>
                 
+                <!-- Student Type Info -->
+                <div class="form-group" style="background: rgba(6, 182, 212, 0.1); padding: 10px 15px; border-radius: 8px; border: 1px solid rgba(6, 182, 212, 0.2);">
+                    <small style="color: #06b6d4;">
+                        <i class="fas fa-info-circle"></i> This exam will be scheduled for <strong>Regular Freshman</strong> students.
+                        Semester: <?= ($edit_exam['semester'] ?? '1st Semester') ?>
+                    </small>
+                </div>
+                
                 <div class="form-actions">
                     <button type="submit" name="save_exam" class="btn btn-primary">
                         <i class="fas fa-save"></i> <?= $edit_exam ? 'Update Exam' : 'Schedule Exam' ?>
@@ -1783,10 +2019,10 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
             
             <div class="stat-card">
                 <div class="stat-icon">
-                    <i class="fas fa-layer-group"></i>
+                    <i class="fas fa-user-graduate"></i>
                 </div>
-                <div class="stat-value"><?= count($all_sections) ?></div>
-                <div class="stat-label">Active Sections</div>
+                <div class="stat-value">Regular (Freshman)</div>
+                <div class="stat-label">Student Type</div>
             </div>
         </div>
 
@@ -1880,6 +2116,10 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
                     </div>
                 </div>
                 
+                <!-- Hidden fields for bulk scheduling -->
+                <input type="hidden" name="student_type" value="regular">
+                <input type="hidden" name="year" value="freshman">
+                
                 <div class="form-group">
                     <label>Select Courses to Schedule Exams:</label>
                     <div class="course-selection">
@@ -1905,6 +2145,7 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
                     </button>
                     <small style="display: block; margin-top: 10px; color: var(--text-secondary);">
                         This will schedule exams for ALL sections of selected courses, automatically assigning available rooms.
+                        <br><strong>Student Type:</strong> Regular (Freshman)
                     </small>
                 </div>
             </form>
@@ -1942,6 +2183,7 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
                                 <th>Exam Type</th>
                                 <th>Date & Time</th>
                                 <th>Room</th>
+                                <th>Student Type</th>
                                 <th>Capacity</th>
                                 <th>Status</th>
                                 <th>Actions</th>
@@ -1955,6 +2197,9 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
                                 $is_past = $exam_timestamp < $current_time;
                                 $is_upcoming = $exam_timestamp > $current_time;
                                 $is_today = date('Y-m-d') == $exam['exam_date'];
+                                
+                                $student_type = $exam['student_type'] ?? 'Not specified';
+                                $year = $exam['year'] ?? '';
                                 ?>
                                 <tr>
                                     <td>
@@ -1990,6 +2235,20 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
                                         <div style="color: var(--text-secondary); font-size: 0.9rem;">
                                             Capacity: <?= $exam['capacity'] ?>
                                         </div>
+                                    </td>
+                                    <td>
+                                        <?php if($student_type && $student_type !== 'Not specified'): ?>
+                                            <span class="student-type-badge <?= $student_type ?>">
+                                                <?= ucfirst($student_type) ?>
+                                                <?php if($year): ?>
+                                                    <span class="year-badge">
+                                                        Year <?= htmlspecialchars($year) ?>
+                                                    </span>
+                                                <?php endif; ?>
+                                            </span>
+                                        <?php else: ?>
+                                            <span class="badge badge-secondary">Not specified</span>
+                                        <?php endif; ?>
                                     </td>
                                     <td>
                                         <div style="font-weight: 600; color: var(--text-primary);">
@@ -2134,7 +2393,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 'course' => $exam['course_name'],
                 'room' => $exam['room_name'],
                 'published' => $exam['is_published'] == 1,
-                'section' => $exam['section_number']
+                'section' => $exam['section_number'],
+                'student_type' => $exam['student_type'] ?? 'regular',
+                'year' => $exam['year'] ?? 'freshman'
             ]
         ];
     }, $exams)) ?>;
@@ -2158,9 +2419,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const room = info.event.extendedProps.room;
             const published = info.event.extendedProps.published;
             const section = info.event.extendedProps.section;
+            const student_type = info.event.extendedProps.student_type;
+            const year = info.event.extendedProps.year;
             
             const status = published ? 'Published' : 'Not Published';
-            info.el.title = `${title}\nCourse: ${course}\nRoom: ${room}\nSection: ${section}\nStatus: ${status}`;
+            info.el.title = `${title}\nCourse: ${course}\nRoom: ${room}\nSection: ${section}\nStudent Type: ${student_type} (Year ${year})\nStatus: ${status}`;
             
             // Add custom styling
             info.el.style.borderRadius = '6px';
@@ -2257,6 +2520,7 @@ document.getElementById('bulkExamForm').addEventListener('submit', function(e) {
     const confirmation = confirm(
         `📚 Bulk Exam Scheduling:\n\n` +
         `This will schedule exams for ALL sections of ${selectedCourses} course(s).\n` +
+        `Student Type: Regular (Freshman)\n` +
         `The system will automatically assign available rooms.\n\n` +
         `Continue?`
     );

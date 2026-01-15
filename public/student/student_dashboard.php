@@ -213,6 +213,191 @@ $current_page = basename($_SERVER['PHP_SELF']);
     font-size: 16px;
 }
 
+/* ================= Updated Sidebar ================= */
+.sidebar {
+    position: fixed; 
+    top:0; 
+    left:0;
+    width:250px; 
+    height:100%;
+    background:var(--bg-sidebar); 
+    color:var(--text-sidebar);
+    z-index:1100;
+    transition: transform 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.sidebar.hidden { 
+    transform:translateX(-260px); 
+}
+
+/* Sidebar Content (scrollable) */
+.sidebar-content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 20px 0;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+/* Custom scrollbar for sidebar */
+.sidebar-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sidebar-content::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 3px;
+}
+
+.sidebar-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+}
+
+.sidebar-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
+}
+
+[data-theme="dark"] .sidebar-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+[data-theme="dark"] .sidebar-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* Sidebar Profile */
+.sidebar-profile {
+    text-align: center;
+    margin-bottom: 25px;
+    padding: 0 20px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.2);
+    flex-shrink: 0; /* Prevent shrinking */
+}
+
+.sidebar-profile img {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-bottom: 10px;
+    border: 2px solid #1abc9c;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+.sidebar-profile p {
+    color: var(--text-sidebar);
+    font-weight: bold;
+    margin: 0;
+    font-size: 16px;
+}
+
+/* Year badge in sidebar */
+.year-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    background: <?= (substr($student_year, 0, 1) === 'E') ? '#8b5cf6' : '#3b82f6' ?>;
+    color: white;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-top: 5px;
+}
+
+/* Sidebar Title */
+.sidebar h2 {
+    text-align: center;
+    color: var(--text-sidebar);
+    margin-bottom: 25px;
+    font-size: 22px;
+    padding: 0 20px;
+}
+
+/* Sidebar Navigation */
+.sidebar nav {
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar a { 
+    display: flex; 
+    align-items: center;
+    gap: 10px;
+    padding: 12px 20px; 
+    color: var(--text-sidebar); 
+    text-decoration: none; 
+    transition: all 0.3s; 
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.sidebar a:hover, .sidebar a.active { 
+    background: #1abc9c; 
+    color: white; 
+    padding-left: 25px;
+}
+
+.sidebar a i {
+    width: 20px;
+    text-align: center;
+    font-size: 1.1rem;
+}
+
+/* Optional: Add fade effect at bottom when scrolling */
+.sidebar-content::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 30px;
+    background: linear-gradient(to bottom, transparent, var(--bg-sidebar));
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.sidebar-content.scrolled::after {
+    opacity: 1;
+}
+
+/* ================= Overlay ================= */
+.overlay {
+    position: fixed; 
+    top:0; 
+    left:0; 
+    width:100%; 
+    height:100%;
+    background: rgba(0,0,0,0.4); 
+    z-index:1050;
+    display:none; 
+    opacity:0; 
+    transition: opacity 0.3s ease;
+}
+
+.overlay.active { 
+    display:block; 
+    opacity:1; 
+}
+
+/* ================= Main content ================= */
+.main-content {
+    margin-left: 250px;
+    padding:20px;
+    min-height:100vh;
+    background: var(--bg-primary);
+    transition: all 0.3s ease;
+}
+
+@media (max-width: 768px) {
+    .main-content {
+        margin-left: 0;
+        padding: 15px;
+        padding-top: 80px;
+    }
+}
 /* Year badge in sidebar */
 .year-badge {
     display: inline-block;
@@ -677,8 +862,9 @@ $current_page = basename($_SERVER['PHP_SELF']);
     <!-- Overlay for Mobile -->
     <div class="overlay" onclick="toggleSidebar()"></div>
 
-    <!-- Sidebar - FIXED DUPLICATE LINKS -->
-    <div class="sidebar">
+<!-- Sidebar -->
+<div class="sidebar" id="sidebar">
+    <div class="sidebar-content" id="sidebarContent">
         <div class="sidebar-profile">
             <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic">
             <p><?= htmlspecialchars($user['username'] ?? 'Student') ?></p>
@@ -694,26 +880,34 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 </span>
             <?php endif; ?>
         </div>
+        
         <h2>Student Panel</h2>
-        <a href="student_dashboard.php" class="<?= $current_page=='student_dashboard.php'?'active':'' ?>">
-            <i class="fas fa-home"></i> Dashboard
-        </a>
-        <a href="my_schedule.php" class="<?= $current_page=='my_schedule.php'?'active':'' ?>">
-            <i class="fas fa-calendar-alt"></i> My Schedule
-        </a>
-        <a href="view_exam_schedules.php" class="<?= $current_page=='view_exam_schedules.php'?'active':'' ?>">
-            <i class="fas fa-clipboard-list"></i> Exam Schedule
-        </a>
-        <a href="view_announcements.php" class="<?= $current_page=='view_announcements.php'?'active':'' ?>">
-            <i class="fas fa-bullhorn"></i> Announcements
-        </a>
-        <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
-            <i class="fas fa-user-edit"></i> Edit Profile
-        </a>
-        <a href="../logout.php">
-            <i class="fas fa-sign-out-alt"></i> Logout
-        </a>
+        
+        <nav>
+            <a href="student_dashboard.php" class="<?= $current_page=='student_dashboard.php'?'active':'' ?>">
+                <i class="fas fa-home"></i> Dashboard
+            </a>
+            <a href="my_schedule.php" class="<?= $current_page=='my_schedule.php'?'active':'' ?>">
+                <i class="fas fa-calendar-alt"></i> My Schedule
+            </a>
+            <a href="view_exam_schedules.php" class="<?= $current_page=='view_exam_schedules.php'?'active':'' ?>">
+                <i class="fas fa-clipboard-list"></i> Exam Schedule
+            </a>
+            <a href="view_announcements.php" class="<?= $current_page=='view_announcements.php'?'active':'' ?>">
+                <i class="fas fa-bullhorn"></i> Announcements
+            </a>
+            <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
+                <i class="fas fa-user-edit"></i> Edit Profile
+            </a>
+            <a href="../logout.php">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </nav>
     </div>
+</div>
+
+<!-- Overlay for Mobile -->
+<div class="overlay" onclick="toggleSidebar()"></div>
 
     <!-- Main Content -->
     <div class="main-content">
