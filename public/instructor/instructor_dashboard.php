@@ -135,11 +135,93 @@ $current_page = basename($_SERVER['PHP_SELF']);
 * {margin:0;padding:0;box-sizing:border-box;}
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    display:flex;
     min-height:100vh;
     background: var(--bg-primary);
     background-size: 400% 400%;
     overflow-x: hidden;
+}
+
+/* ================= University Header ================= */
+.university-header {
+    background: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%);
+    color: white;
+    padding: 0.5rem 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1201;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.dku-logo-img {
+    width: 45px;
+    height: 45px;
+    object-fit: contain;
+    border-radius: 5px;
+    background: white;
+    padding: 4px;
+}
+
+.system-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    opacity: 0.95;
+}
+
+.header-right {
+    font-size: 0.8rem;
+    opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+    .university-header {
+        padding: 0.5rem 15px;
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+    }
+    
+    .header-left, .header-right {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .system-title {
+        font-size: 0.8rem;
+    }
+    
+    .header-right {
+        font-size: 0.75rem;
+    }
+}
+
+/* Adjust other elements for university header */
+.topbar {
+    top: 60px !important; /* Adjusted for university header */
+}
+
+.sidebar {
+    top: 60px !important; /* Adjusted for university header */
+    height: calc(100vh - 60px) !important;
+}
+
+.overlay {
+    top: 60px; /* Adjusted for university header */
+    height: calc(100vh - 60px);
+}
+
+.main-content {
+    margin-top: 60px; /* Added for university header */
 }
 
 /* Animation for background gradient */
@@ -164,42 +246,54 @@ body {
 /* ========== Topbar for Mobile ========== */
 .topbar {
     display: none;
-    position: fixed; top:0; left:0; width:100%;
-    background:var(--bg-sidebar); color:var(--text-sidebar);
-    padding:15px 20px;
-    z-index:1200;
-    justify-content:space-between; align-items:center;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    position: fixed; 
+    top: 60px; /* Adjusted for university header */
+    left: 0; 
+    width: 100%;
+    background: var(--bg-sidebar); 
+    color: var(--text-sidebar);
+    padding: 12px 20px;
+    z-index: 1200;
+    justify-content: space-between; 
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 .menu-btn {
-    font-size:26px;
-    background:#1abc9c;
-    border:none; color:var(--text-sidebar);
-    cursor:pointer;
-    padding:10px 14px;
-    border-radius:8px;
-    font-weight:600;
+    font-size: 26px;
+    background: #1abc9c;
+    border: none; 
+    color: var(--text-sidebar);
+    cursor: pointer;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-weight: 600;
     transition: background 0.3s, transform 0.2s;
 }
-.menu-btn:hover { background:#159b81; transform:translateY(-2px); }
+.menu-btn:hover { 
+    background: #159b81; 
+    transform: translateY(-2px); 
+}
 
 /* ========== Sidebar ========== */
 .sidebar {
     position: fixed;
-    top:0; left:0;
-    height:100vh;
-    width:240px;
+    top: 60px; /* Adjusted for university header */
+    left: 0;
+    height: calc(100vh - 60px); /* Adjusted for university header */
+    width: 240px;
     background: var(--bg-sidebar);
     padding: 30px 0 20px;
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    box-shadow:2px 0 10px rgba(0,0,0,0.2);
-    z-index:1000;
-    overflow-y:auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.2);
+    z-index: 1000;
+    overflow-y: auto;
     transition: transform 0.3s ease;
 }
-.sidebar.hidden { transform:translateX(-100%); }
+.sidebar.hidden { 
+    transform: translateX(-100%); 
+}
 
 .sidebar-profile {
     text-align: center;
@@ -228,47 +322,34 @@ body {
 
 .sidebar h2 {
     color: var(--text-sidebar);
-    text-align:center;
-    width:100%;
-    margin-bottom:25px;
-    font-size:22px;
+    text-align: center;
+    width: 100%;
+    margin-bottom: 25px;
+    font-size: 22px;
     padding: 0 20px;
 }
+
 .sidebar a {
-    padding:12px 20px;
-    text-decoration:none;
-    font-size:16px;
-    color:var(--text-sidebar);
-    width:100%;
+    padding: 12px 20px;
+    text-decoration: none;
+    font-size: 16px;
+    color: var(--text-sidebar);
+    width: 100%;
     transition: background 0.3s, color 0.3s;
-    border-radius:6px;
-    margin:3px 0;
+    border-radius: 6px;
+    margin: 3px 0;
     display: flex;
     align-items: center;
     gap: 10px;
 }
 .sidebar a.active, .sidebar a:hover {
-    background:#1abc9c;
-    color:#fff;
-    font-weight:bold;
+    background: #1abc9c;
+    color: #fff;
+    font-weight: bold;
 }
 
 /* ========== Updated Sidebar ========== */
 .sidebar {
-    position: fixed;
-    top:0; 
-    left:0;
-    height:100vh;
-    width:240px;
-    background: var(--bg-sidebar);
-    padding: 30px 0 20px;
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    box-shadow:2px 0 10px rgba(0,0,0,0.2);
-    z-index:1000;
-    overflow-y: auto;
-    transition: transform 0.3s ease;
     scrollbar-width: thin;
     scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
 }
@@ -300,58 +381,7 @@ body {
     background: rgba(255, 255, 255, 0.3);
 }
 
-.sidebar.hidden { 
-    transform:translateX(-100%); 
-}
-
-/* Sidebar Profile */
-.sidebar-profile {
-    text-align: center;
-    margin-bottom: 25px;
-    padding: 0 20px 20px;
-    border-bottom: 1px solid rgba(255,255,255,0.2);
-    flex-shrink: 0; /* Prevent shrinking */
-    width: 100%;
-}
-
-.sidebar-profile img {
-    width: 100px;
-    height: 100px;
-    border-radius: 50%;
-    object-fit: cover;
-    margin-bottom: 10px;
-    border: 2px solid #1abc9c;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-}
-
-.sidebar-profile p {
-    color: var(--text-sidebar);
-    font-weight: bold;
-    margin: 0;
-    font-size: 16px;
-}
-
-.sidebar h2 {
-    color: var(--text-sidebar);
-    text-align:center;
-    width:100%;
-    margin-bottom:25px;
-    font-size:22px;
-    padding: 0 20px;
-}
-
 .sidebar a {
-    padding:12px 20px;
-    text-decoration:none;
-    font-size:16px;
-    color:var(--text-sidebar);
-    width:100%;
-    transition: background 0.3s, color 0.3s;
-    border-radius:6px;
-    margin:3px 0;
-    display: flex;
-    align-items: center;
-    gap: 10px;
     border-bottom: 1px solid rgba(255,255,255,0.1);
 }
 
@@ -360,9 +390,6 @@ body {
 }
 
 .sidebar a.active, .sidebar a:hover {
-    background:#1abc9c;
-    color:#fff;
-    font-weight:bold;
     padding-left: 25px;
 }
 
@@ -389,74 +416,42 @@ body {
 /* ========== Overlay ========== */
 .overlay {
     position: fixed; 
-    top:0; 
-    left:0; 
-    width:100%; 
-    height:100%;
+    top: 60px; /* Adjusted for university header */
+    left: 0; 
+    width: 100%; 
+    height: calc(100vh - 60px); /* Adjusted for university header */
     background: rgba(0,0,0,0.4); 
-    z-index:999;
-    display:none; 
-    opacity:0; 
+    z-index: 999;
+    display: none; 
+    opacity: 0; 
     transition: opacity 0.3s ease;
 }
 
 .overlay.active { 
-    display:block; 
-    opacity:1; 
+    display: block; 
+    opacity: 1; 
 }
 
 /* ========== Main Content ========== */
 .main-content {
-    margin-left:240px;
-    padding:30px;
-    flex-grow:1;
-    min-height:100vh;
+    margin-left: 240px;
+    margin-top: 60px; /* Adjusted for university header */
+    padding: 30px;
+    min-height: calc(100vh - 60px);
     background: var(--bg-primary);
-    border-radius:12px;
-    margin-top:20px;
-    margin-bottom:20px;
+    border-radius: 12px;
     width: calc(100% - 240px);
     transition: all 0.3s ease;
 }
 
-@media screen and (max-width:768px){
-    .sidebar { 
-        transform: translateX(-100%); 
-        width: 280px;
+@media screen and (max-width: 768px) {
+    .main-content {
+        margin-left: 0;
+        width: 100%;
+        padding: 15px;
+        padding-top: 140px; /* Adjusted for headers on mobile */
+        margin-top: 120px; /* 60px header + 60px topbar */
     }
-    .sidebar.active { 
-        transform: translateX(0); 
-    }
-    .main-content { 
-        margin-left: 0; 
-        padding: 15px; 
-        width: 100%; 
-        margin-top: 0;
-    }
-    .sidebar::after {
-        width: 280px;
-    }
-}
-/* ========== Overlay ========== */
-.overlay {
-    position: fixed; top:0; left:0; width:100%; height:100%;
-    background: rgba(0,0,0,0.4); z-index:1050;
-    display:none; opacity:0; transition: opacity 0.3s ease;
-}
-.overlay.active { display:block; opacity:1; }
-
-/* ========== Main Content ========== */
-.main-content {
-    margin-left:240px;
-    padding:30px;
-    flex-grow:1;
-    min-height:100vh;
-    background: var(--bg-primary);
-    border-radius:12px;
-    margin-top:20px;
-    margin-bottom:20px;
-    width: calc(100% - 240px);
-    transition: all 0.3s ease;
 }
 
 /* Content Wrapper */
@@ -465,7 +460,7 @@ body {
     border-radius: 15px;
     padding: 30px;
     box-shadow: 0 4px 6px var(--shadow-color);
-    min-height: calc(100vh - 40px);
+    min-height: calc(100vh - 100px); /* Adjusted for header */
 }
 
 /* Header Styles */
@@ -533,43 +528,43 @@ body {
 
 /* ========== Stats Cards ========== */
 .stats-cards {
-    display:flex;
-    gap:25px;
-    flex-wrap:wrap;
-    margin-bottom:35px;
+    display: flex;
+    gap: 25px;
+    flex-wrap: wrap;
+    margin-bottom: 35px;
 }
 .stats-cards .card {
-    flex:1;
-    min-width:180px;
+    flex: 1;
+    min-width: 180px;
     background: linear-gradient(135deg,#6a11cb,#2575fc);
-    color:#fff;
-    padding:25px;
-    border-radius:16px;
-    box-shadow:0 8px 20px rgba(0,0,0,0.15);
-    text-align:center;
+    color: #fff;
+    padding: 25px;
+    border-radius: 16px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    text-align: center;
     transition: transform 0.3s, box-shadow 0.3s;
-    position:relative;
+    position: relative;
     border: 1px solid var(--border-color);
 }
 .stats-cards .card:hover {
     transform: translateY(-5px);
-    box-shadow:0 12px 25px rgba(0,0,0,0.25);
+    box-shadow: 0 12px 25px rgba(0,0,0,0.25);
 }
 .stats-cards .card h3 {
-    font-size:17px;
-    margin-bottom:12px;
+    font-size: 17px;
+    margin-bottom: 12px;
     font-weight: 600;
 }
 .stats-cards .card p {
-    font-size:24px;
-    font-weight:bold;
+    font-size: 24px;
+    font-weight: bold;
 }
 .stats-cards .card::before {
-    content:"📘";
-    font-size:28px;
-    position:absolute;
-    top:15px;
-    right:15px;
+    content: "📘";
+    font-size: 28px;
+    position: absolute;
+    top: 15px;
+    right: 15px;
 }
 
 /* Dark mode adjustments for stats cards */
@@ -768,12 +763,13 @@ body {
 }
 
 /* ========== Responsive ========== */
-@media screen and (max-width:1200px){
+@media screen and (max-width: 1200px) {
     .weekly-schedule {
         grid-template-columns: repeat(3, 1fr);
     }
 }
-@media screen and (max-width:1024px){
+
+@media screen and (max-width: 1024px) {
     .weekly-schedule {
         grid-template-columns: repeat(2, 1fr);
     }
@@ -781,26 +777,92 @@ body {
         grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     }
 }
-@media screen and (max-width:768px){
-    .topbar { display: flex; }
-    .sidebar { transform: translateX(-100%); width: 250px; }
-    .sidebar.active { transform: translateX(0); }
-    .main-content { margin-left: 0; padding: 15px; width: 100%; }
-    .content-wrapper { padding: 20px; border-radius: 0; }
-    .header { flex-direction: column; gap: 15px; align-items: flex-start; }
-    .header h1 { font-size: 1.8rem; }
-    .stats-cards{flex-direction:column;}
-    .weekly-schedule{grid-template-columns: 1fr;}
-    .courses-grid { grid-template-columns: 1fr; }
+
+@media screen and (max-width: 768px) {
+    .topbar { 
+        display: flex; 
+    }
+    
+    .sidebar { 
+        transform: translateX(-100%); 
+        width: 250px; 
+        top: 120px; /* 60px header + 60px topbar */
+        height: calc(100vh - 120px) !important;
+    }
+    
+    .sidebar.active { 
+        transform: translateX(0); 
+    }
+    
+    .sidebar::after {
+        width: 250px;
+    }
+    
+    .overlay {
+        top: 120px;
+        height: calc(100vh - 120px);
+    }
+    
+    .main-content { 
+        margin-left: 0; 
+        width: 100%; 
+    }
+    
+    .content-wrapper { 
+        padding: 20px; 
+        border-radius: 0; 
+    }
+    
+    .header { 
+        flex-direction: column; 
+        gap: 15px; 
+        align-items: flex-start; 
+    }
+    
+    .header h1 { 
+        font-size: 1.8rem; 
+    }
+    
+    .stats-cards { 
+        flex-direction: column; 
+    }
+    
+    .weekly-schedule { 
+        grid-template-columns: 1fr; 
+    }
+    
+    .courses-grid { 
+        grid-template-columns: 1fr; 
+    }
 }
-@media screen and (max-width:480px){
-    .day-column { padding: 10px; }
-    .class-slot { padding: 10px; }
-    .stats-cards .card { padding: 20px; }
+
+@media screen and (max-width: 480px) {
+    .day-column { 
+        padding: 10px; 
+    }
+    
+    .class-slot { 
+        padding: 10px; 
+    }
+    
+    .stats-cards .card { 
+        padding: 20px; 
+    }
 }
 </style>
 </head>
 <body>
+    <!-- University Header -->
+    <div class="university-header">
+        <div class="header-left">
+            <img src="../assets/images/dku logo.jpg" alt="Debark University Logo" class="dku-logo-img">
+            <div class="system-title">Debark University Class Scheduling System</div>
+        </div>
+        <div class="header-right">
+            Instructor Dashboard
+        </div>
+    </div>
+
     <!-- Topbar for Mobile -->
     <div class="topbar">
         <button class="menu-btn" onclick="toggleSidebar()">☰</button>
@@ -810,36 +872,36 @@ body {
     <!-- Overlay for Mobile -->
     <div class="overlay" onclick="toggleSidebar()"></div>
 
-<!-- Sidebar -->
-<div class="sidebar" id="sidebar">
-    <div class="sidebar-profile">
-        <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic"
-             onerror="this.onerror=null; this.src='../assets/default_profile.png';">
-        <p><?= htmlspecialchars($user['username'] ?? 'Instructor') ?></p>
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-profile">
+            <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic"
+                 onerror="this.onerror=null; this.src='../assets/default_profile.png';">
+            <p><?= htmlspecialchars($user['username'] ?? 'Instructor') ?></p>
+        </div>
+        <h2>Instructor Panel</h2>
+        
+        <nav>
+            <a href="instructor_dashboard.php" class="<?= $current_page=='instructor_dashboard.php'?'active':'' ?>">
+                <i class="fas fa-home"></i> Dashboard
+            </a>
+            <a href="announcements.php" class="<?= $current_page=='announcements.php'?'active':'' ?>">
+                <i class="fas fa-bullhorn"></i> Announcements
+            </a>
+            <a href="exam_assignments.php" class="<?= $current_page=='exam_assignments.php'?'active':'' ?>">
+                <i class="fas fa-clipboard-list"></i> Exam Assignments
+            </a>
+            <a href="my_courses.php" class="<?= $current_page=='my_courses.php'?'active':'' ?>">
+                <i class="fas fa-book"></i> My Courses
+            </a>
+            <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
+                <i class="fas fa-user-edit"></i> Edit Profile
+            </a>
+            <a href="../logout.php">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </nav>
     </div>
-    <h2>Instructor Dashboard</h2>
-    <a href="instructor_dashboard.php" class="<?= $current_page=='instructor_dashboard.php'?'active':'' ?>">
-        <i class="fas fa-home"></i> Dashboard
-    </a>
-    <a href="announcements.php" class="<?= $current_page=='announcements.php'?'active':'' ?>">
-        <i class="fas fa-bullhorn"></i> Announcements
-    </a>
-    <a href="exam_assignments.php" class="<?= $current_page=='exam_assignments.php'?'active':'' ?>">
-        <i class="fas fa-clipboard-list"></i> Exam Assignments
-    </a>
-    <a href="my_courses.php" class="<?= $current_page=='my_courses.php'?'active':'' ?>">
-        <i class="fas fa-book"></i> My Courses
-    </a>
-    <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
-        <i class="fas fa-user-edit"></i> Edit Profile
-    </a>
-    <a href="../logout.php">
-        <i class="fas fa-sign-out-alt"></i> Logout
-    </a>
-</div>
-
-<!-- Overlay for Mobile -->
-<div class="overlay" onclick="toggleSidebar()"></div>
 
     <!-- Main Content -->
     <div class="main-content">

@@ -54,6 +54,75 @@
             color: var(--dark-text);
         }
 
+        /* ================= University Header ================= */
+        .university-header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            padding: 0.5rem 5%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 1001;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .dku-logo-img {
+            width: 50px;
+            height: 50px;
+            object-fit: contain;
+            border-radius: 5px;
+            background: white;
+            padding: 5px;
+        }
+
+        .system-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            opacity: 0.95;
+        }
+
+        .header-right {
+            font-size: 0.8rem;
+            opacity: 0.9;
+        }
+
+        @media (max-width: 768px) {
+            .university-header {
+                padding: 0.5rem 1rem;
+                flex-direction: column;
+                gap: 0.5rem;
+                text-align: center;
+            }
+            
+            .header-left, .header-right {
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .system-title {
+                font-size: 0.8rem;
+            }
+            
+            .header-right {
+                font-size: 0.75rem;
+            }
+        }
+
+        /* Adjust navbar position to account for university header */
+        nav {
+            top: 60px; /* Adjusted for university header */
+        }
+
         /* ================= Dark Mode Toggle ================= */
         .theme-toggle {
             position: fixed;
@@ -90,7 +159,7 @@
         /* Modern Navbar */
         nav {
             position: fixed;
-            top: 0;
+            top: 60px; /* Adjusted for university header */
             left: 0;
             width: 100%;
             z-index: 1000;
@@ -206,17 +275,82 @@
             box-shadow: var(--shadow-lg);
         }
 
+        /* Mobile Menu Toggle - Hidden by default */
+        .mobile-menu-toggle {
+            display: none;
+            flex-direction: column;
+            justify-content: space-between;
+            width: 30px;
+            height: 24px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 0;
+            z-index: 1001;
+        }
+
+        .mobile-menu-toggle span {
+            height: 3px;
+            width: 100%;
+            background: var(--primary);
+            border-radius: 3px;
+            transition: all 0.3s ease;
+        }
+
+        body.dark-mode .mobile-menu-toggle span {
+            background: #60a5fa;
+        }
+
+        .mobile-menu-toggle.active span:nth-child(1) {
+            transform: rotate(45deg) translate(6px, 6px);
+        }
+
+        .mobile-menu-toggle.active span:nth-child(2) {
+            opacity: 0;
+        }
+
+        .mobile-menu-toggle.active span:nth-child(3) {
+            transform: rotate(-45deg) translate(6px, -6px);
+        }
+
         /* ================= Hero Section ================= */
         .hero {
             min-height: 100vh;
             background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #dbeafe 100%);
             position: relative;
             overflow: hidden;
-            padding: 100px 5% 40px;
+            padding: 180px 5% 40px; /* Increased padding to account for headers */
+            display: flex;
+            align-items: center;
         }
 
         body.dark-mode .hero {
             background: linear-gradient(135deg, #0c4a6e 0%, #1e40af 50%, #3730a3 100%);
+        }
+
+        /* Campus Image Background - Using dku2.jpg */
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: url('assets/images/dku2.jpg');
+            background-size: cover;
+            background-position: center;
+            opacity: 0.15; /* Lower transparency */
+            z-index: 1;
+            animation: subtleZoom 20s ease-in-out infinite alternate;
+        }
+
+        @keyframes subtleZoom {
+            0% {
+                transform: scale(1);
+            }
+            100% {
+                transform: scale(1.05);
+            }
         }
 
         .hero-container {
@@ -226,7 +360,8 @@
             grid-template-columns: 1fr 1fr;
             gap: 3rem;
             align-items: center;
-            min-height: calc(100vh - 140px);
+            position: relative;
+            z-index: 2;
         }
 
         @media (max-width: 1024px) {
@@ -239,7 +374,6 @@
 
         .hero-content {
             max-width: 600px;
-            z-index: 2;
         }
 
         .hero-content h1 {
@@ -632,7 +766,7 @@
             color: var(--dark-gray);
         }
 
-        /* Location Section */
+        /* ================= Location Section ================= */
         .location {
             padding: 6rem 5%;
             background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
@@ -648,7 +782,7 @@
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 4rem;
-            align-items: center;
+            align-items: start; /* Changed to start for better alignment */
         }
 
         @media (max-width: 968px) {
@@ -660,9 +794,10 @@
 
         .location-info {
             background: white;
-            padding: 3rem;
+            padding: 2.5rem;
             border-radius: 1rem;
             box-shadow: var(--shadow);
+            height: 100%;
         }
 
         body.dark-mode .location-info {
@@ -691,13 +826,14 @@
             color: #60a5fa;
         }
 
-        .location-info p {
+        .location-info > p {
             color: var(--gray);
             margin-bottom: 2rem;
             line-height: 1.6;
+            font-size: 1.1rem;
         }
 
-        body.dark-mode .location-info p {
+        body.dark-mode .location-info > p {
             color: var(--dark-gray);
         }
 
@@ -708,7 +844,7 @@
         .contact-item {
             display: flex;
             align-items: center;
-            gap: 1rem;
+            gap: 1.25rem;
             margin-bottom: 1.5rem;
             padding: 1rem;
             background: var(--primary-light);
@@ -724,42 +860,56 @@
             transform: translateX(5px);
         }
 
-        .contact-item i {
-            font-size: 1.25rem;
-            color: var(--primary);
-            width: 40px;
-            height: 40px;
+        .contact-icon {
+            min-width: 50px;
+            width: 50px;
+            height: 50px;
             background: white;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
+            color: var(--primary);
+            font-size: 1.25rem;
+            box-shadow: var(--shadow);
         }
 
-        body.dark-mode .contact-item i {
-            color: #60a5fa;
+        body.dark-mode .contact-icon {
             background: var(--dark-bg);
+            color: #60a5fa;
         }
 
-        .contact-item h4 {
-            font-size: 0.875rem;
+        .contact-text {
+            flex: 1;
+        }
+
+        .contact-text h4 {
+            font-size: 0.9rem;
             font-weight: 600;
             color: var(--gray);
             margin-bottom: 0.25rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
-        body.dark-mode .contact-item h4 {
+        body.dark-mode .contact-text h4 {
             color: var(--dark-gray);
         }
 
-        .contact-item p {
-            margin: 0;
+        .contact-text p {
             color: var(--dark);
             font-weight: 500;
+            line-height: 1.6;
+            margin: 0;
+            font-size: 1rem;
         }
 
-        body.dark-mode .contact-item p {
+        body.dark-mode .contact-text p {
             color: var(--dark-text);
+        }
+
+        .map-btn-container {
+            margin-top: 2rem;
         }
 
         .map-btn {
@@ -779,13 +929,15 @@
         .map-btn:hover {
             transform: translateY(-2px);
             box-shadow: var(--shadow-lg);
+            gap: 1rem;
         }
 
         .map-container {
-            height: 400px;
+            height: 100%;
+            min-height: 400px;
             border-radius: 1rem;
             overflow: hidden;
-            box-shadow: var(--shadow);
+            box-shadow: var(--shadow-lg);
         }
 
         .map-wrapper {
@@ -798,11 +950,11 @@
             width: 100%;
             height: 100%;
             border: none;
-            filter: brightness(0.95);
+            filter: brightness(0.95) contrast(1.05) saturate(1.1);
         }
 
         body.dark-mode .map-wrapper iframe {
-            filter: brightness(0.8) contrast(1.1);
+            filter: brightness(0.7) contrast(1.2) saturate(1.1);
         }
 
         /* CTA Section */
@@ -896,6 +1048,14 @@
 
         .footer-links li {
             margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .footer-links i {
+            width: 20px;
+            opacity: 0.7;
         }
 
         .footer-links a {
@@ -940,6 +1100,7 @@
         }
 
         /* ================= Responsive Design ================= */
+        /* Tablet and below */
         @media (max-width: 1024px) {
             .hero-container {
                 grid-template-columns: 1fr;
@@ -958,84 +1119,444 @@
             }
         }
 
+        /* Mobile phones (768px and below) */
         @media (max-width: 768px) {
+            /* Navigation improvements */
             nav {
-                padding: 1rem;
+                padding: 0.8rem 1rem !important;
+                flex-wrap: wrap;
+                top: 100px; /* Adjusted for stacked headers on mobile */
+            }
+            
+            .mobile-menu-toggle {
+                display: flex !important;
+            }
+            
+            .nav-links {
+                display: none;
+                position: fixed;
+                top: 140px; /* Adjusted for stacked headers on mobile */
+                left: 0;
+                width: 100%;
+                background: white;
+                padding: 1.5rem;
                 flex-direction: column;
                 gap: 1rem;
+                box-shadow: var(--shadow);
+                z-index: 999;
+                border-top: 1px solid var(--gray-light);
             }
-
-            .nav-links {
-                gap: 1rem;
+            
+            body.dark-mode .nav-links {
+                background: var(--dark-card);
+                border-color: var(--dark-border);
             }
-
+            
+            .nav-links.active {
+                display: flex;
+            }
+            
+            .nav-links a {
+                width: 100%;
+                padding: 0.75rem 1rem;
+                border-radius: 8px;
+                text-align: center;
+            }
+            
+            .nav-links a:hover {
+                background: var(--primary-light);
+            }
+            
+            body.dark-mode .nav-links a:hover {
+                background: rgba(96, 165, 250, 0.1);
+            }
+            
+            .auth-links {
+                margin-left: auto;
+            }
+            
+            .login-btn {
+                padding: 0.6rem 1.2rem;
+                font-size: 0.9rem;
+            }
+            
+            /* Hero section improvements */
             .hero {
-                padding: 120px 5% 40px;
+                padding: 180px 1rem 40px !important;
             }
             
             .hero-content h1 {
-                font-size: 2.3rem;
+                font-size: 2rem !important;
+                line-height: 1.3;
             }
             
             .hero-content p {
-                font-size: 1.1rem;
-                margin-bottom: 2rem;
+                font-size: 1rem !important;
+                margin-bottom: 1.5rem;
             }
             
             .hero-buttons {
                 flex-direction: column;
-                align-items: center;
                 gap: 0.75rem;
+                align-items: stretch;
             }
             
             .hero-buttons a {
                 width: 100%;
-                max-width: 300px;
+                text-align: center;
+                padding: 1rem !important;
+                font-size: 0.95rem;
                 justify-content: center;
-                padding: 0.875rem 1.5rem;
             }
             
             .hero-visual {
-                min-height: 250px;
-                padding: 10px;
+                min-height: 220px !important;
+                padding: 1rem !important;
+                margin-top: 1rem;
             }
             
             .hero-visual svg {
-                max-width: 400px;
-                max-height: 300px;
+                max-width: 100% !important;
+                max-height: 220px !important;
             }
-
+            
+            /* Stats improvements */
+            .stats {
+                padding: 3rem 1rem !important;
+                grid-template-columns: repeat(2, 1fr) !important;
+                gap: 1rem !important;
+            }
+            
+            .stat-card {
+                padding: 1.5rem 1rem !important;
+            }
+            
+            .stat-icon {
+                width: 50px !important;
+                height: 50px !important;
+                font-size: 1.25rem !important;
+            }
+            
+            .stat-number {
+                font-size: 1.75rem !important;
+            }
+            
+            .stat-label {
+                font-size: 0.9rem !important;
+            }
+            
+            /* Features improvements */
+            .features {
+                padding: 4rem 1rem !important;
+            }
+            
+            .section-header {
+                margin-bottom: 2.5rem !important;
+                padding: 0 1rem;
+            }
+            
+            .section-header h2 {
+                font-size: 2rem !important;
+            }
+            
+            .section-header p {
+                font-size: 1rem !important;
+            }
+            
             .features-grid {
-                grid-template-columns: 1fr;
+                gap: 1.5rem !important;
             }
-
+            
+            .feature-card {
+                padding: 1.75rem !important;
+            }
+            
+            .feature-icon {
+                width: 50px !important;
+                height: 50px !important;
+                font-size: 1.25rem !important;
+            }
+            
+            .feature-card h3 {
+                font-size: 1.25rem !important;
+            }
+            
+            /* Security improvements */
+            .security {
+                padding: 4rem 1rem !important;
+            }
+            
+            .security-icon {
+                width: 80px !important;
+                height: 80px !important;
+                font-size: 2rem !important;
+                margin-bottom: 1.5rem !important;
+            }
+            
+            .security h2 {
+                font-size: 2rem !important;
+            }
+            
+            .security p {
+                font-size: 1rem !important;
+                padding: 0 0.5rem;
+            }
+            
+            .security-features {
+                grid-template-columns: repeat(2, 1fr) !important;
+                gap: 1.5rem !important;
+                margin-top: 2rem !important;
+            }
+            
+            .security-feature {
+                padding: 1rem !important;
+            }
+            
+            /* Location improvements */
+            .location {
+                padding: 4rem 1rem !important;
+            }
+            
+            .location-container {
+                gap: 2rem !important;
+            }
+            
+            .location-info {
+                padding: 1.5rem !important;
+            }
+            
+            .contact-item {
+                padding: 0.75rem !important;
+                margin-bottom: 1rem !important;
+            }
+            
+            .contact-icon {
+                width: 40px !important;
+                height: 40px !important;
+                font-size: 1rem !important;
+            }
+            
+            .map-btn {
+                width: 100%;
+                text-align: center;
+                justify-content: center;
+                padding: 1rem !important;
+            }
+            
+            .map-container {
+                height: 300px !important;
+            }
+            
+            /* CTA improvements */
+            .cta {
+                padding: 4rem 1rem !important;
+            }
+            
+            .cta h2 {
+                font-size: 2rem !important;
+            }
+            
+            .cta p {
+                font-size: 1rem !important;
+                padding: 0 1rem;
+            }
+            
+            .cta-btn {
+                width: 100%;
+                max-width: 300px;
+                justify-content: center;
+                padding: 1rem 2rem !important;
+            }
+            
+            /* Footer improvements */
+            footer {
+                padding: 3rem 1rem 1.5rem !important;
+            }
+            
+            .footer-content {
+                grid-template-columns: 1fr !important;
+                gap: 2rem !important;
+            }
+            
+            .footer-column {
+                text-align: center;
+            }
+            
+            .social-links {
+                justify-content: center;
+            }
+            
+            .footer-bottom p {
+                font-size: 0.9rem;
+                line-height: 1.5;
+            }
+            
+            /* Theme toggle adjustments */
             .theme-toggle {
-                bottom: 20px;
-                right: 20px;
+                bottom: 15px !important;
+                right: 15px !important;
+            }
+            
+            .theme-btn {
+                width: 45px !important;
+                height: 45px !important;
+                font-size: 1.1rem !important;
             }
         }
 
+        /* Small phones (480px and below) */
         @media (max-width: 480px) {
             .hero-content h1 {
-                font-size: 2rem;
+                font-size: 1.75rem !important;
             }
             
             .hero-content p {
-                font-size: 1rem;
+                font-size: 0.95rem !important;
+            }
+            
+            .stats {
+                grid-template-columns: 1fr !important;
+                gap: 1rem !important;
+            }
+            
+            .stat-card {
+                padding: 1.5rem !important;
+            }
+            
+            .security-features {
+                grid-template-columns: 1fr !important;
+            }
+            
+            .location-info h3 {
+                font-size: 1.25rem !important;
+            }
+            
+            .contact-text h4 {
+                font-size: 0.8rem !important;
+            }
+            
+            .contact-text p {
+                font-size: 0.9rem !important;
+            }
+            
+            .map-container {
+                height: 250px !important;
             }
             
             .hero-visual {
-                min-height: 200px;
+                min-height: 180px !important;
             }
             
             .hero-visual svg {
-                max-width: 350px;
-                max-height: 250px;
+                max-height: 180px !important;
             }
+            
+            .logo {
+                font-size: 1.25rem !important;
+            }
+            
+            .logo i {
+                font-size: 1.5rem !important;
+            }
+            
+            .login-btn {
+                padding: 0.5rem 1rem !important;
+                font-size: 0.85rem !important;
+            }
+        }
 
+        /* Very small phones (360px and below) */
+        @media (max-width: 360px) {
+            .hero-content h1 {
+                font-size: 1.5rem !important;
+            }
+            
+            .hero-content p {
+                font-size: 0.9rem !important;
+            }
+            
+            .hero-buttons a {
+                font-size: 0.85rem !important;
+                padding: 0.875rem !important;
+            }
+            
+            .section-header h2 {
+                font-size: 1.75rem !important;
+            }
+            
+            .feature-card {
+                padding: 1.5rem !important;
+            }
+            
+            .feature-card h3 {
+                font-size: 1.1rem !important;
+            }
+            
+            .feature-card p {
+                font-size: 0.9rem !important;
+            }
+            
+            .map-container {
+                height: 200px !important;
+            }
+            
+            .theme-btn {
+                width: 40px !important;
+                height: 40px !important;
+                font-size: 1rem !important;
+            }
+            
             .theme-toggle {
-                bottom: 15px;
-                right: 15px;
+                bottom: 10px !important;
+                right: 10px !important;
+            }
+        }
+
+        /* Landscape orientation for phones */
+        @media (max-height: 500px) and (orientation: landscape) {
+            .hero {
+                min-height: auto;
+                padding: 140px 1rem 2rem !important;
+            }
+            
+            .hero-container {
+                min-height: auto;
+                gap: 1rem;
+            }
+            
+            .hero-content h1 {
+                font-size: 1.75rem !important;
+                margin-bottom: 1rem;
+            }
+            
+            .hero-content p {
+                margin-bottom: 1rem;
+                font-size: 0.9rem !important;
+            }
+            
+            .hero-buttons {
+                flex-direction: row;
+                flex-wrap: wrap;
+            }
+            
+            .hero-buttons a {
+                flex: 1;
+                min-width: 150px;
+                padding: 0.75rem !important;
+                font-size: 0.85rem !important;
+            }
+            
+            .hero-visual {
+                min-height: 150px !important;
+            }
+            
+            .hero-visual svg {
+                max-height: 150px !important;
+            }
+            
+            .nav-links.active {
+                max-height: 80vh;
+                overflow-y: auto;
             }
         }
 
@@ -1053,6 +1574,18 @@
     </style>
 </head>
 <body>
+    <!-- University Header -->
+    <div class="university-header">
+        <div class="header-left">
+            <!-- Using the DKU logo image -->
+            <img src="assets/images/dku logo.jpg" alt="Debark University Logo" class="dku-logo-img">
+            <div class="system-title">Debark University Class Scheduling System</div>
+        </div>
+        <div class="header-right">
+            Academic Scheduling Platform
+        </div>
+    </div>
+
     <!-- Dark Mode Toggle -->
     <div class="theme-toggle">
         <button class="theme-btn" id="themeToggle">
@@ -1064,9 +1597,17 @@
     <nav id="navbar">
         <a href="#" class="logo">
             <i class="fas fa-calendar-alt"></i>
-            DKU Scheduler
+            <!-- Removed "DKU Scheduler" text -->
         </a>
-        <div class="nav-links">
+        
+        <!-- Mobile Menu Toggle -->
+        <button class="mobile-menu-toggle" id="mobileMenuToggle">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        
+        <div class="nav-links" id="navLinks">
             <a href="#home">Home</a>
             <a href="#features">Features</a>
             <a href="#security">Security</a>
@@ -1085,7 +1626,7 @@
     <section class="hero" id="home">
         <div class="hero-container">
             <div class="hero-content">
-                <h1>Secure Academic Scheduling Platform</h1>
+                <h1>Academic Scheduling Platform</h1>
                 <p>Access your personalized academic schedule through DKU's secure platform. Accounts are managed by administrators for enhanced security and control.</p>
                 <div class="hero-buttons">
                     <a href="login.php" class="primary-btn">
@@ -1173,7 +1714,7 @@
                         </rect>
                     </g>
                     
-                    <!-- Abstract Clock/Time Element - PROPERLY POSITIONED -->
+                    <!-- Abstract Clock/Time Element -->
                     <g class="float-delayed" transform="translate(600, 250)">
                         <circle cx="0" cy="0" r="40" fill="white" stroke="#3b82f6" stroke-width="3" opacity="0.9"/>
                         <!-- Hour hand -->
@@ -1202,38 +1743,6 @@
                     <line x1="600" y1="250" x2="400" y2="200" stroke="#10b981" stroke-width="1.5" stroke-dasharray="4,4" opacity="0.3"/>
                 </svg>
             </div>
-        </div>
-    </section>
-
-    <!-- Stats Section -->
-    <section class="stats">
-        <div class="stat-card fade-in">
-            <div class="stat-icon">
-                <i class="fas fa-users"></i>
-            </div>
-            <div class="stat-number">5,000+</div>
-            <div class="stat-label">Active Users</div>
-        </div>
-        <div class="stat-card fade-in">
-            <div class="stat-icon">
-                <i class="fas fa-calendar-check"></i>
-            </div>
-            <div class="stat-number">50,000+</div>
-            <div class="stat-label">Classes Scheduled</div>
-        </div>
-        <div class="stat-card fade-in">
-            <div class="stat-icon">
-                <i class="fas fa-chart-line"></i>
-            </div>
-            <div class="stat-number">98%</div>
-            <div class="stat-label">Satisfaction Rate</div>
-        </div>
-        <div class="stat-card fade-in">
-            <div class="stat-icon">
-                <i class="fas fa-user-shield"></i>
-            </div>
-            <div class="stat-number">100%</div>
-            <div class="stat-label">Secure Access</div>
         </div>
     </section>
 
@@ -1330,43 +1839,32 @@
             <p>Visit us at Debark University Campus</p>
         </div>
         <div class="location-container">
-            <div class="location-content fade-in">
-                <div class="location-info">
-                    <h3><i class="fas fa-map-marker-alt"></i> Campus Address</h3>
-                    <p>Debark University<br>Main Campus<br>Debark, Ethiopia</p>
-                    
-                    <div class="contact-details">
-                        <div class="contact-item">
-                            <i class="fas fa-phone"></i>
-                            <div>
-                                <h4>Phone</h4>
-                                <p>+251 900 000 000</p>
-                            </div>
+            <div class="location-info fade-in">
+                <h3><i class="fas fa-map-marker-alt"></i> Campus Address</h3>
+                <p>Debark University is located in the heart of Debark city, providing quality education and research facilities to students from across the region.</p>
+                
+                <div class="contact-details">
+                    <!-- Only campus address, contact info removed as requested -->
+                    <div class="contact-item">
+                        <div class="contact-icon">
+                            <i class="fas fa-university"></i>
                         </div>
-                        <div class="contact-item">
-                            <i class="fas fa-envelope"></i>
-                            <div>
-                                <h4>Email</h4>
-                                <p>scheduler@dku.edu.et</p>
-                            </div>
-                        </div>
-                        <div class="contact-item">
-                            <i class="fas fa-clock"></i>
-                            <div>
-                                <h4>Support Hours</h4>
-                                <p>Mon-Fri: 8:00 AM - 5:00 PM<br>Sat: 9:00 AM - 1:00 PM</p>
-                            </div>
+                        <div class="contact-text">
+                            <h4>Main Campus</h4>
+                            <p>Debark University, Main Campus<br>Debark, Ethiopia</p>
                         </div>
                     </div>
-                    
+                </div>
+                
+                <div class="map-btn-container">
                     <a href="https://maps.google.com/?q=Debark+University" target="_blank" class="map-btn">
                         <i class="fas fa-directions"></i>
                         Get Directions
                     </a>
                 </div>
             </div>
+            
             <div class="map-container fade-in">
-                <!-- Google Maps Embed -->
                 <div class="map-wrapper">
                     <iframe 
                         src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3940.692157192372!2d37.89337427486112!3d9.004099989696422!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x1644126757f8edfd%3A0xafad271bff01d83!2sDebark%20University!5e0!3m2!1sen!2set!4v1647000000000!5m2!1sen!2set"
@@ -1399,7 +1897,7 @@
         <div class="footer-content">
             <div class="footer-column">
                 <h3>DKU Scheduler</h3>
-                <p>Secure academic scheduling platform for Debark University.</p>
+                <p>Academic scheduling platform for Debark University.</p>
                 <div class="social-links">
                     <a href="#"><i class="fab fa-facebook-f"></i></a>
                     <a href="#"><i class="fab fa-twitter"></i></a>
@@ -1410,27 +1908,27 @@
             <div class="footer-column">
                 <h3>Quick Links</h3>
                 <ul class="footer-links">
-                    <li><a href="#home">Home</a></li>
-                    <li><a href="#features">Features</a></li>
-                    <li><a href="#security">Security</a></li>
-                    <li><a href="#location">Location</a></li>
-                    <li><a href="#contact">Contact</a></li>
+                    <li><i class="fas fa-chevron-right"></i><a href="#home">Home</a></li>
+                    <li><i class="fas fa-chevron-right"></i><a href="#features">Features</a></li>
+                    <li><i class="fas fa-chevron-right"></i><a href="#security">Security</a></li>
+                    <li><i class="fas fa-chevron-right"></i><a href="#location">Location</a></li>
+                    <li><i class="fas fa-chevron-right"></i><a href="#contact">Contact</a></li>
                 </ul>
             </div>
             <div class="footer-column">
                 <h3>Resources</h3>
                 <ul class="footer-links">
-                    <li><a href="#">User Guide</a></li>
-                    <li><a href="#">Help Center</a></li>
-                    <li><a href="#">Privacy Policy</a></li>
-                    <li><a href="#">Terms of Service</a></li>
+                    <li><i class="fas fa-book"></i><a href="#">User Guide</a></li>
+                    <li><i class="fas fa-question-circle"></i><a href="#">Help Center</a></li>
+                    <li><i class="fas fa-shield-alt"></i><a href="#">Privacy Policy</a></li>
+                    <li><i class="fas fa-file-contract"></i><a href="#">Terms of Service</a></li>
                 </ul>
             </div>
             <div class="footer-column">
                 <h3>Contact Info</h3>
                 <ul class="footer-links">
-                    <li><i class="fas fa-envelope"></i> support@dku-scheduler.edu</li>
                     <li><i class="fas fa-phone"></i> +251 900 000 000</li>
+                    <li><i class="fas fa-envelope"></i> support@dku-scheduler.edu</li>
                     <li><i class="fas fa-map-marker-alt"></i> Debark University</li>
                     <li><i class="fas fa-user-tie"></i> Contact Admin for Account Access</li>
                 </ul>
@@ -1476,6 +1974,49 @@
             }
         });
 
+        // Mobile Menu Toggle
+        const mobileMenuToggle = document.getElementById('mobileMenuToggle');
+        const navLinks = document.getElementById('navLinks');
+
+        mobileMenuToggle.addEventListener('click', () => {
+            mobileMenuToggle.classList.toggle('active');
+            navLinks.classList.toggle('active');
+            
+            // Prevent body scroll when menu is open
+            if (mobileMenuToggle.classList.contains('active')) {
+                document.body.style.overflow = 'hidden';
+            } else {
+                document.body.style.overflow = '';
+            }
+        });
+
+        // Close mobile menu when clicking a link
+        document.querySelectorAll('.nav-links a').forEach(link => {
+            link.addEventListener('click', () => {
+                mobileMenuToggle.classList.remove('active');
+                navLinks.classList.remove('active');
+                document.body.style.overflow = '';
+            });
+        });
+
+        // Close mobile menu when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!navLinks.contains(e.target) && !mobileMenuToggle.contains(e.target)) {
+                mobileMenuToggle.classList.remove('active');
+                navLinks.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+        });
+
+        // Close mobile menu on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                mobileMenuToggle.classList.remove('active');
+                navLinks.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+        });
+
         // Fade-in animation on scroll
         const fadeElements = document.querySelectorAll('.fade-in');
         
@@ -1494,6 +2035,11 @@
         // Smooth scrolling for anchor links
         document.querySelectorAll('a[href^="#"]').forEach(anchor => {
             anchor.addEventListener('click', function (e) {
+                // Close mobile menu if open
+                mobileMenuToggle.classList.remove('active');
+                navLinks.classList.remove('active');
+                document.body.style.overflow = '';
+                
                 e.preventDefault();
                 const target = document.querySelector(this.getAttribute('href'));
                 if (target) {

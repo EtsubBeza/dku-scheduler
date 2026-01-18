@@ -17,9 +17,6 @@ $user_stmt = $pdo->prepare("SELECT username, email, profile_picture FROM users W
 $user_stmt->execute([$instructor_id]);
 $user = $user_stmt->fetch(PDO::FETCH_ASSOC);
 
-// FIXED: Simplified profile picture path logic
-$default_profile = '../assets/default_profile.png';
-
 // Function to check if profile picture exists
 function getProfilePicturePath($profile_picture) {
     if (empty($profile_picture)) {
@@ -36,7 +33,6 @@ function getProfilePicturePath($profile_picture) {
     
     foreach ($locations as $location) {
         if (file_exists($location)) {
-            // Return the appropriate web path
             if (strpos($location, '../../uploads/') !== false) {
                 return '../../uploads/' . $profile_picture;
             } elseif (strpos($location, '../uploads/') !== false) {
@@ -47,7 +43,6 @@ function getProfilePicturePath($profile_picture) {
         }
     }
     
-    // If file doesn't exist anywhere, return default
     return '../assets/default_profile.png';
 }
 
@@ -55,77 +50,127 @@ function getProfilePicturePath($profile_picture) {
 $profile_img_path = getProfilePicturePath($user['profile_picture'] ?? '');
 
 $message = "";
-$message_type = "success"; // success, error, warning
+$message_type = "success";
 
+// Handle form submissions
 if($_SERVER['REQUEST_METHOD'] === 'POST'){
-    $username = trim($_POST['username']);
-    $email = trim($_POST['email']);
-    
-    // Validation
-    if(empty($username) || empty($email)) {
-        $message = "Please fill in all required fields.";
-        $message_type = "error";
-    } elseif(!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $message = "Please enter a valid email address.";
-        $message_type = "error";
-    } else {
-        // Handle profile picture upload
-        $filename = $user['profile_picture'];
+    if(isset($_POST['update_profile'])) {
+        // Profile update form
+        $username = trim($_POST['username']);
+        $email = trim($_POST['email']);
         
-        if(isset($_FILES['profile_picture']) && $_FILES['profile_picture']['error']===0){
-            $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-            $file_type = $_FILES['profile_picture']['type'];
-            $file_size = $_FILES['profile_picture']['size'];
+        // Validation
+        if(empty($username) || empty($email)) {
+            $message = "Please fill in all required fields.";
+            $message_type = "error";
+        } elseif(!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $message = "Please enter a valid email address.";
+            $message_type = "error";
+        } else {
+            // Handle profile picture upload
+            $filename = $user['profile_picture'];
             
-            // Validate file type
-            if(!in_array($file_type, $allowed_types)) {
-                $message = "Invalid file type. Please upload JPEG, PNG, GIF, or WebP images only.";
-                $message_type = "error";
-            } elseif($file_size > 2 * 1024 * 1024) { // 2MB limit
-                $message = "File is too large. Maximum size is 2MB.";
-                $message_type = "error";
-            } else {
-                $ext = pathinfo($_FILES['profile_picture']['name'], PATHINFO_EXTENSION);
-                $filename = "profile_".$instructor_id."_".time().".".$ext;
-                $upload_path = __DIR__."/../uploads/".$filename;
+            if(isset($_FILES['profile_picture']) && $_FILES['profile_picture']['error']===0){
+                $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+                $file_type = $_FILES['profile_picture']['type'];
+                $file_size = $_FILES['profile_picture']['size'];
                 
-                // Create uploads directory if it doesn't exist
-                if(!is_dir(dirname($upload_path))) {
-                    mkdir(dirname($upload_path), 0755, true);
-                }
-                
-                if(move_uploaded_file($_FILES['profile_picture']['tmp_name'], $upload_path)) {
-                    // Delete old profile picture if it exists and is not default
-                    if(!empty($user['profile_picture']) && 
-                       $user['profile_picture'] != 'default_profile.png' && 
-                       file_exists(__DIR__."/../uploads/".$user['profile_picture'])) {
-                        unlink(__DIR__."/../uploads/".$user['profile_picture']);
-                    }
-                } else {
-                    $message = "Error uploading profile picture. Please try again.";
+                // Validate file type
+                if(!in_array($file_type, $allowed_types)) {
+                    $message = "Invalid file type. Please upload JPEG, PNG, GIF, or WebP images only.";
                     $message_type = "error";
-                    $filename = $user['profile_picture']; // Keep old picture on error
+                } elseif($file_size > 2 * 1024 * 1024) { // 2MB limit
+                    $message = "File is too large. Maximum size is 2MB.";
+                    $message_type = "error";
+                } else {
+                    $ext = pathinfo($_FILES['profile_picture']['name'], PATHINFO_EXTENSION);
+                    $filename = "profile_".$instructor_id."_".time().".".$ext;
+                    $upload_path = __DIR__."/../uploads/".$filename;
+                    
+                    // Create uploads directory if it doesn't exist
+                    if(!is_dir(dirname($upload_path))) {
+                        mkdir(dirname($upload_path), 0755, true);
+                    }
+                    
+                    if(move_uploaded_file($_FILES['profile_picture']['tmp_name'], $upload_path)) {
+                        // Delete old profile picture if it exists and is not default
+                        if(!empty($user['profile_picture']) && 
+                           $user['profile_picture'] != 'default_profile.png' && 
+                           file_exists(__DIR__."/../uploads/".$user['profile_picture'])) {
+                            unlink(__DIR__."/../uploads/".$user['profile_picture']);
+                        }
+                    } else {
+                        $message = "Error uploading profile picture. Please try again.";
+                        $message_type = "error";
+                        $filename = $user['profile_picture']; // Keep old picture on error
+                    }
+                }
+            }
+            
+            // Update database if no errors
+            if($message_type !== "error") {
+                $update = $pdo->prepare("UPDATE users SET username=?, email=?, profile_picture=? WHERE user_id=?");
+                if($update->execute([$username, $email, $filename, $instructor_id])) {
+                    $message = "Profile updated successfully!";
+                    $message_type = "success";
+                    
+                    // Refresh user info
+                    $user['username'] = $username;
+                    $user['email'] = $email;
+                    $user['profile_picture'] = $filename;
+                    
+                    // Update profile image path
+                    $profile_img_path = getProfilePicturePath($filename);
+                } else {
+                    $message = "Error updating profile. Please try again.";
+                    $message_type = "error";
                 }
             }
         }
+    } elseif(isset($_POST['change_password'])) {
+        // Password change form
+        $current_password = $_POST['current_password'];
+        $new_password = $_POST['new_password'];
+        $confirm_password = $_POST['confirm_password'];
         
-        // Update database if no errors
-        if($message_type !== "error") {
-            $update = $pdo->prepare("UPDATE users SET username=?, email=?, profile_picture=? WHERE user_id=?");
-            if($update->execute([$username, $email, $filename, $instructor_id])) {
-                $message = "Profile updated successfully!";
-                $message_type = "success";
-                
-                // Refresh user info
-                $user['username'] = $username;
-                $user['email'] = $email;
-                $user['profile_picture'] = $filename;
-                
-                // Update profile image path
-                $profile_img_path = getProfilePicturePath($filename);
+        // Fetch current password hash
+        $password_stmt = $pdo->prepare("SELECT password FROM users WHERE user_id = ?");
+        $password_stmt->execute([$instructor_id]);
+        $current_password_hash = $password_stmt->fetchColumn();
+        
+        // Verify current password
+        if(!password_verify($current_password, $current_password_hash)) {
+            $message = "Current password is incorrect.";
+            $message_type = 'error';
+        } elseif($new_password !== $confirm_password) {
+            $message = "New passwords do not match.";
+            $message_type = 'error';
+        } elseif(strlen($new_password) < 8) {
+            $message = "New password must be at least 8 characters long.";
+            $message_type = 'error';
+        } elseif(!preg_match('/[A-Z]/', $new_password)) {
+            $message = "New password must contain at least one uppercase letter.";
+            $message_type = 'error';
+        } elseif(!preg_match('/[a-z]/', $new_password)) {
+            $message = "New password must contain at least one lowercase letter.";
+            $message_type = 'error';
+        } elseif(!preg_match('/[0-9]/', $new_password)) {
+            $message = "New password must contain at least one number.";
+            $message_type = 'error';
+        } elseif($new_password === $current_password) {
+            $message = "New password must be different from current password.";
+            $message_type = 'error';
+        } else {
+            // Update password
+            $new_password_hash = password_hash($new_password, PASSWORD_DEFAULT);
+            $update_password = $pdo->prepare("UPDATE users SET password = ? WHERE user_id = ?");
+            
+            if($update_password->execute([$new_password_hash, $instructor_id])) {
+                $message = "Password changed successfully!";
+                $message_type = 'success';
             } else {
-                $message = "Error updating profile. Please try again.";
-                $message_type = "error";
+                $message = "Error changing password. Please try again.";
+                $message_type = 'error';
             }
         }
     }
@@ -134,7 +179,6 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
 // Sidebar active page
 $current_page = basename($_SERVER['PHP_SELF']);
 ?>
-
 <!DOCTYPE html>
 <html lang="en" data-theme="<?= $darkMode ? 'dark' : 'light' ?>">
 <head>
@@ -146,155 +190,149 @@ $current_page = basename($_SERVER['PHP_SELF']);
 <style>
 * { margin:0; padding:0; box-sizing:border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
 
-/* ================= Topbar for Hamburger ================= */
+/* ================= University Header ================= */
+.university-header {
+    background: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%);
+    color: white;
+    padding: 0.5rem 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1201;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.dku-logo-img {
+    width: 45px;
+    height: 45px;
+    object-fit: contain;
+    border-radius: 5px;
+    background: white;
+    padding: 4px;
+}
+
+.system-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    opacity: 0.95;
+}
+
+.header-right {
+    font-size: 0.8rem;
+    opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+    .university-header {
+        padding: 0.5rem 15px;
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+    }
+    
+    .header-left, .header-right {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .system-title {
+        font-size: 0.8rem;
+    }
+    
+    .header-right {
+        font-size: 0.75rem;
+    }
+}
+
+/* Adjust other elements for university header */
+.topbar {
+    top: 60px !important;
+}
+
+.sidebar {
+    top: 60px !important;
+    height: calc(100vh - 60px) !important;
+}
+
+.overlay {
+    top: 60px;
+    height: calc(100vh - 60px);
+}
+
+.main-content {
+    margin-top: 60px;
+}
+
+/* ================= Topbar ================= */
 .topbar {
     display: none;
-    position: fixed; top:0; left:0; width:100%;
-    background:var(--bg-sidebar); color:var(--text-sidebar);
-    padding:15px 20px;
-    z-index:1200;
-    justify-content:space-between; align-items:center;
+    position: fixed; 
+    top: 60px;
+    left: 0; 
+    width: 100%;
+    background: var(--bg-sidebar); 
+    color: var(--text-sidebar);
+    padding: 15px 20px;
+    z-index: 1200;
+    justify-content: space-between; 
+    align-items: center;
     box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 .menu-btn {
-    font-size:26px;
-    background:#1abc9c;
-    border:none; color:var(--text-sidebar);
-    cursor:pointer;
-    padding:10px 14px;
-    border-radius:8px;
-    font-weight:600;
+    font-size: 26px;
+    background: #1abc9c;
+    border: none; 
+    color: var(--text-sidebar);
+    cursor: pointer;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-weight: 600;
     transition: background 0.3s, transform 0.2s;
 }
-.menu-btn:hover { background:#159b81; transform:translateY(-2px); }
+.menu-btn:hover { 
+    background: #159b81; 
+    transform: translateY(-2px); 
+}
 
 /* ================= Sidebar ================= */
 .sidebar {
     position: fixed;
-    top:0; left:0;
-    height:100vh;
-    width:240px;
+    top: 60px;
+    left: 0;
+    height: calc(100vh - 60px);
+    width: 240px;
     background: var(--bg-sidebar);
     padding: 30px 0 20px;
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    box-shadow:2px 0 10px rgba(0,0,0,0.2);
-    z-index:1000;
-    overflow-y:auto;
-    transition: transform 0.3s ease;
-}
-.sidebar.hidden { transform:translateX(-100%); }
-
-.sidebar-profile {
-    text-align: center;
-    margin-bottom: 25px;
-    padding: 0 20px 20px;
-    border-bottom: 1px solid rgba(255,255,255,0.2);
-    width: 100%;
-}
-
-.sidebar-profile img {
-    width: 100px;
-    height: 100px;
-    border-radius: 50%;
-    object-fit: cover;
-    margin-bottom: 10px;
-    border: 2px solid #1abc9c;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-}
-
-.sidebar-profile p {
-    color: var(--text-sidebar);
-    font-weight: bold;
-    margin: 0;
-    font-size: 16px;
-}
-
-.sidebar h2 {
-    color: var(--text-sidebar);
-    text-align:center;
-    width:100%;
-    margin-bottom:25px;
-    font-size:22px;
-    padding: 0 20px;
-}
-.sidebar a {
-    padding:12px 20px;
-    text-decoration:none;
-    font-size:16px;
-    color:var(--text-sidebar);
-    width:100%;
-    transition: background 0.3s, color 0.3s;
-    border-radius:6px;
-    margin:3px 0;
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 10px;
-}
-.sidebar a.active, .sidebar a:hover {
-    background:#1abc9c;
-    color:#fff;
-    font-weight:bold;
-}
-/* ================= Updated Sidebar ================= */
-.sidebar {
-    position: fixed;
-    top:0; 
-    left:0;
-    height:100vh;
-    width:240px;
-    background: var(--bg-sidebar);
-    padding: 30px 0 20px;
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    box-shadow:2px 0 10px rgba(0,0,0,0.2);
-    z-index:1000;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.2);
+    z-index: 1000;
     overflow-y: auto;
     transition: transform 0.3s ease;
     scrollbar-width: thin;
     scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
 }
-
-/* Custom scrollbar for sidebar */
-.sidebar::-webkit-scrollbar {
-    width: 6px;
-}
-
-.sidebar::-webkit-scrollbar-track {
-    background: transparent;
-    border-radius: 3px;
-}
-
-.sidebar::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.3);
-    border-radius: 3px;
-}
-
-.sidebar::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.5);
-}
-
-[data-theme="dark"] .sidebar::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
-}
-
-[data-theme="dark"] .sidebar::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.3);
-}
-
 .sidebar.hidden { 
-    transform:translateX(-100%); 
+    transform: translateX(-100%); 
 }
 
-/* Sidebar Profile */
 .sidebar-profile {
     text-align: center;
     margin-bottom: 25px;
     padding: 0 20px 20px;
     border-bottom: 1px solid rgba(255,255,255,0.2);
-    flex-shrink: 0; /* Prevent shrinking */
     width: 100%;
 }
 
@@ -317,22 +355,22 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
 .sidebar h2 {
     color: var(--text-sidebar);
-    text-align:center;
-    width:100%;
-    margin-bottom:25px;
-    font-size:22px;
+    text-align: center;
+    width: 100%;
+    margin-bottom: 25px;
+    font-size: 22px;
     padding: 0 20px;
 }
 
 .sidebar a {
-    padding:12px 20px;
-    text-decoration:none;
-    font-size:16px;
-    color:var(--text-sidebar);
-    width:100%;
+    padding: 12px 20px;
+    text-decoration: none;
+    font-size: 16px;
+    color: var(--text-sidebar);
+    width: 100%;
     transition: background 0.3s, color 0.3s;
-    border-radius:6px;
-    margin:3px 0;
+    border-radius: 6px;
+    margin: 3px 0;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -344,103 +382,49 @@ $current_page = basename($_SERVER['PHP_SELF']);
 }
 
 .sidebar a.active, .sidebar a:hover {
-    background:#1abc9c;
-    color:#fff;
-    font-weight:bold;
+    background: #1abc9c;
+    color: #fff;
+    font-weight: bold;
     padding-left: 25px;
-}
-
-/* Optional: Add fade effect at bottom when scrolling */
-.sidebar::after {
-    content: '';
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 30px;
-    width: 240px;
-    background: linear-gradient(to bottom, transparent, var(--bg-sidebar));
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.3s;
-    z-index: 1001;
-}
-
-.sidebar.scrolled::after {
-    opacity: 1;
 }
 
 /* ================= Overlay ================= */
 .overlay {
     position: fixed; 
-    top:0; 
-    left:0; 
-    width:100%; 
-    height:100%;
+    top: 60px;
+    left: 0; 
+    width: 100%; 
+    height: calc(100vh - 60px);
     background: rgba(0,0,0,0.4); 
-    z-index:999;
-    display:none; 
-    opacity:0; 
+    z-index: 1050;
+    display: none; 
+    opacity: 0; 
     transition: opacity 0.3s ease;
 }
-
 .overlay.active { 
-    display:block; 
-    opacity:1; 
+    display: block; 
+    opacity: 1; 
 }
 
 /* ================= Main content ================= */
 .main-content {
-    margin-left:240px;
-    padding:30px;
-    flex-grow:1;
-    min-height:100vh;
+    margin-left: 240px;
+    margin-top: 60px;
+    padding: 30px;
+    min-height: calc(100vh - 60px);
     background: var(--bg-primary);
-    border-radius:12px;
-    margin-top:20px;
-    margin-bottom:20px;
     width: calc(100% - 240px);
     transition: all 0.3s ease;
 }
 
-@media screen and (max-width: 768px){
-    .sidebar { 
-        transform: translateX(-100%); 
-        width: 280px;
+@media screen and (max-width: 768px) {
+    .main-content {
+        margin-left: 0;
+        padding: 15px;
+        width: 100%;
+        padding-top: 140px;
+        margin-top: 120px;
     }
-    .sidebar.active { 
-        transform: translateX(0); 
-    }
-    .main-content { 
-        margin-left: 0; 
-        padding: 15px; 
-        width: 100%; 
-        margin-top: 0;
-    }
-    .sidebar::after {
-        width: 280px;
-    }
-}
-/* ================= Overlay ================= */
-.overlay {
-    position: fixed; top:0; left:0; width:100%; height:100%;
-    background: rgba(0,0,0,0.4); z-index:1050;
-    display:none; opacity:0; transition: opacity 0.3s ease;
-}
-.overlay.active { display:block; opacity:1; }
-
-/* ================= Main content ================= */
-.main-content {
-    margin-left:240px;
-    padding:30px;
-    flex-grow:1;
-    min-height:100vh;
-    background: var(--bg-primary);
-    border-radius:12px;
-    margin-top:20px;
-    margin-bottom:20px;
-    width: calc(100% - 240px);
-    transition: all 0.3s ease;
 }
 
 /* Content Wrapper */
@@ -449,7 +433,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
     border-radius: 15px;
     padding: 30px;
     box-shadow: 0 4px 6px var(--shadow-color);
-    min-height: calc(100vh - 40px);
+    min-height: calc(100vh - 100px);
 }
 
 /* Header Styles */
@@ -515,37 +499,80 @@ $current_page = basename($_SERVER['PHP_SELF']);
     margin-top: 10px;
 }
 
-/* ================= Edit Profile Form ================= */
-.edit-profile-container {
+/* ================= Forms Section ================= */
+.forms-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
     margin-top: 30px;
 }
 
-.profile-form-card {
+@media (max-width: 1024px) {
+    .forms-section {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Form Cards */
+.form-card {
     background: var(--bg-card);
-    max-width: 600px;
+    border-radius: 12px;
     padding: 30px;
-    border-radius: 16px;
-    box-shadow: 0 8px 20px var(--shadow-color);
+    box-shadow: 0 4px 6px var(--shadow-color);
     border: 1px solid var(--border-color);
-    margin: 0 auto;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
-.profile-form-card:hover {
+.form-card:hover {
     transform: translateY(-3px);
-    box-shadow: 0 12px 25px var(--shadow-lg);
+    box-shadow: 0 8px 15px var(--shadow-lg);
 }
 
-.profile-form-card h2 {
+.form-card h2 {
+    font-size: 1.5rem;
     color: var(--text-primary);
     margin-bottom: 25px;
-    font-size: 1.5rem;
     font-weight: 600;
     display: flex;
     align-items: center;
     gap: 10px;
     padding-bottom: 15px;
     border-bottom: 2px solid var(--border-color);
+}
+
+.form-card h2 i {
+    color: #3b82f6;
+}
+
+/* Form Elements */
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+}
+
+.form-control {
+    width: 100%;
+    padding: 12px 15px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 1rem;
+    color: var(--text-primary);
+    transition: all 0.3s;
+    background: var(--bg-secondary);
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    background: var(--bg-card);
 }
 
 /* Profile Picture Section */
@@ -598,10 +625,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
     background: #2563eb;
 }
 
-.file-input-wrapper label i {
-    font-size: 1.1rem;
-}
-
 .file-name {
     margin-top: 8px;
     font-size: 0.85rem;
@@ -609,42 +632,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
     text-align: center;
 }
 
-/* Form Elements */
-.form-group {
-    margin-bottom: 20px;
-}
-
-.form-group label {
-    display: block;
-    margin-bottom: 8px;
-    font-weight: 600;
-    color: var(--text-primary);
-    font-size: 0.95rem;
-}
-
-.form-control {
-    width: 100%;
-    padding: 12px 15px;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    font-size: 1rem;
-    color: var(--text-primary);
-    transition: all 0.3s;
-    background: var(--bg-secondary);
-}
-
-.form-control:focus {
-    outline: none;
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-    background: var(--bg-card);
-}
-
-.form-control::placeholder {
-    color: var(--text-secondary);
-}
-
-/* Submit Button */
+/* Submit Buttons */
 .btn-submit {
     display: inline-flex;
     align-items: center;
@@ -669,6 +657,194 @@ $current_page = basename($_SERVER['PHP_SELF']);
     box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
 }
 
+.btn-submit:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.btn-submit:disabled:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+/* Password Requirements */
+.password-requirements {
+    background: var(--bg-secondary);
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border-left: 4px solid #3b82f6;
+}
+
+.password-requirements h4 {
+    font-size: 0.95rem;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+
+.password-requirements ul {
+    margin: 0;
+    padding-left: 20px;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+
+.password-requirements li {
+    margin-bottom: 5px;
+    line-height: 1.4;
+}
+
+/* ================= Validation Styles ================= */
+/* Password strength meter */
+.password-strength-container {
+    margin-top: 5px;
+}
+
+.password-strength-bar {
+    height: 6px;
+    border-radius: 3px;
+    margin-top: 8px;
+    background: var(--border-color);
+    overflow: hidden;
+    position: relative;
+}
+
+.strength-fill {
+    height: 100%;
+    width: 0%;
+    transition: all 0.3s ease;
+    border-radius: 3px;
+}
+
+.password-strength-text {
+    font-size: 0.85rem;
+    margin-top: 5px;
+    font-weight: 500;
+}
+
+/* Password strength colors */
+.strength-0 { background: #dc2626; } /* Very weak */
+.strength-1 { background: #ef4444; } /* Weak */
+.strength-2 { background: #f59e0b; } /* Fair */
+.strength-3 { background: #10b981; } /* Good */
+.strength-4 { background: #059669; } /* Strong */
+
+/* Password requirements list */
+.password-requirements-list {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-top: 5px;
+    line-height: 1.4;
+}
+
+.password-requirements-list ul {
+    padding-left: 20px;
+    margin: 5px 0;
+}
+
+.password-requirements-list li {
+    margin-bottom: 3px;
+}
+
+.password-requirements-list li.valid {
+    color: #10b981;
+}
+
+.password-requirements-list li.invalid {
+    color: #dc2626;
+}
+
+.password-requirements-list li i {
+    margin-right: 5px;
+}
+
+/* Email validation */
+.email-validation {
+    font-size: 0.85rem;
+    margin-top: 5px;
+    font-weight: 500;
+}
+
+.email-valid {
+    color: #10b981;
+}
+
+.email-invalid {
+    color: #dc2626;
+}
+
+/* Input Validation States */
+input.valid {
+    border-color: #10b981 !important;
+    background: linear-gradient(90deg, var(--bg-secondary), #d1fae5) !important;
+}
+
+input.invalid {
+    border-color: #dc2626 !important;
+    background: linear-gradient(90deg, var(--bg-secondary), #fee2e2) !important;
+}
+
+/* Password match indicator */
+.password-match {
+    font-size: 0.85rem;
+    margin-top: 5px;
+    padding: 5px;
+    border-radius: 4px;
+    text-align: center;
+}
+
+.password-match.valid {
+    background: var(--success-bg);
+    color: var(--success-text);
+}
+
+.password-match.invalid {
+    background: var(--error-bg);
+    color: var(--error-text);
+}
+
+/* Password container with toggle */
+.password-container {
+    position: relative;
+    width: 100%;
+}
+
+.password-container input {
+    width: 100%;
+    padding-right: 40px !important;
+}
+
+.toggle-password {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-size: 1rem;
+    padding: 5px;
+    border-radius: 4px;
+    transition: all 0.3s;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.toggle-password:hover {
+    color: #2563eb;
+    background: var(--hover-color);
+}
+
+.toggle-password:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.3);
+}
+
 /* Form Tips */
 .form-tip {
     font-size: 0.85rem;
@@ -676,6 +852,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
     margin-top: 5px;
     font-style: italic;
 }
+
+/* ================= End Validation Styles ================= */
 
 /* Message Styles */
 .message {
@@ -688,7 +866,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
     gap: 12px;
     animation: slideIn 0.3s ease;
     box-shadow: 0 4px 6px var(--shadow-color);
-    border-left: 4px solid;
 }
 
 @keyframes slideIn {
@@ -705,65 +882,89 @@ $current_page = basename($_SERVER['PHP_SELF']);
 .message.success {
     background: linear-gradient(135deg, var(--success-bg), #bbf7d0);
     color: var(--success-text);
-    border-color: var(--success-border);
+    border-left: 4px solid var(--success-border);
 }
 
 .message.error {
     background: linear-gradient(135deg, var(--error-bg), #fecaca);
     color: var(--error-text);
-    border-color: var(--error-border);
+    border-left: 4px solid var(--error-border);
 }
 
 .message.warning {
     background: linear-gradient(135deg, var(--warning-bg), #fde68a);
     color: var(--warning-text);
-    border-color: var(--warning-border);
+    border-left: 4px solid var(--warning-border);
 }
 
 .message i {
     font-size: 1.2rem;
 }
 
-/* Dark mode specific adjustments */
-[data-theme="dark"] .btn-submit {
-    background: linear-gradient(135deg, #059669, #047857);
-}
-
-[data-theme="dark"] .btn-submit:hover {
-    background: linear-gradient(135deg, #047857, #065f46);
-}
-
-[data-theme="dark"] .file-input-wrapper label {
-    background: #2563eb;
-}
-
-[data-theme="dark"] .file-input-wrapper label:hover {
-    background: #1d4ed8;
-}
-
-[data-theme="dark"] .current-profile-pic {
-    border-color: #3b82f6;
-}
-
-[data-theme="dark"] .profile-form-card h2 {
-    border-bottom-color: var(--border-color);
-}
-
 /* ================= Responsive ================= */
-@media screen and (max-width: 768px){
-    .topbar { display: flex; }
-    .sidebar { transform: translateX(-100%); width: 250px; }
-    .sidebar.active { transform: translateX(0); }
-    .main-content { margin-left: 0; padding: 15px; width: 100%; }
-    .content-wrapper { padding: 20px; border-radius: 0; }
-    .header { flex-direction: column; gap: 15px; align-items: flex-start; }
-    .header h1 { font-size: 1.8rem; }
-    .profile-form-card { padding: 20px; }
-    .current-profile-pic { width: 120px; height: 120px; }
+@media (max-width: 768px) {
+    .topbar { 
+        display: flex; 
+    }
+    
+    .sidebar { 
+        transform: translateX(-100%); 
+        width: 250px;
+        top: 120px;
+        height: calc(100vh - 120px) !important;
+    }
+    
+    .sidebar.active { 
+        transform: translateX(0); 
+    }
+    
+    .overlay {
+        top: 120px;
+        height: calc(100vh - 120px);
+    }
+    
+    .main-content {
+        padding-top: 140px;
+        margin-top: 120px;
+    }
+    
+    .header { 
+        flex-direction: column; 
+        gap: 15px; 
+        align-items: flex-start; 
+    }
+    
+    .header h1 { 
+        font-size: 1.8rem; 
+    }
+    
+    .forms-section { 
+        gap: 20px; 
+    }
+    
+    .form-card { 
+        padding: 20px; 
+    }
+    
+    .current-profile-pic { 
+        width: 120px; 
+        height: 120px; 
+    }
 }
 </style>
 </head>
 <body>
+    <!-- University Header -->
+    <div class="university-header">
+        <div class="header-left">
+            <img src="../assets/images/dku logo.jpg" alt="Debark University Logo" class="dku-logo-img">
+            <div class="system-title">Debark University Class Scheduling System</div>
+        </div>
+        <div class="header-right">
+            Edit Profile
+        </div>
+    </div>
+
     <!-- Topbar for Mobile -->
     <div class="topbar">
         <button class="menu-btn" onclick="toggleSidebar()">☰</button>
@@ -773,33 +974,33 @@ $current_page = basename($_SERVER['PHP_SELF']);
     <!-- Overlay for Mobile -->
     <div class="overlay" onclick="toggleSidebar()"></div>
 
-  <!-- Sidebar -->
-<div class="sidebar">
-    <div class="sidebar-profile">
-        <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic"
-             onerror="this.onerror=null; this.src='../assets/default_profile.png';">
-        <p><?= htmlspecialchars($user['username'] ?? 'Instructor') ?></p>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-profile">
+            <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic"
+                 onerror="this.onerror=null; this.src='../assets/default_profile.png';">
+            <p><?= htmlspecialchars($user['username'] ?? 'Instructor') ?></p>
+        </div>
+        <h2>Instructor Panel</h2>
+        <a href="instructor_dashboard.php" class="<?= $current_page=='instructor_dashboard.php'?'active':'' ?>">
+            <i class="fas fa-home"></i> Dashboard
+        </a>
+        <a href="announcements.php" class="<?= $current_page=='announcements.php'?'active':'' ?>">
+            <i class="fas fa-bullhorn"></i> Announcements
+        </a>
+        <a href="exam_assignments.php" class="<?= $current_page=='exam_assignments.php'?'active':'' ?>">
+            <i class="fas fa-clipboard-list"></i> Exam Assignments
+        </a>
+        <a href="my_courses.php" class="<?= $current_page=='my_courses.php'?'active':'' ?>">
+            <i class="fas fa-book"></i> My Courses
+        </a>
+        <a href="edit_profile.php" class="active">
+            <i class="fas fa-user-edit"></i> Edit Profile
+        </a>
+        <a href="../logout.php">
+            <i class="fas fa-sign-out-alt"></i> Logout
+        </a>
     </div>
-    <h2>Instructor Dashboard</h2>
-    <a href="instructor_dashboard.php" class="<?= $current_page=='instructor_dashboard.php'?'active':'' ?>">
-        <i class="fas fa-home"></i> Dashboard
-    </a>
-    <a href="announcements.php" class="<?= $current_page=='announcements.php'?'active':'' ?>">
-        <i class="fas fa-bullhorn"></i> Announcements
-    </a>
-    <a href="exam_assignments.php" class="<?= $current_page=='exam_assignments.php'?'active':'' ?>">
-        <i class="fas fa-clipboard-list"></i> Exam Assignments
-    </a>
-    <a href="my_courses.php" class="<?= $current_page=='my_courses.php'?'active':'' ?>">
-        <i class="fas fa-book"></i> My Courses
-    </a>
-    <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
-        <i class="fas fa-user-edit"></i> Edit Profile
-    </a>
-    <a href="../logout.php">
-        <i class="fas fa-sign-out-alt"></i> Logout
-    </a>
-</div>
 
     <!-- Main Content -->
     <div class="main-content">
@@ -807,7 +1008,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <div class="header">
                 <div class="welcome-section">
                     <h1>Edit Profile</h1>
-                    <p>Update your personal information and profile picture</p>
+                    <p>Update your personal information and manage your account settings</p>
                 </div>
                 <div class="user-info">
                     <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile" id="headerProfilePic"
@@ -827,10 +1028,11 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 </div>
             <?php endif; ?>
 
-            <!-- Edit Profile Form -->
-            <div class="edit-profile-container">
-                <div class="profile-form-card">
-                    <h2><i class="fas fa-user-edit"></i> Update Your Information</h2>
+            <!-- Forms Section -->
+            <div class="forms-section">
+                <!-- Profile Information Form -->
+                <div class="form-card">
+                    <h2><i class="fas fa-user-edit"></i> Profile Information</h2>
                     
                     <form method="post" enctype="multipart/form-data" id="profileForm">
                         <div class="profile-picture-section">
@@ -861,11 +1063,89 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         <div class="form-group">
                             <label for="email">Email Address</label>
                             <input type="email" id="email" name="email" class="form-control" 
-                                   value="<?= htmlspecialchars($user['email'] ?? '') ?>" required>
+                                   value="<?= htmlspecialchars($user['email'] ?? '') ?>" required oninput="validateEmail()">
+                            <div class="email-validation" id="email-validation"></div>
                         </div>
                         
-                        <button type="submit" class="btn-submit">
+                        <button type="submit" name="update_profile" class="btn-submit" id="profileSubmitBtn">
                             <i class="fas fa-save"></i> Update Profile
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Password Change Form -->
+                <div class="form-card">
+                    <h2><i class="fas fa-lock"></i> Change Password</h2>
+                    
+                    <div class="password-requirements">
+                        <h4>Password Requirements:</h4>
+                        <ul>
+                            <li>At least 8 characters long</li>
+                            <li>At least one uppercase letter</li>
+                            <li>At least one lowercase letter</li>
+                            <li>At least one number</li>
+                            <li>Should be different from your current password</li>
+                            <li>Special characters are optional but recommended</li>
+                        </ul>
+                    </div>
+                    
+                    <form method="post" id="passwordForm">
+                        <div class="form-group">
+                            <label for="current_password">Current Password</label>
+                            <div class="password-container">
+                                <input type="password" id="current_password" name="current_password" 
+                                       class="form-control" required placeholder="Enter your current password">
+                                <button type="button" class="toggle-password" onclick="togglePasswordVisibility('current_password', this)">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="new_password">New Password</label>
+                            <div class="password-container">
+                                <input type="password" id="new_password" name="new_password" 
+                                       class="form-control" required placeholder="Enter new password" minlength="8" oninput="validatePassword()">
+                                <button type="button" class="toggle-password" onclick="togglePasswordVisibility('new_password', this)">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                            
+                            <!-- Password strength meter -->
+                            <div class="password-strength-container" id="password-strength-container">
+                                <div class="password-strength-bar">
+                                    <div class="strength-fill" id="strength-fill"></div>
+                                </div>
+                                <div class="password-strength-text" id="password-strength-text"></div>
+                                
+                                <!-- Password requirements list -->
+                                <div class="password-requirements-list" id="password-requirements">
+                                    <p>Password must contain:</p>
+                                    <ul>
+                                        <li id="req-length" class="invalid"><i class="fas fa-times"></i> At least 8 characters</li>
+                                        <li id="req-uppercase" class="invalid"><i class="fas fa-times"></i> At least one uppercase letter</li>
+                                        <li id="req-lowercase" class="invalid"><i class="fas fa-times"></i> At least one lowercase letter</li>
+                                        <li id="req-number" class="invalid"><i class="fas fa-times"></i> At least one number</li>
+                                        <li id="req-special" class="invalid"><i class="fas fa-times"></i> At least one special character (optional)</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="confirm_password">Confirm New Password</label>
+                            <div class="password-container">
+                                <input type="password" id="confirm_password" name="confirm_password" 
+                                       class="form-control" required placeholder="Confirm new password" minlength="8" oninput="validatePasswordMatch()">
+                                <button type="button" class="toggle-password" onclick="togglePasswordVisibility('confirm_password', this)">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                            <div class="password-match" id="passwordMatch"></div>
+                        </div>
+                        
+                        <button type="submit" name="change_password" class="btn-submit" id="passwordSubmitBtn" disabled>
+                            <i class="fas fa-key"></i> Change Password
                         </button>
                     </form>
                 </div>
@@ -895,19 +1175,21 @@ $current_page = basename($_SERVER['PHP_SELF']);
             }
         });
         
-        // Add animation to form card
-        const formCard = document.querySelector('.profile-form-card');
-        formCard.style.opacity = '0';
-        formCard.style.transform = 'translateY(20px)';
-        setTimeout(() => {
-            formCard.style.transition = 'all 0.5s ease';
-            formCard.style.opacity = '1';
-            formCard.style.transform = 'translateY(0)';
-        }, 200);
+        // Add animation to form cards
+        const formCards = document.querySelectorAll('.form-card');
+        formCards.forEach((card, index) => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            setTimeout(() => {
+                card.style.transition = 'all 0.5s ease';
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, index * 200);
+        });
         
-        // Debug: Log profile picture paths
-        console.log('Sidebar profile pic src:', document.getElementById('sidebarProfilePic').src);
-        console.log('Header profile pic src:', document.getElementById('headerProfilePic').src);
+        // Initialize validation
+        validateEmail();
+        validatePassword();
     });
 
     // Confirm logout
@@ -939,6 +1221,194 @@ $current_page = basename($_SERVER['PHP_SELF']);
             }
             reader.readAsDataURL(file);
         }
+    }
+
+    // Toggle password visibility
+    function togglePasswordVisibility(fieldId, button) {
+        const input = document.getElementById(fieldId);
+        const icon = button.querySelector('i');
+        
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.remove('fa-eye');
+            icon.classList.add('fa-eye-slash');
+            button.setAttribute('aria-label', 'Hide password');
+            button.title = 'Hide password';
+        } else {
+            input.type = 'password';
+            icon.classList.remove('fa-eye-slash');
+            icon.classList.add('fa-eye');
+            button.setAttribute('aria-label', 'Show password');
+            button.title = 'Show password';
+        }
+    }
+
+    // Email validation
+    function validateEmail() {
+        const emailInput = document.getElementById('email');
+        const emailValidation = document.getElementById('email-validation');
+        const email = emailInput.value.trim();
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+        
+        emailInput.classList.remove('valid', 'invalid');
+        
+        if (!email) {
+            emailValidation.innerHTML = '';
+            return;
+        }
+        
+        if (!emailRegex.test(email)) {
+            emailInput.classList.add('invalid');
+            emailValidation.innerHTML = '<span class="email-invalid"><i class="fas fa-exclamation-circle"></i> Please enter a valid email address</span>';
+        } else {
+            emailInput.classList.add('valid');
+            emailValidation.innerHTML = '<span class="email-valid"><i class="fas fa-check-circle"></i> Valid email format</span>';
+        }
+        
+        updateProfileSubmitButton();
+    }
+
+    // Password strength validation
+    function validatePassword() {
+        const passwordInput = document.getElementById('new_password');
+        const password = passwordInput.value;
+        
+        // Calculate password strength
+        let strength = 0;
+        const requirements = {
+            length: password.length >= 8,
+            uppercase: /[A-Z]/.test(password),
+            lowercase: /[a-z]/.test(password),
+            number: /[0-9]/.test(password),
+            special: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)
+        };
+        
+        // Update requirement indicators
+        document.getElementById('req-length').className = requirements.length ? 'valid' : 'invalid';
+        document.getElementById('req-length').innerHTML = (requirements.length ? '<i class="fas fa-check"></i>' : '<i class="fas fa-times"></i>') + ' At least 8 characters';
+        
+        document.getElementById('req-uppercase').className = requirements.uppercase ? 'valid' : 'invalid';
+        document.getElementById('req-uppercase').innerHTML = (requirements.uppercase ? '<i class="fas fa-check"></i>' : '<i class="fas fa-times"></i>') + ' At least one uppercase letter';
+        
+        document.getElementById('req-lowercase').className = requirements.lowercase ? 'valid' : 'invalid';
+        document.getElementById('req-lowercase').innerHTML = (requirements.lowercase ? '<i class="fas fa-check"></i>' : '<i class="fas fa-times"></i>') + ' At least one lowercase letter';
+        
+        document.getElementById('req-number').className = requirements.number ? 'valid' : 'invalid';
+        document.getElementById('req-number').innerHTML = (requirements.number ? '<i class="fas fa-check"></i>' : '<i class="fas fa-times"></i>') + ' At least one number';
+        
+        document.getElementById('req-special').className = requirements.special ? 'valid' : 'invalid';
+        document.getElementById('req-special').innerHTML = (requirements.special ? '<i class="fas fa-check"></i>' : '<i class="fas fa-times"></i>') + ' At least one special character (optional)';
+        
+        // Calculate strength score
+        if (requirements.length) strength++;
+        if (requirements.uppercase) strength++;
+        if (requirements.lowercase) strength++;
+        if (requirements.number) strength++;
+        if (requirements.special) strength++;
+        
+        // Update strength meter
+        const strengthPercent = (strength / 5) * 100;
+        const strengthFill = document.getElementById('strength-fill');
+        strengthFill.className = 'strength-fill strength-' + strength;
+        strengthFill.style.width = strengthPercent + '%';
+        
+        // Update strength text
+        const strengthTexts = ['Very Weak', 'Weak', 'Fair', 'Good', 'Strong'];
+        const strengthColors = ['#dc2626', '#ef4444', '#f59e0b', '#10b981', '#059669'];
+        const passwordStrengthText = document.getElementById('password-strength-text');
+        passwordStrengthText.textContent = 'Password Strength: ' + strengthTexts[strength];
+        passwordStrengthText.style.color = strengthColors[strength];
+        
+        // Update input border color based on strength
+        passwordInput.classList.remove('valid', 'invalid');
+        if (password.length === 0) {
+            // Do nothing
+        } else if (strength < 3) {
+            passwordInput.classList.add('invalid');
+        } else {
+            passwordInput.classList.add('valid');
+        }
+        
+        // Validate password match
+        validatePasswordMatch();
+        
+        updatePasswordSubmitButton();
+    }
+
+    // Password confirmation validation
+    function validatePasswordMatch() {
+        const newPassword = document.getElementById('new_password');
+        const confirmPassword = document.getElementById('confirm_password');
+        const passwordMatch = document.getElementById('passwordMatch');
+        
+        if (newPassword.value === '' || confirmPassword.value === '') {
+            passwordMatch.textContent = '';
+            passwordMatch.className = 'password-match';
+            confirmPassword.classList.remove('valid', 'invalid');
+            return;
+        }
+        
+        if (newPassword.value === confirmPassword.value) {
+            passwordMatch.textContent = '✓ Passwords match';
+            passwordMatch.className = 'password-match valid';
+            confirmPassword.classList.remove('invalid');
+            confirmPassword.classList.add('valid');
+        } else {
+            passwordMatch.textContent = '✗ Passwords do not match';
+            passwordMatch.className = 'password-match invalid';
+            confirmPassword.classList.remove('valid');
+            confirmPassword.classList.add('invalid');
+        }
+        
+        updatePasswordSubmitButton();
+    }
+
+    // Update profile submit button state
+    function updateProfileSubmitButton() {
+        const emailInput = document.getElementById('email');
+        const usernameInput = document.getElementById('username');
+        const submitBtn = document.getElementById('profileSubmitBtn');
+        
+        // Check if email is valid
+        const email = emailInput.value.trim();
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+        const emailValid = emailRegex.test(email);
+        
+        // Check if username is filled
+        const usernameValid = usernameInput.value.trim() !== '';
+        
+        // Enable button only if both are valid
+        submitBtn.disabled = !(emailValid && usernameValid);
+    }
+
+    // Update password submit button state
+    function updatePasswordSubmitButton() {
+        const currentPassword = document.getElementById('current_password');
+        const newPassword = document.getElementById('new_password');
+        const confirmPassword = document.getElementById('confirm_password');
+        const submitBtn = document.getElementById('passwordSubmitBtn');
+        
+        // Check if all fields are filled
+        const allFilled = currentPassword.value.trim() !== '' && 
+                         newPassword.value.trim() !== '' && 
+                         confirmPassword.value.trim() !== '';
+        
+        // Check password strength
+        const password = newPassword.value;
+        const requirements = {
+            length: password.length >= 8,
+            uppercase: /[A-Z]/.test(password),
+            lowercase: /[a-z]/.test(password),
+            number: /[0-9]/.test(password)
+        };
+        const passwordValid = requirements.length && requirements.uppercase && 
+                            requirements.lowercase && requirements.number;
+        
+        // Check if passwords match
+        const passwordsMatch = newPassword.value === confirmPassword.value;
+        
+        // Enable button only if all conditions are met
+        submitBtn.disabled = !(allFilled && passwordValid && passwordsMatch);
     }
 
     // Auto-close messages after 5 seconds
@@ -973,16 +1443,62 @@ $current_page = basename($_SERVER['PHP_SELF']);
             alert('Please enter a valid email address');
             return false;
         }
+        
+        return true;
+    });
+
+    document.getElementById('passwordForm').addEventListener('submit', function(e) {
+        const currentPass = document.getElementById('current_password').value;
+        const newPass = document.getElementById('new_password').value;
+        const confirmPass = document.getElementById('confirm_password').value;
+        
+        if (!currentPass || !newPass || !confirmPass) {
+            e.preventDefault();
+            alert('Please fill in all password fields');
+            return false;
+        }
+        
+        if (newPass !== confirmPass) {
+            e.preventDefault();
+            alert('New passwords do not match');
+            return false;
+        }
+        
+        if (newPass.length < 8) {
+            e.preventDefault();
+            alert('New password must be at least 8 characters long');
+            return false;
+        }
+        
+        if (!/[A-Z]/.test(newPass)) {
+            e.preventDefault();
+            alert('New password must contain at least one uppercase letter');
+            return false;
+        }
+        
+        if (!/[a-z]/.test(newPass)) {
+            e.preventDefault();
+            alert('New password must contain at least one lowercase letter');
+            return false;
+        }
+        
+        if (!/[0-9]/.test(newPass)) {
+            e.preventDefault();
+            alert('New password must contain at least one number');
+            return false;
+        }
+        
+        // Check if new password is same as current
+        if (newPass === currentPass) {
+            e.preventDefault();
+            alert('New password must be different from current password');
+            return false;
+        }
+        
+        return true;
     });
     
     // Fallback for broken profile pictures
-    function handleImageError(img) {
-        img.onerror = null;
-        img.src = '../assets/default_profile.png';
-        return true;
-    }
-    
-    // Set profile picture fallbacks
     document.addEventListener('DOMContentLoaded', function() {
         const profileImages = document.querySelectorAll('img[src*="profile"], img[alt*="Profile"]');
         profileImages.forEach(img => {
@@ -990,6 +1506,18 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 this.src = '../assets/default_profile.png';
             };
         });
+    });
+    
+    // Add event listeners for real-time validation
+    document.getElementById('email').addEventListener('input', validateEmail);
+    document.getElementById('username').addEventListener('input', updateProfileSubmitButton);
+    document.getElementById('current_password').addEventListener('input', updatePasswordSubmitButton);
+    document.getElementById('new_password').addEventListener('input', function() {
+        validatePassword();
+        validatePasswordMatch();
+    });
+    document.getElementById('confirm_password').addEventListener('input', function() {
+        validatePasswordMatch();
     });
     </script>
 </body>

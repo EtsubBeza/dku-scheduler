@@ -135,49 +135,184 @@ body {
   overflow-x: hidden;
 }
 
+/* ================= University Header ================= */
+.university-header {
+    background: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%);
+    color: white;
+    padding: 0.5rem 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1201;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.dku-logo-img {
+    width: 45px;
+    height: 45px;
+    object-fit: contain;
+    border-radius: 5px;
+    background: white;
+    padding: 4px;
+}
+
+.system-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    opacity: 0.95;
+}
+
+.header-right {
+    font-size: 0.8rem;
+    opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+    .university-header {
+        padding: 0.5rem 15px;
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+    }
+    
+    .header-left, .header-right {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .system-title {
+        font-size: 0.8rem;
+    }
+    
+    .header-right {
+        font-size: 0.75rem;
+    }
+}
+
+/* Adjust other elements for university header */
+.topbar {
+    top: 60px !important; /* Adjusted for university header */
+}
+
+.sidebar {
+    top: 60px !important; /* Adjusted for university header */
+    height: calc(100% - 60px) !important;
+}
+
+.overlay {
+    top: 60px; /* Adjusted for university header */
+    height: calc(100% - 60px);
+}
+
+.main-content {
+    margin-top: 60px; /* Added for university header */
+}
+
 /* =============== Topbar for Mobile =============== */
 .topbar {
-  display: none;
-  position: fixed; top:0; left:0; width:100%;
-  background:var(--bg-sidebar); color:var(--text-sidebar);
-  padding:15px 20px;
-  z-index:1200;
-  justify-content:space-between; align-items:center;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    display: none;
+    position: fixed; 
+    top:60px; 
+    left:0; 
+    width:100%;
+    background:var(--bg-sidebar); 
+    color:var(--text-sidebar);
+    padding:12px 20px;
+    z-index:1200;
+    justify-content:space-between; 
+    align-items:center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 .menu-btn {
-  font-size:26px;
-  background:#1abc9c;
-  border:none; color:var(--text-sidebar);
-  cursor:pointer;
-  padding:10px 14px;
-  border-radius:8px;
-  font-weight:600;
-  transition: background 0.3s, transform 0.2s;
+    font-size:26px;
+    background:#1abc9c;
+    border:none; 
+    color:var(--text-sidebar);
+    cursor:pointer;
+    padding:8px 12px;
+    border-radius:8px;
+    font-weight:600;
+    transition: background 0.3s, transform 0.2s;
 }
-.menu-btn:hover { background:#159b81; transform:translateY(-2px); }
+.menu-btn:hover { 
+    background:#159b81; 
+    transform:translateY(-2px); 
+}
 
 /* =============== SIDEBAR =============== */
 .sidebar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 250px;
-  height: 100vh;
-  background: var(--bg-sidebar);
-  padding: 20px 0;
-  display: flex;
-  flex-direction: column;
-  z-index: 1000;
-  transition: transform 0.3s ease;
+    position: fixed; 
+    top:60px; 
+    left:0;
+    width:250px; 
+    height:calc(100% - 60px);
+    background:var(--bg-sidebar); 
+    color:var(--text-sidebar);
+    z-index:1100;
+    transition: transform 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.2);
 }
-.sidebar.hidden { transform: translateX(-100%); }
+.sidebar.hidden { 
+    transform:translateX(-260px); 
+}
 
+/* Sidebar Content (scrollable) */
+.sidebar-content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 20px 0;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+/* Custom scrollbar for sidebar */
+.sidebar-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sidebar-content::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 3px;
+}
+
+.sidebar-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+}
+
+.sidebar-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
+}
+
+[data-theme="dark"] .sidebar-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+[data-theme="dark"] .sidebar-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* Sidebar Profile */
 .sidebar-profile {
     text-align: center;
     margin-bottom: 25px;
     padding: 0 20px 20px;
     border-bottom: 1px solid rgba(255,255,255,0.2);
+    flex-shrink: 0;
 }
 
 .sidebar-profile img {
@@ -197,6 +332,7 @@ body {
     font-size: 16px;
 }
 
+/* Sidebar Title */
 .sidebar h2 {
     text-align: center;
     color: var(--text-sidebar);
@@ -205,105 +341,33 @@ body {
     padding: 0 20px;
 }
 
-.sidebar a { 
-    display:block; 
-    padding:12px 20px; 
-    color:var(--text-sidebar); 
-    text-decoration:none; 
-    transition: background 0.3s; 
-    border-bottom: 1px solid rgba(255,255,255,0.1);
+/* Sidebar Navigation */
+.sidebar nav {
     display: flex;
+    flex-direction: column;
+}
+
+.sidebar a { 
+    display: flex; 
     align-items: center;
     gap: 10px;
+    padding: 12px 20px; 
+    color: var(--text-sidebar); 
+    text-decoration: none; 
+    transition: all 0.3s; 
+    border-bottom: 1px solid rgba(255,255,255,0.1);
     position: relative;
 }
-.sidebar a:hover, .sidebar a.active { background:#1abc9c; color:white; }
-
-/* =============== SIDEBAR SCROLLABILITY =============== */
-.sidebar {
-    /* ... existing styles ... */
-    display: flex;
-    flex-direction: column;
-    overflow: hidden; /* Hide overflow from main sidebar container */
+.sidebar a:hover, .sidebar a.active { 
+    background: #1abc9c; 
+    color: white; 
+    padding-left: 25px;
 }
 
-/* Scrollable sidebar content */
-.sidebar-scrollable {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: 20px 0;
-    display: flex;
-    flex-direction: column;
-}
-
-/* Custom scrollbar styling for sidebar */
-.sidebar-scrollable::-webkit-scrollbar {
-    width: 6px;
-}
-
-.sidebar-scrollable::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 3px;
-}
-
-.sidebar-scrollable::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.3);
-    border-radius: 3px;
-}
-
-.sidebar-scrollable::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.4);
-}
-
-/* For Firefox */
-.sidebar-scrollable {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.3) rgba(255, 255, 255, 0.1);
-}
-
-/* Make profile and header sticky */
-.sidebar-profile, .sidebar h2 {
-    position: sticky;
-    top: 0;
-    background: var(--bg-sidebar);
-    z-index: 10;
-    padding-top: 10px;
-    margin-top: -10px;
-}
-
-.sidebar h2 {
-    top: 181px; /* Adjust based on profile height */
-    margin-top: 0;
-}
-
-/* Navigation links container */
-.sidebar nav {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
-
-
-
-/* For mobile, adjust sticky positions */
-@media (max-width: 768px) {
-    .sidebar.active {
-        display: flex;
-        flex-direction: column;
-    }
-    
-    .sidebar-profile, .sidebar h2 {
-        position: relative;
-        top: 0;
-    }
-    
-    .sidebar a[href="../logout.php"] {
-        position: relative;
-        bottom: auto;
-        margin-top: 0;
-        border-top: 1px solid rgba(255, 255, 255, 0.1);
-    }
+.sidebar a i {
+    width: 20px;
+    text-align: center;
+    font-size: 1.1rem;
 }
 
 /* Pending badge */
@@ -327,11 +391,21 @@ body {
 
 /* =============== Overlay =============== */
 .overlay {
-    position: fixed; top:0; left:0; width:100%; height:100%;
-    background: rgba(0,0,0,0.4); z-index:1050;
-    display:none; opacity:0; transition: opacity 0.3s ease;
+    position: fixed; 
+    top:60px; 
+    left:0; 
+    width:100%; 
+    height:calc(100% - 60px);
+    background: rgba(0,0,0,0.4); 
+    z-index:1050;
+    display:none; 
+    opacity:0; 
+    transition: opacity 0.3s ease;
 }
-.overlay.active { display:block; opacity:1; }
+.overlay.active { 
+    display:block; 
+    opacity:1; 
+}
 
 /* =============== MAIN CONTAINER =============== */
 .main-content {
@@ -340,7 +414,18 @@ body {
   min-height: 100vh;
   background: var(--bg-primary);
   transition: all 0.3s ease;
+  margin-top: 60px;
   width: calc(100% - 250px);
+}
+
+@media (max-width: 768px) {
+    .main-content {
+        margin-left: 0;
+        padding: 15px;
+        padding-top: 140px; /* Adjusted for headers on mobile */
+        margin-top: 120px; /* 60px header + 60px topbar */
+        width: 100%;
+    }
 }
 
 /* Content Wrapper */
@@ -583,7 +668,7 @@ td:first-child {
     letter-spacing: 0.5px;
 }
 .role-student { background:#10b981; color:white; }
-.role-instructor { background:#3b82f6; color:white; }
+.role-faculty { background:#3b82f6; color:white; }
 .role-department_head { background:#8b5cf6; color:white; }
 
 /* Student ID badge */
@@ -652,50 +737,86 @@ td:first-child {
 }
 
 @media (max-width: 768px) {
-  .topbar { display: flex; }
-  .sidebar { transform: translateX(-100%); }
-  .sidebar.active { transform: translateX(0); }
-  .main-content { 
-    margin-left: 0; 
-    padding: 15px;
-    padding-top: 80px;
-    width: 100%;
-  }
-  .content-wrapper {
-    padding: 15px;
-    border-radius: 0;
-  }
-  .header { 
-    flex-direction: column; 
-    gap: 15px; 
-    align-items: flex-start; 
-  }
-  .header h1 { font-size: 1.8rem; }
-  
-  .bulk-actions {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 15px;
-  }
-  
-  .bulk-buttons {
-    width: 100%;
-  }
-  
-  .bulk-btn {
-    flex: 1;
-    justify-content: center;
-  }
-  
-  .action-buttons {
-    flex-direction: column;
-    gap: 5px;
-  }
-  
-  .btn-approve, .btn-reject {
-    width: 100%;
-    justify-content: center;
-  }
+    .university-header {
+        padding: 0.5rem 15px;
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+    }
+    
+    .header-left, .header-right {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .system-title {
+        font-size: 0.8rem;
+    }
+    
+    .header-right {
+        font-size: 0.75rem;
+    }
+    
+    .topbar { 
+        display:flex;
+        top: 60px; /* Adjusted for mobile with header */
+    }
+    
+    .sidebar { 
+        transform:translateX(-100%); 
+        top: 120px; /* 60px header + 60px topbar */
+        height: calc(100% - 120px) !important;
+    }
+    
+    .sidebar.active { 
+        transform:translateX(0); 
+    }
+    
+    .overlay {
+        top: 120px;
+        height: calc(100% - 120px);
+    }
+    
+    .main-content {
+        padding-top: 140px; /* Adjusted for headers on mobile */
+        margin-top: 120px; /* 60px header + 60px topbar */
+    }
+    
+    .content-wrapper {
+        padding: 15px;
+        border-radius: 0;
+    }
+    .header { 
+        flex-direction: column; 
+        gap: 15px; 
+        align-items: flex-start; 
+    }
+    .header h1 { font-size: 1.8rem; }
+    
+    .bulk-actions {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+    
+    .bulk-buttons {
+        width: 100%;
+    }
+    
+    .bulk-btn {
+        flex: 1;
+        justify-content: center;
+    }
+    
+    .action-buttons {
+        flex-direction: column;
+        gap: 5px;
+    }
+    
+    .btn-approve, .btn-reject {
+        width: 100%;
+        justify-content: center;
+    }
 }
 
 /* =============== MOBILE CARD VIEW =============== */
@@ -756,321 +877,331 @@ td:first-child {
 </style>
 </head>
 <body>
-
-<!-- Topbar for Mobile -->
-<div class="topbar">
-  <button class="menu-btn" onclick="toggleSidebar()">☰</button>
-  <h2>Approve Users</h2>
-</div>
-
-<!-- Overlay for Mobile -->
-<div class="overlay" onclick="toggleSidebar()"></div>
-
-<!-- Sidebar -->
-<div class="sidebar" id="sidebar">
-    <!-- Scrollable content wrapper -->
-    <div class="sidebar-scrollable">
-        <div class="sidebar-profile">
-            <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic"
-                 onerror="this.onerror=null; this.src='../assets/default_profile.png';">
-            <p><?= htmlspecialchars($current_user['username']) ?></p>
+    <!-- University Header -->
+    <div class="university-header">
+        <div class="header-left">
+            <img src="../assets/images/dku logo.jpg" alt="Debark University Logo" class="dku-logo-img">
+            <div class="system-title">Debark University Class Scheduling System</div>
         </div>
-        <h2>Admin Panel</h2>
-        
-        <!-- Navigation Links Container -->
-        <nav>
-            <a href="dashboard.php" class="<?= $current_page=='dashboard.php'?'active':'' ?>">
-                <i class="fas fa-home"></i> Dashboard
-            </a>
-            <a href="manage_users.php" class="<?= $current_page=='manage_users.php'?'active':'' ?>">
-                <i class="fas fa-users"></i> Manage Users
-            </a>
-            <a href="approve_users.php" class="active">
-                <i class="fas fa-user-check"></i> Approve Users
-                <?php if($pending_count > 0): ?>
-                    <span class="pending-badge"><?= $pending_count ?></span>
-                <?php endif; ?>
-            </a>
-            <a href="manage_departments.php" class="<?= $current_page=='manage_departments.php'?'active':'' ?>">
-                <i class="fas fa-building"></i> Manage Departments
-            </a>
-            <a href="manage_courses.php" class="<?= $current_page=='manage_courses.php'?'active':'' ?>">
-                <i class="fas fa-book"></i> Manage Courses
-            </a>
-            <a href="manage_rooms.php" class="<?= $current_page=='manage_rooms.php'?'active':'' ?>">
-                <i class="fas fa-door-closed"></i> Manage Rooms
-            </a>
-            <a href="manage_schedules.php" class="<?= $current_page=='manage_schedules.php'?'active':'' ?>">
-                <i class="fas fa-calendar-alt"></i> Manage Schedule
-            </a>
-            <a href="assign_instructors.php" class="<?= $current_page=='assign_instructors.php'?'active':'' ?>">
-                <i class="fas fa-chalkboard-teacher"></i> Assign Instructors
-            </a>
-            <a href="admin_exam_schedules.php" class="<?= $current_page=='admin_exam_schedules.php'?'active':'' ?>">
-                <i class="fas fa-clipboard-list"></i> Exam Scheduling
-            </a>
-            <a href="manage_announcements.php" class="<?= $current_page=='manage_announcements.php'?'active':'' ?>">
-                <i class="fas fa-bullhorn"></i> Manage Announcements
-            </a>
-            <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
-                <i class="fas fa-user-edit"></i> Edit Profile
-            </a>
-            <a href="../logout.php">
-                <i class="fas fa-sign-out-alt"></i> Logout
-            </a>
-        </nav>
+        <div class="header-right">
+            Approve Users
+        </div>
     </div>
-</div>
-<!-- Main Content -->
-<div class="main-content">
-    <div class="content-wrapper">
-        <!-- Header -->
-        <div class="header">
-            <div>
-                <h1>Approve Users</h1>
-                <p style="color: var(--text-secondary); margin-top: 5px;">Review and approve pending user registrations</p>
-            </div>
-            <div class="user-info">
-                <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile" id="headerProfilePic"
+
+    <!-- Topbar for Mobile -->
+    <div class="topbar">
+        <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+        <h2>Approve Users</h2>
+    </div>
+
+    <!-- Overlay for Mobile -->
+    <div class="overlay" onclick="toggleSidebar()"></div>
+
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-content">
+            <div class="sidebar-profile">
+                <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic"
                      onerror="this.onerror=null; this.src='../assets/default_profile.png';">
-                <div>
-                    <div><?= htmlspecialchars($current_user['username']) ?></div>
-                    <small>Administrator</small>
-                </div>
+                <p><?= htmlspecialchars($current_user['username']) ?></p>
             </div>
+            <h2>Admin Dashboard</h2>
+            
+            <!-- Navigation Links -->
+            <nav>
+                <a href="dashboard.php" class="<?= $current_page=='dashboard.php'?'active':'' ?>">
+                    <i class="fas fa-home"></i> Dashboard
+                </a>
+                <a href="manage_users.php" class="<?= $current_page=='manage_users.php'?'active':'' ?>">
+                    <i class="fas fa-users"></i> Manage Users
+                </a>
+                <a href="approve_users.php" class="active">
+                    <i class="fas fa-user-check"></i> Approve Users
+                    <?php if($pending_count > 0): ?>
+                        <span class="pending-badge"><?= $pending_count ?></span>
+                    <?php endif; ?>
+                </a>
+                <a href="manage_departments.php" class="<?= $current_page=='manage_departments.php'?'active':'' ?>">
+                    <i class="fas fa-building"></i> Manage Departments
+                </a>
+                <a href="manage_courses.php" class="<?= $current_page=='manage_courses.php'?'active':'' ?>">
+                    <i class="fas fa-book"></i> Manage Courses
+                </a>
+                <a href="manage_rooms.php" class="<?= $current_page=='manage_rooms.php'?'active':'' ?>">
+                    <i class="fas fa-door-closed"></i> Manage Rooms
+                </a>
+                <a href="manage_schedules.php" class="<?= $current_page=='manage_schedules.php'?'active':'' ?>">
+                    <i class="fas fa-calendar-alt"></i> Manage Schedule
+                </a>
+                <a href="assign_instructors.php" class="<?= $current_page=='assign_instructors.php'?'active':'' ?>">
+                    <i class="fas fa-chalkboard-teacher"></i> Assign Instructors
+                </a>
+                <a href="admin_exam_schedules.php" class="<?= $current_page=='admin_exam_schedules.php'?'active':'' ?>">
+                    <i class="fas fa-clipboard-list"></i> Exam Scheduling
+                </a>
+                <a href="manage_announcements.php" class="<?= $current_page=='manage_announcements.php'?'active':'' ?>">
+                    <i class="fas fa-bullhorn"></i> Manage Announcements
+                </a>
+                <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
+                    <i class="fas fa-user-edit"></i> Edit Profile
+                </a>
+                <a href="../logout.php">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </nav>
         </div>
-
-        <!-- Stats Card -->
-        <div class="stats-card">
-            <i class="fas fa-user-clock"></i>
-            <div>
-                <h3><?= $pending_count ?> Pending Approval<?= $pending_count !== 1 ? 's' : '' ?></h3>
-                <p>Users waiting for review and approval</p>
-            </div>
-        </div>
-
-        <!-- Bulk Actions -->
-        <?php if($pending_count > 0): ?>
-        <form method="POST" class="bulk-form">
-            <div class="bulk-actions">
-                <div class="bulk-select">
-                    <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
-                    <label for="selectAll" style="color: var(--text-primary); font-weight: 500;">
-                        Select All
-                    </label>
-                </div>
-                <div class="bulk-buttons">
-                    <input type="hidden" name="bulk_action" id="bulkAction">
-                    <button type="button" class="bulk-btn approve" onclick="submitBulkAction('approve_all')">
-                        <i class="fas fa-check-circle"></i> Approve Selected
-                    </button>
-                    <button type="button" class="bulk-btn reject" onclick="submitBulkAction('reject_all')">
-                        <i class="fas fa-times-circle"></i> Reject Selected
-                    </button>
-                </div>
-            </div>
-
-        <!-- Users Table -->
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th><input type="checkbox" id="selectAllHeader" onchange="toggleSelectAll()"></th>
-                        <th>User Details</th>
-                        <th>Role & Department</th>
-                        <th>Registration Date</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach($pending_users as $user): ?>
-                    <tr>
-                        <td data-label="Select">
-                            <input type="checkbox" name="selected_users[]" value="<?= $user['user_id'] ?>" class="user-checkbox">
-                        </td>
-                        <td data-label="User Details">
-                            <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 5px;">
-                                <?= htmlspecialchars($user['username']) ?>
-                            </div>
-                            <div style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 5px;">
-                                <?= htmlspecialchars($user['email']) ?>
-                            </div>
-                            <?php if(!empty($user['full_name'])): ?>
-                                <div style="color: var(--text-primary); font-size: 0.9rem; margin-bottom: 5px;">
-                                    <i class="fas fa-user"></i> <?= htmlspecialchars($user['full_name']) ?>
-                                </div>
-                            <?php endif; ?>
-                            <?php if(!empty($user['student_id'])): ?>
-                                <div class="student-id-badge">
-                                    <i class="fas fa-id-card"></i> <?= htmlspecialchars($user['student_id']) ?>
-                                </div>
-                            <?php endif; ?>
-                        </td>
-                        <td data-label="Role & Department">
-                            <div class="role-badge role-<?= $user['role'] ?>" style="margin-bottom: 8px;">
-                                <?= htmlspecialchars($user['role']) ?>
-                            </div>
-                            <?php if(!empty($user['department_name'])): ?>
-                                <div style="color: var(--text-primary); font-size: 0.9rem;">
-                                    <i class="fas fa-building"></i> <?= htmlspecialchars($user['department_name']) ?>
-                                </div>
-                            <?php else: ?>
-                                <div style="color: var(--text-secondary); font-size: 0.9rem;">
-                                    <i class="fas fa-building"></i> No Department
-                                </div>
-                            <?php endif; ?>
-                        </td>
-                        <td data-label="Registration Date">
-                            <div style="color: var(--text-primary); margin-bottom: 5px;">
-                                <?= date('M d, Y', strtotime($user['created_at'])) ?>
-                            </div>
-                            <div class="time-badge">
-                                <i class="fas fa-clock"></i> <?= date('h:i A', strtotime($user['created_at'])) ?>
-                            </div>
-                        </td>
-                        <td data-label="Actions">
-                            <div class="action-buttons">
-                                <a href="?approve=<?= $user['user_id'] ?>" class="btn-approve" onclick="return confirmApprove()">
-                                    <i class="fas fa-check"></i> Approve
-                                </a>
-                                <a href="?reject=<?= $user['user_id'] ?>" class="btn-reject" onclick="return confirm('Are you sure you want to reject this user?')">
-                                    <i class="fas fa-times"></i> Reject
-                                </a>
-                            </div>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-        </form>
-        <?php else: ?>
-        <!-- Empty State -->
-        <div class="empty-state">
-            <i class="fas fa-user-check"></i>
-            <h3>No Pending Approvals</h3>
-            <p>All users have been approved. Check back later for new registration requests.</p>
-        </div>
-        <?php endif; ?>
     </div>
-</div>
 
-<!-- Include darkmode.js -->
-<script src="../../assets/js/darkmode.js"></script>
-<script>
-function toggleSidebar(){
-    const sidebar = document.querySelector('.sidebar');
-    const overlay = document.querySelector('.overlay');
-    sidebar.classList.toggle('active');
-    overlay.classList.toggle('active');
-}
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="content-wrapper">
+            <!-- Header -->
+            <div class="header">
+                <div>
+                    <h1>Approve Users</h1>
+                    <p style="color: var(--text-secondary); margin-top: 5px;">Review and approve pending user registrations</p>
+                </div>
+                <div class="user-info">
+                    <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile" id="headerProfilePic"
+                         onerror="this.onerror=null; this.src='../assets/default_profile.png';">
+                    <div>
+                        <div><?= htmlspecialchars($current_user['username']) ?></div>
+                        <small>Administrator</small>
+                    </div>
+                </div>
+            </div>
 
-// Set active state for current page
-document.addEventListener('DOMContentLoaded', function() {
-    const currentPage = window.location.pathname.split('/').pop();
-    const navLinks = document.querySelectorAll('.sidebar a');
-    
-    navLinks.forEach(link => {
-        const linkPage = link.getAttribute('href');
-        if (linkPage === currentPage) {
-            link.classList.add('active');
-        }
-    });
-    
-    // Add animation to table rows
-    const tableRows = document.querySelectorAll('tbody tr');
-    tableRows.forEach((row, index) => {
-        row.style.opacity = '0';
-        row.style.transform = 'translateX(-20px)';
-        setTimeout(() => {
-            row.style.transition = 'all 0.5s ease';
-            row.style.opacity = '1';
-            row.style.transform = 'translateX(0)';
-        }, index * 100);
-    });
-});
+            <!-- Stats Card -->
+            <div class="stats-card">
+                <i class="fas fa-user-clock"></i>
+                <div>
+                    <h3><?= $pending_count ?> Pending Approval<?= $pending_count !== 1 ? 's' : '' ?></h3>
+                    <p>Users waiting for review and approval</p>
+                </div>
+            </div>
 
-// Confirm logout
-document.querySelector('a[href="../logout.php"]').addEventListener('click', function(e) {
-    if(!confirm('Are you sure you want to logout?')) {
-        e.preventDefault();
+            <!-- Bulk Actions -->
+            <?php if($pending_count > 0): ?>
+            <form method="POST" class="bulk-form">
+                <div class="bulk-actions">
+                    <div class="bulk-select">
+                        <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
+                        <label for="selectAll" style="color: var(--text-primary); font-weight: 500;">
+                            Select All
+                        </label>
+                    </div>
+                    <div class="bulk-buttons">
+                        <input type="hidden" name="bulk_action" id="bulkAction">
+                        <button type="button" class="bulk-btn approve" onclick="submitBulkAction('approve_all')">
+                            <i class="fas fa-check-circle"></i> Approve Selected
+                        </button>
+                        <button type="button" class="bulk-btn reject" onclick="submitBulkAction('reject_all')">
+                            <i class="fas fa-times-circle"></i> Reject Selected
+                        </button>
+                    </div>
+                </div>
+
+            <!-- Users Table -->
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th><input type="checkbox" id="selectAllHeader" onchange="toggleSelectAll()"></th>
+                            <th>User Details</th>
+                            <th>Role & Department</th>
+                            <th>Registration Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach($pending_users as $user): ?>
+                        <tr>
+                            <td data-label="Select">
+                                <input type="checkbox" name="selected_users[]" value="<?= $user['user_id'] ?>" class="user-checkbox">
+                            </td>
+                            <td data-label="User Details">
+                                <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 5px;">
+                                    <?= htmlspecialchars($user['username']) ?>
+                                </div>
+                                <div style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 5px;">
+                                    <?= htmlspecialchars($user['email']) ?>
+                                </div>
+                                <?php if(!empty($user['full_name'])): ?>
+                                    <div style="color: var(--text-primary); font-size: 0.9rem; margin-bottom: 5px;">
+                                        <i class="fas fa-user"></i> <?= htmlspecialchars($user['full_name']) ?>
+                                    </div>
+                                <?php endif; ?>
+                                <?php if(!empty($user['student_id'])): ?>
+                                    <div class="student-id-badge">
+                                        <i class="fas fa-id-card"></i> <?= htmlspecialchars($user['student_id']) ?>
+                                    </div>
+                                <?php endif; ?>
+                            </td>
+                            <td data-label="Role & Department">
+                                <div class="role-badge role-<?= $user['role'] ?>" style="margin-bottom: 8px;">
+                                    <?= htmlspecialchars($user['role']) ?>
+                                </div>
+                                <?php if(!empty($user['department_name'])): ?>
+                                    <div style="color: var(--text-primary); font-size: 0.9rem;">
+                                        <i class="fas fa-building"></i> <?= htmlspecialchars($user['department_name']) ?>
+                                    </div>
+                                <?php else: ?>
+                                    <div style="color: var(--text-secondary); font-size: 0.9rem;">
+                                        <i class="fas fa-building"></i> No Department
+                                    </div>
+                                <?php endif; ?>
+                            </td>
+                            <td data-label="Registration Date">
+                                <div style="color: var(--text-primary); margin-bottom: 5px;">
+                                    <?= date('M d, Y', strtotime($user['created_at'])) ?>
+                                </div>
+                                <div class="time-badge">
+                                    <i class="fas fa-clock"></i> <?= date('h:i A', strtotime($user['created_at'])) ?>
+                                </div>
+                            </td>
+                            <td data-label="Actions">
+                                <div class="action-buttons">
+                                    <a href="?approve=<?= $user['user_id'] ?>" class="btn-approve" onclick="return confirmApprove()">
+                                        <i class="fas fa-check"></i> Approve
+                                    </a>
+                                    <a href="?reject=<?= $user['user_id'] ?>" class="btn-reject" onclick="return confirm('Are you sure you want to reject this user?')">
+                                        <i class="fas fa-times"></i> Reject
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            </form>
+            <?php else: ?>
+            <!-- Empty State -->
+            <div class="empty-state">
+                <i class="fas fa-user-check"></i>
+                <h3>No Pending Approvals</h3>
+                <p>All users have been approved. Check back later for new registration requests.</p>
+            </div>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <!-- Include darkmode.js -->
+    <script src="../../assets/js/darkmode.js"></script>
+    <script>
+    function toggleSidebar(){
+        const sidebar = document.querySelector('.sidebar');
+        const overlay = document.querySelector('.overlay');
+        sidebar.classList.toggle('active');
+        overlay.classList.toggle('active');
     }
-});
 
-// Confirm approve action
-function confirmApprove() {
-    return confirm('Are you sure you want to approve this user?');
-}
-
-// Bulk selection functions
-function toggleSelectAll() {
-    const selectAllCheckbox = document.getElementById('selectAll');
-    const selectAllHeader = document.getElementById('selectAllHeader');
-    const userCheckboxes = document.querySelectorAll('.user-checkbox');
-    
-    const isChecked = selectAllCheckbox.checked || selectAllHeader.checked;
-    userCheckboxes.forEach(checkbox => {
-        checkbox.checked = isChecked;
-    });
-    
-    // Sync both select all checkboxes
-    selectAllCheckbox.checked = isChecked;
-    selectAllHeader.checked = isChecked;
-}
-
-function submitBulkAction(action) {
-    const selectedUsers = Array.from(document.querySelectorAll('.user-checkbox:checked')).map(cb => cb.value);
-    
-    if (selectedUsers.length === 0) {
-        alert('Please select at least one user to perform this action.');
-        return;
-    }
-    
-    const actionText = action === 'approve_all' ? 'approve' : 'reject';
-    if (confirm(`Are you sure you want to ${actionText} ${selectedUsers.length} user(s)?`)) {
-        document.getElementById('bulkAction').value = action;
-        document.querySelector('.bulk-form').submit();
-    }
-}
-
-// Individual checkbox change handler
-document.addEventListener('DOMContentLoaded', function() {
-    const userCheckboxes = document.querySelectorAll('.user-checkbox');
-    const selectAllCheckbox = document.getElementById('selectAll');
-    const selectAllHeader = document.getElementById('selectAllHeader');
-    
-    userCheckboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', function() {
-            const allChecked = Array.from(userCheckboxes).every(cb => cb.checked);
-            const anyChecked = Array.from(userCheckboxes).some(cb => cb.checked);
-            
-            selectAllCheckbox.checked = allChecked;
-            selectAllHeader.checked = allChecked;
-            
-            // Indeterminate state for select all
-            selectAllCheckbox.indeterminate = anyChecked && !allChecked;
-            selectAllHeader.indeterminate = anyChecked && !allChecked;
+    // Set active state for current page
+    document.addEventListener('DOMContentLoaded', function() {
+        const currentPage = window.location.pathname.split('/').pop();
+        const navLinks = document.querySelectorAll('.sidebar a');
+        
+        navLinks.forEach(link => {
+            const linkPage = link.getAttribute('href');
+            if (linkPage === currentPage) {
+                link.classList.add('active');
+            }
+        });
+        
+        // Add animation to table rows
+        const tableRows = document.querySelectorAll('tbody tr');
+        tableRows.forEach((row, index) => {
+            row.style.opacity = '0';
+            row.style.transform = 'translateX(-20px)';
+            setTimeout(() => {
+                row.style.transition = 'all 0.5s ease';
+                row.style.opacity = '1';
+                row.style.transform = 'translateX(0)';
+            }, index * 100);
         });
     });
-});
 
-// Fallback for broken profile pictures
-function handleImageError(img) {
-    img.onerror = null;
-    img.src = '../assets/default_profile.png';
-    return true;
-}
-
-// Set profile picture fallbacks
-document.addEventListener('DOMContentLoaded', function() {
-    const profileImages = document.querySelectorAll('img[src*="profile"], img[alt*="Profile"]');
-    profileImages.forEach(img => {
-        img.onerror = function() {
-            this.src = '../assets/default_profile.png';
-        };
+    // Confirm logout
+    document.querySelector('a[href="../logout.php"]').addEventListener('click', function(e) {
+        if(!confirm('Are you sure you want to logout?')) {
+            e.preventDefault();
+        }
     });
-});
-</script>
+
+    // Confirm approve action
+    function confirmApprove() {
+        return confirm('Are you sure you want to approve this user?');
+    }
+
+    // Bulk selection functions
+    function toggleSelectAll() {
+        const selectAllCheckbox = document.getElementById('selectAll');
+        const selectAllHeader = document.getElementById('selectAllHeader');
+        const userCheckboxes = document.querySelectorAll('.user-checkbox');
+        
+        const isChecked = selectAllCheckbox.checked || selectAllHeader.checked;
+        userCheckboxes.forEach(checkbox => {
+            checkbox.checked = isChecked;
+        });
+        
+        // Sync both select all checkboxes
+        selectAllCheckbox.checked = isChecked;
+        selectAllHeader.checked = isChecked;
+    }
+
+    function submitBulkAction(action) {
+        const selectedUsers = Array.from(document.querySelectorAll('.user-checkbox:checked')).map(cb => cb.value);
+        
+        if (selectedUsers.length === 0) {
+            alert('Please select at least one user to perform this action.');
+            return;
+        }
+        
+        const actionText = action === 'approve_all' ? 'approve' : 'reject';
+        if (confirm(`Are you sure you want to ${actionText} ${selectedUsers.length} user(s)?`)) {
+            document.getElementById('bulkAction').value = action;
+            document.querySelector('.bulk-form').submit();
+        }
+    }
+
+    // Individual checkbox change handler
+    document.addEventListener('DOMContentLoaded', function() {
+        const userCheckboxes = document.querySelectorAll('.user-checkbox');
+        const selectAllCheckbox = document.getElementById('selectAll');
+        const selectAllHeader = document.getElementById('selectAllHeader');
+        
+        userCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const allChecked = Array.from(userCheckboxes).every(cb => cb.checked);
+                const anyChecked = Array.from(userCheckboxes).some(cb => cb.checked);
+                
+                selectAllCheckbox.checked = allChecked;
+                selectAllHeader.checked = allChecked;
+                
+                // Indeterminate state for select all
+                selectAllCheckbox.indeterminate = anyChecked && !allChecked;
+                selectAllHeader.indeterminate = anyChecked && !allChecked;
+            });
+        });
+    });
+
+    // Fallback for broken profile pictures
+    function handleImageError(img) {
+        img.onerror = null;
+        img.src = '../assets/default_profile.png';
+        return true;
+    }
+
+    // Set profile picture fallbacks
+    document.addEventListener('DOMContentLoaded', function() {
+        const profileImages = document.querySelectorAll('img[src*="profile"], img[alt*="Profile"]');
+        profileImages.forEach(img => {
+            img.onerror = function() {
+                this.src = '../assets/default_profile.png';
+            };
+        });
+    });
+    </script>
 
 </body>
 </html>

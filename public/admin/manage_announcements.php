@@ -275,6 +275,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <link rel="stylesheet" href="../../assets/css/darkmode.css">
 <style>
+* { box-sizing: border-box; margin:0; padding:0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+
 /* ================= CSS Variables ================= */
 :root {
     --bg-primary: #f8f9fa;
@@ -322,154 +324,187 @@ $current_page = basename($_SERVER['PHP_SELF']);
     --warning-border: #f59e0b;
 }
 
-/* ================= General Reset ================= */
-* { margin:0; padding:0; box-sizing:border-box; font-family: "Segoe UI", Arial, sans-serif; }
-body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x:hidden; }
+/* ================= University Header ================= */
+.university-header {
+    background: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%);
+    color: white;
+    padding: 0.5rem 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1201;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.dku-logo-img {
+    width: 45px;
+    height: 45px;
+    object-fit: contain;
+    border-radius: 5px;
+    background: white;
+    padding: 4px;
+}
+
+.system-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    opacity: 0.95;
+}
+
+.header-right {
+    font-size: 0.8rem;
+    opacity: 0.9;
+}
+
+/* Adjust elements for university header */
+.topbar {
+    top: 60px !important;
+}
+
+.sidebar {
+    top: 60px !important;
+    height: calc(100% - 60px) !important;
+}
+
+.overlay {
+    top: 60px;
+    height: calc(100% - 60px);
+}
+
+.main-content {
+    margin-top: 60px;
+}
+
+@media (max-width: 768px) {
+    .university-header {
+        padding: 0.5rem 15px;
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+    }
+    
+    .header-left, .header-right {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .system-title {
+        font-size: 0.8rem;
+    }
+    
+    .header-right {
+        font-size: 0.75rem;
+    }
+}
 
 /* ================= Topbar for Mobile ================= */
 .topbar {
     display: none;
-    position: fixed; top:0; left:0; width:100%;
-    background:var(--bg-sidebar); color:var(--text-sidebar);
-    padding:15px 20px;
-    z-index:1200;
-    justify-content:space-between; align-items:center;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    position: fixed; 
+    top: 60px; 
+    left: 0; 
+    width: 100%;
+    background: var(--bg-sidebar); 
+    color: var(--text-sidebar);
+    padding: 12px 20px;
+    z-index: 1200;
+    justify-content: space-between; 
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
+
 .menu-btn {
-    font-size:26px;
-    background:#1abc9c;
-    border:none; color:var(--text-sidebar);
-    cursor:pointer;
-    padding:10px 14px;
-    border-radius:8px;
-    font-weight:600;
+    font-size: 26px;
+    background: #1abc9c;
+    border: none; 
+    color: var(--text-sidebar);
+    cursor: pointer;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-weight: 600;
     transition: background 0.3s, transform 0.2s;
 }
-.menu-btn:hover { background:#159b81; transform:translateY(-2px); }
+
+.menu-btn:hover { 
+    background: #159b81; 
+    transform: translateY(-2px); 
+}
 
 /* ================= Sidebar ================= */
 .sidebar { 
     position: fixed; 
-    top:0; left:0; 
-    width:250px; 
-    height:100%; 
-    background:var(--bg-sidebar); 
-    color:var(--text-sidebar);
-    z-index:1100;
-    transition: transform 0.3s ease;
-    padding: 20px 0;
-}
-.sidebar.hidden { transform:translateX(-260px); }
-
-.sidebar-profile {
-    text-align: center;
-    margin-bottom: 25px;
-    padding: 0 20px 20px;
-    border-bottom: 1px solid rgba(255,255,255,0.2);
-}
-
-.sidebar-profile img {
-    width: 100px;
-    height: 100px;
-    border-radius: 50%;
-    object-fit: cover;
-    margin-bottom: 10px;
-    border: 2px solid #1abc9c;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-}
-
-.sidebar-profile p {
+    top: 60px; 
+    left: 0; 
+    width: 250px; 
+    height: calc(100% - 60px);
+    background: var(--bg-sidebar); 
     color: var(--text-sidebar);
-    font-weight: bold;
-    margin: 0;
-    font-size: 16px;
-}
-
-.sidebar h2 {
-    text-align: center;
-    color: var(--text-sidebar);
-    margin-bottom: 25px;
-    font-size: 22px;
-    padding: 0 20px;
-}
-
-.sidebar a { 
-    display:block; 
-    padding:12px 20px; 
-    color:var(--text-sidebar); 
-    text-decoration:none; 
-    transition: background 0.3s; 
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    position: relative;
-}
-.sidebar a:hover, .sidebar a.active { background:#1abc9c; color:white; }
-/* ================= Sidebar with Scrollability ================= */
-.sidebar { 
-    position: fixed; 
-    top:0; left:0; 
-    width:250px; 
-    height:100%; 
-    background:var(--bg-sidebar); 
-    color:var(--text-sidebar);
-    z-index:1100;
+    z-index: 1100;
     transition: transform 0.3s ease;
-    padding: 20px 0;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.2);
 }
 
-/* Scrollable sidebar content */
-.sidebar-scrollable {
+.sidebar.hidden { 
+    transform: translateX(-260px); 
+}
+
+/* Sidebar Content (scrollable) */
+.sidebar-content {
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
-    display: flex;
-    flex-direction: column;
+    padding: 20px 0;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
 }
 
-/* Custom scrollbar styling for sidebar */
-.sidebar-scrollable::-webkit-scrollbar {
+/* Custom scrollbar for sidebar */
+.sidebar-content::-webkit-scrollbar {
     width: 6px;
 }
 
-.sidebar-scrollable::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.1);
+.sidebar-content::-webkit-scrollbar-track {
+    background: transparent;
     border-radius: 3px;
 }
 
-.sidebar-scrollable::-webkit-scrollbar-thumb {
+.sidebar-content::-webkit-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.3);
     border-radius: 3px;
 }
 
-.sidebar-scrollable::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.4);
+.sidebar-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
 }
 
-/* For Firefox */
-.sidebar-scrollable {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.3) rgba(255, 255, 255, 0.1);
+[data-theme="dark"] .sidebar-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
 }
 
-.sidebar.hidden { transform:translateX(-260px); }
+[data-theme="dark"] .sidebar-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
 
+/* Sidebar Profile */
 .sidebar-profile {
     text-align: center;
     margin-bottom: 25px;
     padding: 0 20px 20px;
     border-bottom: 1px solid rgba(255,255,255,0.2);
-    position: sticky;
-    top: 0;
-    background: var(--bg-sidebar);
-    z-index: 10;
-    padding-top: 10px;
-    margin-top: -10px;
+    flex-shrink: 0;
 }
 
 .sidebar-profile img {
@@ -489,80 +524,38 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
     font-size: 16px;
 }
 
+/* Sidebar Title */
 .sidebar h2 {
     text-align: center;
     color: var(--text-sidebar);
     margin-bottom: 25px;
     font-size: 22px;
     padding: 0 20px;
-    position: sticky;
-    top: 181px;
-    background: var(--bg-sidebar);
-    z-index: 10;
+    flex-shrink: 0;
 }
 
-/* Navigation container */
-.sidebar nav {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
-
+/* Sidebar Links */
 .sidebar a { 
-    display:block; 
-    padding:12px 20px; 
-    color:var(--text-sidebar); 
-    text-decoration:none; 
-    transition: background 0.3s; 
+    display: block; 
+    padding: 12px 20px; 
+    color: var(--text-sidebar); 
+    text-decoration: none; 
+    transition: all 0.3s; 
     border-bottom: 1px solid rgba(255,255,255,0.1);
     display: flex;
     align-items: center;
     gap: 10px;
     position: relative;
-}
-.sidebar a:hover, .sidebar a.active { background:#1abc9c; color:white; }
-
-.pending-badge {
-    position: absolute;
-    right: 15px;
-    background: #ef4444;
-    color: white;
-    border-radius: 50%;
-    width: 20px;
-    height: 20px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.75rem;
-    margin-left: auto;
+    flex-shrink: 0;
 }
 
-/* Logout button - pushes to bottom */
-.sidebar a[href="../logout.php"] {
-    margin-top: auto;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+.sidebar a:hover, .sidebar a.active { 
+    background: #1abc9c; 
+    color: white; 
+    padding-left: 25px;
 }
 
-/* Adjust for mobile */
-@media(max-width: 768px){
-    .sidebar { 
-        transform:translateX(-100%); 
-        width: 250px;
-    }
-    .sidebar.active { transform:translateX(0); }
-    
-    .sidebar-profile, .sidebar h2 {
-        position: relative;
-        top: 0;
-        margin-top: 0;
-        padding-top: 0;
-    }
-    
-    .sidebar a[href="../logout.php"] {
-        margin-top: 0;
-    }
-}
-
+/* Pending Badge */
 .pending-badge {
     background: #ef4444;
     color: white;
@@ -574,21 +567,36 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
     justify-content: center;
     font-size: 0.75rem;
     margin-left: auto;
+}
+
+[data-theme="dark"] .pending-badge {
+    background: #dc2626;
 }
 
 /* ================= Overlay ================= */
 .overlay {
-    position: fixed; top:0; left:0; width:100%; height:100%;
-    background: rgba(0,0,0,0.4); z-index:1050;
-    display:none; opacity:0; transition: opacity 0.3s ease;
+    position: fixed; 
+    top: 60px; 
+    left: 0; 
+    width: 100%; 
+    height: calc(100% - 60px);
+    background: rgba(0,0,0,0.4); 
+    z-index: 1050;
+    display: none; 
+    opacity: 0; 
+    transition: opacity 0.3s ease;
 }
-.overlay.active { display:block; opacity:1; }
+
+.overlay.active { 
+    display: block; 
+    opacity: 1; 
+}
 
 /* ================= Main Content ================= */
 .main-content { 
-    margin-left:250px; 
-    padding:30px;
-    min-height:100vh;
+    margin-left: 250px; 
+    padding: 30px;
+    min-height: 100vh;
     background: var(--bg-primary);
     transition: all 0.3s ease;
     width: calc(100% - 250px);
@@ -1080,40 +1088,70 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
     gap: 5px;
 }
 
-/* Loading spinner */
-.spinner {
-    animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
 /* ================= Responsive ================= */
 @media(max-width: 1200px){ 
     .main-content{ padding:25px; }
     .content-wrapper { padding: 20px; }
 }
 @media(max-width: 768px){
-    .topbar{ display:flex; }
-    .sidebar{ transform:translateX(-100%); }
-    .sidebar.active{ transform:translateX(0); }
+    .university-header {
+        padding: 0.5rem 15px;
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+    }
+    
+    .header-left, .header-right {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .system-title {
+        font-size: 0.8rem;
+    }
+    
+    .header-right {
+        font-size: 0.75rem;
+    }
+    
+    .topbar{ 
+        display: flex; 
+        top: 60px;
+    }
+    
+    .sidebar{ 
+        transform: translateX(-100%); 
+        top: 120px;
+        height: calc(100% - 120px) !important;
+    }
+    
+    .sidebar.active{ 
+        transform: translateX(0); 
+    }
+    
+    .overlay {
+        top: 120px;
+        height: calc(100% - 120px);
+    }
+    
     .main-content{ 
-        margin-left:0; 
+        margin-left: 0; 
         padding: 15px;
-        padding-top: 80px;
+        padding-top: 140px;
         width: 100%;
     }
+    
     .content-wrapper {
         padding: 15px;
         border-radius: 0;
     }
+    
     .header { 
         flex-direction: column; 
         gap: 15px; 
         align-items: flex-start; 
     }
+    
     .header h1 { font-size: 1.8rem; }
     
     .form-actions {
@@ -1153,6 +1191,8 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
         position: relative; 
         border: none; 
         margin-bottom: 10px;
+        padding: 10px 15px;
+        padding-left: 50%;
     }
     .announcement-table td::before { 
         content: attr(data-label); 
@@ -1162,6 +1202,8 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
         text-align: left; 
         font-weight: bold; 
         color: var(--text-secondary);
+        top: 50%;
+        transform: translateY(-50%);
     }
     
     .announcement-table td:last-child {
@@ -1214,6 +1256,17 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
 </head>
 <body>
 
+<!-- University Header -->
+<div class="university-header">
+    <div class="header-left">
+        <img src="../assets/images/dku logo.jpg" alt="Debark University Logo" class="dku-logo-img">
+        <div class="system-title">Debark University Class Scheduling System</div>
+    </div>
+    <div class="header-right">
+        Manage Announcements
+    </div>
+</div>
+
 <!-- Mobile Topbar -->
 <div class="topbar">
     <button class="menu-btn" onclick="toggleMenu()">☰</button>
@@ -1226,13 +1279,13 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
 <!-- Sidebar -->
 <div class="sidebar" id="sidebar">
     <!-- Scrollable content wrapper -->
-    <div class="sidebar-scrollable">
+    <div class="sidebar-content">
         <div class="sidebar-profile">
             <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic"
                  onerror="this.onerror=null; this.src='../assets/default_profile.png';">
             <p><?= htmlspecialchars($current_user['username']) ?></p>
         </div>
-        <h2>Admin Panel</h2>
+        <h2>Admin Dashboard</h2>
         
         <!-- Navigation Container -->
         <nav>
@@ -1266,7 +1319,7 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
             <a href="admin_exam_schedules.php" class="<?= $current_page=='admin_exam_schedules.php'?'active':'' ?>">
                 <i class="fas fa-clipboard-list"></i> Exam Scheduling
             </a>
-            <a href="manage_announcements.php" class="<?= $current_page=='manage_announcements.php'?'active':'' ?>">
+            <a href="manage_announcements.php" class="active">
                 <i class="fas fa-bullhorn"></i> Manage Announcements
             </a>
             <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
@@ -1278,6 +1331,7 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
         </nav>
     </div>
 </div>
+
 <!-- Main Content -->
 <div class="main-content">
     <div class="content-wrapper">

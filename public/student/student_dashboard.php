@@ -148,78 +148,127 @@ $current_page = basename($_SERVER['PHP_SELF']);
 <style>
 * { box-sizing: border-box; margin:0; padding:0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
 
+/* ================= University Header ================= */
+.university-header {
+    background: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%);
+    color: white;
+    padding: 0.5rem 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1201;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.dku-logo-img {
+    width: 45px;
+    height: 45px;
+    object-fit: contain;
+    border-radius: 5px;
+    background: white;
+    padding: 4px;
+}
+
+.system-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    opacity: 0.95;
+}
+
+.header-right {
+    font-size: 0.8rem;
+    opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+    .university-header {
+        padding: 0.5rem 15px;
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+    }
+    
+    .header-left, .header-right {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .system-title {
+        font-size: 0.8rem;
+    }
+    
+    .header-right {
+        font-size: 0.75rem;
+    }
+}
+
+/* Adjust other elements for university header */
+.topbar {
+    top: 60px !important; /* Adjusted for university header */
+}
+
+.sidebar {
+    top: 60px !important; /* Adjusted for university header */
+    height: calc(100% - 60px) !important;
+}
+
+.overlay {
+    top: 60px; /* Adjusted for university header */
+    height: calc(100% - 60px);
+}
+
+.main-content {
+    margin-top: 60px; /* Added for university header */
+}
+
 /* ================= Topbar for Hamburger ================= */
 .topbar {
     display: none;
-    position: fixed; top:0; left:0; width:100%;
-    background:var(--bg-sidebar); color:var(--text-sidebar);
-    padding:15px 20px;
+    position: fixed; 
+    top:60px; 
+    left:0; 
+    width:100%;
+    background:var(--bg-sidebar); 
+    color:var(--text-sidebar);
+    padding:12px 20px;
     z-index:1200;
-    justify-content:space-between; align-items:center;
+    justify-content:space-between; 
+    align-items:center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 .menu-btn {
     font-size:26px;
     background:#1abc9c;
-    border:none; color:var(--text-sidebar);
+    border:none; 
+    color:var(--text-sidebar);
     cursor:pointer;
-    padding:10px 14px;
+    padding:8px 12px;
     border-radius:8px;
     font-weight:600;
     transition: background 0.3s, transform 0.2s;
 }
-.menu-btn:hover { background:#159b81; transform:translateY(-2px); }
+.menu-btn:hover { 
+    background:#159b81; 
+    transform:translateY(-2px); 
+}
 
 /* ================= Sidebar ================= */
 .sidebar {
-    position: fixed; top:0; left:0;
-    width:250px; height:100%;
-    background:var(--bg-sidebar); color:var(--text-sidebar);
-    z-index:1100;
-    transition: transform 0.3s ease;
-    padding: 20px 0;
-}
-.sidebar.hidden { transform:translateX(-260px); }
-.sidebar a { 
-    display:block; 
-    padding:12px 20px; 
-    color:var(--text-sidebar); 
-    text-decoration:none; 
-    transition: background 0.3s; 
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-}
-.sidebar a:hover, .sidebar a.active { background:#1abc9c; color:white; }
-
-.sidebar-profile {
-    text-align: center;
-    margin-bottom: 20px;
-    padding: 0 20px 20px;
-    border-bottom: 1px solid rgba(255,255,255,0.2);
-}
-
-.sidebar-profile img {
-    width: 100px;
-    height: 100px;
-    border-radius: 50%;
-    object-fit: cover;
-    margin-bottom: 10px;
-    border: 2px solid #1abc9c;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-}
-
-.sidebar-profile p {
-    color: var(--text-sidebar);
-    font-weight: bold;
-    margin: 0;
-    font-size: 16px;
-}
-
-/* ================= Updated Sidebar ================= */
-.sidebar {
     position: fixed; 
-    top:0; 
+    top:60px; 
     left:0;
     width:250px; 
-    height:100%;
+    height:calc(100% - 60px);
     background:var(--bg-sidebar); 
     color:var(--text-sidebar);
     z-index:1100;
@@ -228,7 +277,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
     flex-direction: column;
     overflow: hidden;
 }
-
 .sidebar.hidden { 
     transform:translateX(-260px); 
 }
@@ -276,7 +324,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
     margin-bottom: 25px;
     padding: 0 20px 20px;
     border-bottom: 1px solid rgba(255,255,255,0.2);
-    flex-shrink: 0; /* Prevent shrinking */
+    flex-shrink: 0;
 }
 
 .sidebar-profile img {
@@ -345,38 +393,19 @@ $current_page = basename($_SERVER['PHP_SELF']);
     font-size: 1.1rem;
 }
 
-/* Optional: Add fade effect at bottom when scrolling */
-.sidebar-content::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 30px;
-    background: linear-gradient(to bottom, transparent, var(--bg-sidebar));
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.3s;
-}
-
-.sidebar-content.scrolled::after {
-    opacity: 1;
-}
-
 /* ================= Overlay ================= */
 .overlay {
     position: fixed; 
-    top:0; 
+    top:60px; 
     left:0; 
     width:100%; 
-    height:100%;
+    height:calc(100% - 60px);
     background: rgba(0,0,0,0.4); 
     z-index:1050;
     display:none; 
     opacity:0; 
     transition: opacity 0.3s ease;
 }
-
 .overlay.active { 
     display:block; 
     opacity:1; 
@@ -389,51 +418,16 @@ $current_page = basename($_SERVER['PHP_SELF']);
     min-height:100vh;
     background: var(--bg-primary);
     transition: all 0.3s ease;
+    margin-top: 60px;
 }
 
 @media (max-width: 768px) {
     .main-content {
         margin-left: 0;
         padding: 15px;
-        padding-top: 80px;
+        padding-top: 140px; /* Adjusted for headers on mobile */
+        margin-top: 120px; /* 60px header + 60px topbar */
     }
-}
-/* Year badge in sidebar */
-.year-badge {
-    display: inline-block;
-    padding: 3px 10px;
-    background: <?= (substr($student_year, 0, 1) === 'E') ? '#8b5cf6' : '#3b82f6' ?>;
-    color: white;
-    border-radius: 12px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    margin-top: 5px;
-}
-
-/* Sidebar title */
-.sidebar h2 {
-    text-align: center;
-    color: var(--text-sidebar);
-    margin-bottom: 25px;
-    font-size: 22px;
-    padding: 0 20px;
-}
-
-/* ================= Overlay ================= */
-.overlay {
-    position: fixed; top:0; left:0; width:100%; height:100%;
-    background: rgba(0,0,0,0.4); z-index:1050;
-    display:none; opacity:0; transition: opacity 0.3s ease;
-}
-.overlay.active { display:block; opacity:1; }
-
-/* ================= Main content ================= */
-.main-content {
-    margin-left: 250px;
-    padding:20px;
-    min-height:100vh;
-    background: var(--bg-primary);
-    transition: all 0.3s ease;
 }
 
 /* Content Wrapper */
@@ -823,19 +817,77 @@ $current_page = basename($_SERVER['PHP_SELF']);
 }
 
 /* ================= Responsive ================= */
-@media (max-width: 768px) {
-    .topbar { display: flex; }
-    .sidebar { transform: translateX(-100%); }
-    .sidebar.active { transform: translateX(0); }
-    .main-content { margin-left: 0; padding: 15px; }
-    .content-wrapper { padding: 20px; border-radius: 0; }
-    .header { flex-direction: column; gap: 15px; align-items: flex-start; }
-    .header h1 { font-size: 1.8rem; }
-    .stats-cards { flex-direction: column; }
-    .stat-card { min-width: auto; }
-    .table-container { overflow-x auto; }
-    .schedule-table { min-width: 600px; }
-    .profile-picture { width: 120px; height: 120px; }
+@media(max-width: 768px){
+    .university-header {
+        padding: 0.5rem 15px;
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+    }
+    
+    .header-left, .header-right {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .system-title {
+        font-size: 0.8rem;
+    }
+    
+    .header-right {
+        font-size: 0.75rem;
+    }
+    
+    .topbar { 
+        display:flex;
+        top: 60px; /* Adjusted for mobile with header */
+    }
+    
+    .sidebar { 
+        transform:translateX(-100%); 
+        top: 120px; /* 60px header + 60px topbar */
+        height: calc(100% - 120px) !important;
+    }
+    
+    .sidebar.active { 
+        transform:translateX(0); 
+    }
+    
+    .overlay {
+        top: 120px;
+        height: calc(100% - 120px);
+    }
+    
+    .header { 
+        flex-direction: column; 
+        gap: 15px; 
+        align-items: flex-start; 
+    }
+    
+    .header h1 { 
+        font-size: 1.8rem; 
+    }
+    
+    .stats-cards { 
+        flex-direction: column; 
+    }
+    
+    .stat-card { 
+        min-width: auto; 
+    }
+    
+    .table-container { 
+        overflow-x auto; 
+    }
+    
+    .schedule-table { 
+        min-width: 600px; 
+    }
+    
+    .profile-picture { 
+        width: 120px; 
+        height: 120px; 
+    }
 }
 
 /* Improved sidebar icons */
@@ -853,61 +905,83 @@ $current_page = basename($_SERVER['PHP_SELF']);
 </style>
 </head>
 <body>
+    <!-- University Header -->
+    <div class="university-header">
+        <div class="header-left">
+            <img src="../assets/images/dku logo.jpg" alt="Debark University Logo" class="dku-logo-img">
+            <div class="system-title">Debark University Class Scheduling System</div>
+        </div>
+        <div class="header-right">
+            <?php 
+                $page_titles = [
+                    'student_dashboard.php' => 'Student Dashboard',
+                    'my_schedule.php' => 'My Schedule',
+                    'view_exam_schedules.php' => 'Exam Schedule',
+                    'view_announcements.php' => 'Announcements',
+                    'edit_profile.php' => 'Edit Profile'
+                ];
+                $current_page = basename($_SERVER['PHP_SELF']);
+                echo htmlspecialchars($page_titles[$current_page] ?? 'Student Portal');
+            ?>
+        </div>
+    </div>
+
     <!-- Topbar for Mobile -->
     <div class="topbar">
         <button class="menu-btn" onclick="toggleSidebar()">☰</button>
-        <h2>Student Dashboard</h2>
+        <h2>
+            <?php 
+                echo htmlspecialchars($page_titles[$current_page] ?? 'Student Portal');
+            ?>
+        </h2>
     </div>
 
     <!-- Overlay for Mobile -->
     <div class="overlay" onclick="toggleSidebar()"></div>
 
-<!-- Sidebar -->
-<div class="sidebar" id="sidebar">
-    <div class="sidebar-content" id="sidebarContent">
-        <div class="sidebar-profile">
-            <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic">
-            <p><?= htmlspecialchars($user['username'] ?? 'Student') ?></p>
-            <?php if($student_year): ?>
-                <span class="year-badge">
-                    <?php 
-                    if(substr($student_year, 0, 1) === 'E') {
-                        echo 'Ext. Year ' . substr($student_year, 1);
-                    } else {
-                        echo 'Year ' . $student_year;
-                    }
-                    ?>
-                </span>
-            <?php endif; ?>
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-content" id="sidebarContent">
+            <div class="sidebar-profile">
+                <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic">
+                <p><?= htmlspecialchars($user['username'] ?? 'Student') ?></p>
+                <?php if($student_year): ?>
+                    <span class="year-badge">
+                        <?php 
+                        if(substr($student_year, 0, 1) === 'E') {
+                            echo 'Ext. Year ' . substr($student_year, 1);
+                        } else {
+                            echo 'Year ' . $student_year;
+                        }
+                        ?>
+                    </span>
+                <?php endif; ?>
+            </div>
+            
+            <h2>Student Dashboard</h2>
+            
+            <nav>
+                <a href="student_dashboard.php" class="<?= $current_page=='student_dashboard.php'?'active':'' ?>">
+                    <i class="fas fa-home"></i> Dashboard
+                </a>
+                <a href="my_schedule.php" class="<?= $current_page=='my_schedule.php'?'active':'' ?>">
+                    <i class="fas fa-calendar-alt"></i> My Schedule
+                </a>
+                <a href="view_exam_schedules.php" class="<?= $current_page=='view_exam_schedules.php'?'active':'' ?>">
+                    <i class="fas fa-clipboard-list"></i> Exam Schedule
+                </a>
+                <a href="view_announcements.php" class="<?= $current_page=='view_announcements.php'?'active':'' ?>">
+                    <i class="fas fa-bullhorn"></i> Announcements
+                </a>
+                <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
+                    <i class="fas fa-user-edit"></i> Edit Profile
+                </a>
+                <a href="../logout.php">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </nav>
         </div>
-        
-        <h2>Student Panel</h2>
-        
-        <nav>
-            <a href="student_dashboard.php" class="<?= $current_page=='student_dashboard.php'?'active':'' ?>">
-                <i class="fas fa-home"></i> Dashboard
-            </a>
-            <a href="my_schedule.php" class="<?= $current_page=='my_schedule.php'?'active':'' ?>">
-                <i class="fas fa-calendar-alt"></i> My Schedule
-            </a>
-            <a href="view_exam_schedules.php" class="<?= $current_page=='view_exam_schedules.php'?'active':'' ?>">
-                <i class="fas fa-clipboard-list"></i> Exam Schedule
-            </a>
-            <a href="view_announcements.php" class="<?= $current_page=='view_announcements.php'?'active':'' ?>">
-                <i class="fas fa-bullhorn"></i> Announcements
-            </a>
-            <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
-                <i class="fas fa-user-edit"></i> Edit Profile
-            </a>
-            <a href="../logout.php">
-                <i class="fas fa-sign-out-alt"></i> Logout
-            </a>
-        </nav>
     </div>
-</div>
-
-<!-- Overlay for Mobile -->
-<div class="overlay" onclick="toggleSidebar()"></div>
 
     <!-- Main Content -->
     <div class="main-content">

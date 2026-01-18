@@ -109,77 +109,118 @@ $current_page = basename($_SERVER['PHP_SELF']);
 <style>
 * { box-sizing: border-box; margin:0; padding:0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
 
+/* ================= University Header ================= */
+.university-header {
+    background: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%);
+    color: white;
+    padding: 0.5rem 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1201;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.dku-logo-img {
+    width: 45px;
+    height: 45px;
+    object-fit: contain;
+    border-radius: 5px;
+    background: white;
+    padding: 4px;
+}
+
+.system-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    opacity: 0.95;
+}
+
+.header-right {
+    font-size: 0.8rem;
+    opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+    .university-header {
+        padding: 0.5rem 15px;
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+    }
+    
+    .header-left, .header-right {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .system-title {
+        font-size: 0.8rem;
+    }
+    
+    .header-right {
+        font-size: 0.75rem;
+    }
+}
+
+/* Adjust other elements for university header */
+.topbar {
+    top: 60px !important; /* Adjusted for university header */
+}
+
+.sidebar {
+    top: 60px !important; /* Adjusted for university header */
+    height: calc(100% - 60px) !important;
+}
+
 /* ================= Topbar for Hamburger ================= */
 .topbar {
     display: none;
-    position: fixed; top:0; left:0; width:100%;
-    background:var(--bg-sidebar); color:var(--text-sidebar);
-    padding:15px 20px;
-    z-index:1200;
-    justify-content:space-between; align-items:center;
+    position: fixed; 
+    top: 60px; 
+    left: 0; 
+    width: 100%;
+    background: var(--bg-sidebar); 
+    color: var(--text-sidebar);
+    padding: 12px 20px;
+    z-index: 1200;
+    justify-content: space-between; 
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 .menu-btn {
-    font-size:26px;
-    background:#1abc9c;
-    border:none; color:var(--text-sidebar);
-    cursor:pointer;
-    padding:10px 14px;
-    border-radius:8px;
-    font-weight:600;
+    font-size: 26px;
+    background: #1abc9c;
+    border: none; 
+    color: var(--text-sidebar);
+    cursor: pointer;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-weight: 600;
     transition: background 0.3s, transform 0.2s;
 }
-.menu-btn:hover { background:#159b81; transform:translateY(-2px); }
+.menu-btn:hover { 
+    background: #159b81; 
+    transform: translateY(-2px); 
+}
 
 /* ================= Sidebar ================= */
 .sidebar {
-    position: fixed; top:0; left:0;
-    width:250px; height:100%;
-    background:var(--bg-sidebar); color:var(--text-sidebar);
-    z-index:1100;
-    transition: transform 0.3s ease;
-    padding: 20px 0;
-}
-.sidebar.hidden { transform:translateX(-260px); }
-.sidebar a { 
-    display:block; 
-    padding:12px 20px; 
-    color:var(--text-sidebar); 
-    text-decoration:none; 
-    transition: background 0.3s; 
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-}
-.sidebar a:hover, .sidebar a.active { background:#1abc9c; color:white; }
-
-.sidebar-profile {
-    text-align: center;
-    margin-bottom: 20px;
-    padding: 0 20px 20px;
-    border-bottom: 1px solid rgba(255,255,255,0.2);
-}
-
-.sidebar-profile img {
-    width: 100px;
-    height: 100px;
-    border-radius: 50%;
-    object-fit: cover;
-    margin-bottom: 10px;
-    border: 2px solid #1abc9c;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-}
-
-.sidebar-profile p {
-    color: var(--text-sidebar);
-    font-weight: bold;
-    margin: 0;
-    font-size: 16px;
-}
-/* ================= Updated Sidebar ================= */
-.sidebar {
     position: fixed; 
-    top: 0; 
+    top: 60px; 
     left: 0;
     width: 250px; 
-    height: 100%;
+    height: calc(100% - 60px);
     background: var(--bg-sidebar); 
     color: var(--text-sidebar);
     z-index: 1100;
@@ -236,12 +277,12 @@ $current_page = basename($_SERVER['PHP_SELF']);
     margin-bottom: 25px;
     padding: 0 20px 20px;
     border-bottom: 1px solid rgba(255,255,255,0.2);
-    flex-shrink: 0; /* Prevent shrinking */
+    flex-shrink: 0;
 }
 
 .sidebar-profile img {
-    width: 100px;
-    height: 100px;
+    width: 90px;
+    height: 90px;
     border-radius: 50%;
     object-fit: cover;
     margin-bottom: 10px;
@@ -253,7 +294,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
     color: var(--text-sidebar);
     font-weight: bold;
     margin: 0;
-    font-size: 16px;
+    font-size: 15px;
 }
 
 /* Sidebar Navigation */
@@ -283,99 +324,100 @@ $current_page = basename($_SERVER['PHP_SELF']);
     text-align: center;
 }
 
-/* Optional: Add fade effect at bottom when scrolling */
-.sidebar-content::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 30px;
-    background: linear-gradient(to bottom, transparent, var(--bg-sidebar));
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.3s;
-}
-
-.sidebar-content.scrolled::after {
-    opacity: 1;
-}
 /* ================= Overlay ================= */
 .overlay {
-    position: fixed; top:0; left:0; width:100%; height:100%;
-    background: rgba(0,0,0,0.4); z-index:1050;
-    display:none; opacity:0; transition: opacity 0.3s ease;
+    position: fixed; 
+    top: 60px; 
+    left: 0; 
+    width: 100%; 
+    height: calc(100% - 60px);
+    background: rgba(0,0,0,0.4); 
+    z-index: 1050;
+    display: none; 
+    opacity: 0; 
+    transition: opacity 0.3s ease;
 }
-.overlay.active { display:block; opacity:1; }
+.overlay.active { 
+    display: block; 
+    opacity: 1; 
+}
 
 /* ================= Main content ================= */
 .main-content {
     margin-left: 250px;
-    padding:30px 50px;
-    min-height:100vh;
-    background:var(--bg-primary);
-    color:var(--text-primary);
+    padding: 30px 50px;
+    min-height: 100vh;
+    background: var(--bg-primary);
+    color: var(--text-primary);
     transition: all 0.3s ease;
+    margin-top: 60px; /* Added for university header */
 }
 
 /* Welcome section */
 .welcome-section {
     background: linear-gradient(135deg,#6366f1,#3b82f6);
-    color:white;
-    padding:30px 25px;
-    border-radius:15px;
-    margin-bottom:30px;
-    box-shadow:0 6px 18px var(--shadow-color);
+    color: white;
+    padding: 30px 25px;
+    border-radius: 15px;
+    margin-bottom: 30px;
+    box-shadow: 0 6px 18px var(--shadow-color);
 }
-.welcome-section h1 { font-size:28px; font-weight:600; margin-bottom:8px; }
-.welcome-section p { font-size:16px; opacity:0.9; }
+.welcome-section h1 { 
+    font-size: 28px; 
+    font-weight: 600; 
+    margin-bottom: 8px; 
+}
+.welcome-section p { 
+    font-size: 16px; 
+    opacity: 0.9; 
+}
 
 /* Stats Cards */
 .stats-cards { 
-    display:flex; 
-    flex-wrap:wrap; 
-    gap:20px; 
-    margin-bottom:30px; 
+    display: flex; 
+    flex-wrap: wrap; 
+    gap: 20px; 
+    margin-bottom: 30px; 
 }
 .stats-cards .card {
-    flex:1 1 220px;
-    background:var(--bg-card);
-    border-radius:15px;
-    padding:25px 20px;
-    box-shadow:0 6px 20px var(--shadow-color);
-    display:flex; 
-    flex-direction:column; 
-    justify-content:space-between;
+    flex: 1 1 220px;
+    background: var(--bg-card);
+    border-radius: 15px;
+    padding: 25px 20px;
+    box-shadow: 0 6px 20px var(--shadow-color);
+    display: flex; 
+    flex-direction: column; 
+    justify-content: space-between;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 .stats-cards .card:hover { 
-    transform:translateY(-6px); 
-    box-shadow:0 10px 28px var(--shadow-color); 
+    transform: translateY(-6px); 
+    box-shadow: 0 10px 28px var(--shadow-color); 
 }
 .card-icon { 
-    font-size:40px; 
-    margin-bottom:15px; 
-    padding:15px; 
-    width:60px; 
-    height:60px; 
-    display:flex; 
-    align-items:center; 
-    justify-content:center; 
-    border-radius:50%; 
-    background:#e0e7ff; 
-    color:#4f46e5; 
+    font-size: 40px; 
+    margin-bottom: 15px; 
+    padding: 15px; 
+    width: 60px; 
+    height: 60px; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    border-radius: 50%; 
+    background: #e0e7ff; 
+    color: #4f46e5; 
 }
 .stats-cards .card h3 { 
-    font-size:18px; 
-    margin-bottom:8px; 
-    color:var(--text-primary); 
-    font-weight:600; 
+    font-size: 18px; 
+    margin-bottom: 8px; 
+    color: var(--text-primary); 
+    font-weight: 600; 
 }
 .stats-cards .card p { 
-    font-size:24px; 
-    font-weight:bold; 
-    color:var(--text-primary); 
-    margin-bottom:15px; 
+    font-size: 24px; 
+    font-weight: bold; 
+    color: var(--text-primary); 
+    margin-bottom: 15px; 
 }
 
 /* Table Section */
@@ -583,17 +625,90 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
 /* ================= Responsive ================= */
 @media(max-width: 768px){
-    .topbar { display:flex; }
-    .sidebar { transform:translateX(-100%); }
-    .sidebar.active { transform:translateX(0); }
-    .main-content { margin-left:0; padding: 20px; padding-top: 80px; }
-    .stats-cards { flex-direction: column; }
-    .header { flex-direction: column; gap: 15px; align-items: flex-start; }
-    .header h1 { font-size: 1.8rem; }
+    .university-header {
+        padding: 0.5rem 15px;
+    }
+    
+    .topbar { 
+        display: flex; 
+        top: 60px;
+    }
+    
+    .sidebar { 
+        transform: translateX(-100%); 
+        top: 120px; /* 60px university header + 60px topbar */
+        height: calc(100% - 120px) !important;
+    }
+    
+    .sidebar.active { 
+        transform: translateX(0); 
+    }
+    
+    .overlay {
+        top: 120px;
+        height: calc(100% - 120px);
+    }
+    
+    .main-content { 
+        margin-left: 0; 
+        padding: 20px; 
+        padding-top: 140px; /* Adjusted for headers */
+        margin-top: 120px; /* 60px university header + 60px topbar */
+    }
+    
+    .stats-cards { 
+        flex-direction: column; 
+    }
+    
+    .header { 
+        flex-direction: column; 
+        gap: 15px; 
+        align-items: flex-start; 
+    }
+    
+    .header h1 { 
+        font-size: 1.8rem; 
+    }
+}
+
+@media(max-width: 480px) {
+    .main-content {
+        padding: 15px;
+        padding-top: 140px;
+    }
+    
+    .welcome-section {
+        padding: 20px 15px;
+    }
+    
+    .welcome-section h1 {
+        font-size: 1.5rem;
+    }
+    
+    .table-section, .announcement-section {
+        padding: 15px;
+    }
+    
+    .header h1 {
+        font-size: 1.5rem;
+    }
 }
 </style>
 </head>
 <body>
+    
+    <!-- University Header -->
+    <div class="university-header">
+        <div class="header-left">
+            <!-- Using the DKU logo image -->
+            <img src="../assets/images/dku logo.jpg" alt="Debark University Logo" class="dku-logo-img">
+            <div class="system-title">Debark University Class Scheduling System</div>
+        </div>
+        <div class="header-right">
+            Department Head Dashboard
+        </div>
+    </div>
+
     <!-- Topbar for Mobile -->
     <div class="topbar">
         <button class="menu-btn" onclick="toggleSidebar()">☰</button>
@@ -603,45 +718,44 @@ $current_page = basename($_SERVER['PHP_SELF']);
     <!-- Overlay for Mobile -->
     <div class="overlay" onclick="toggleSidebar()"></div>
 
-<!-- Sidebar -->
-<div class="sidebar" id="sidebar">
-    <div class="sidebar-content" id="sidebarContent">
-        <div class="sidebar-profile">
-            <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture">
-            <p><?= htmlspecialchars($current_user['username']) ?></p>
-            <!-- Dark mode toggle would go here -->
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-content" id="sidebarContent">
+            <div class="sidebar-profile">
+                <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture">
+                <p><?= htmlspecialchars($current_user['username']) ?></p>
+            </div>
+            <nav>
+                <a href="departmenthead_dashboard.php" class="<?= $current_page=='departmenthead_dashboard.php'?'active':'' ?>">
+                    <i class="fas fa-home"></i> Dashboard
+                </a>
+                <a href="manage_enrollments.php" class="<?= $current_page=='manage_enrollments.php'?'active':'' ?>">
+                    <i class="fas fa-users"></i> Manage Enrollments
+                </a>
+                <a href="manage_schedules.php" class="<?= $current_page=='manage_schedules.php'?'active':'' ?>">
+                    <i class="fas fa-calendar-alt"></i> Manage Schedules
+                </a>
+                <a href="assign_courses.php" class="<?= $current_page=='assign_courses.php'?'active':'' ?>">
+                    <i class="fas fa-chalkboard-teacher"></i> Assign Courses
+                </a>
+                <a href="add_courses.php" class="<?= $current_page=='add_courses.php'?'active':'' ?>">
+                    <i class="fas fa-book"></i> Add Courses
+                </a>
+                <a href="exam_schedules.php" class="<?= $current_page=='exam_schedules.php'?'active':'' ?>">
+                    <i class="fas fa-clipboard-list"></i> Exam Schedules
+                </a>
+                <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
+                    <i class="fas fa-user-edit"></i> Edit Profile
+                </a>
+                <a href="manage_announcements.php" class="<?= $current_page=='manage_announcements.php'?'active':'' ?>">
+                    <i class="fas fa-bullhorn"></i> Announcements
+                </a>
+                <a href="../logout.php">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </nav>
         </div>
-        <nav>
-            <a href="departmenthead_dashboard.php" class="<?= $current_page=='departmenthead_dashboard.php'?'active':'' ?>">
-                <i class="fas fa-home"></i> Dashboard
-            </a>
-            <a href="manage_enrollments.php" class="<?= $current_page=='manage_enrollments.php'?'active':'' ?>">
-                <i class="fas fa-users"></i> Manage Enrollments
-            </a>
-            <a href="manage_schedules.php" class="<?= $current_page=='manage_schedules.php'?'active':'' ?>">
-                <i class="fas fa-calendar-alt"></i> Manage Schedules
-            </a>
-            <a href="assign_courses.php" class="<?= $current_page=='assign_courses.php'?'active':'' ?>">
-                <i class="fas fa-chalkboard-teacher"></i> Assign Courses
-            </a>
-            <a href="add_courses.php" class="<?= $current_page=='add_courses.php'?'active':'' ?>">
-                <i class="fas fa-book"></i> Add Courses
-            </a>
-            <a href="exam_schedules.php" class="<?= $current_page=='exam_schedules.php'?'active':'' ?>">
-                <i class="fas fa-clipboard-list"></i> Exam Schedules
-            </a>
-            <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
-                <i class="fas fa-user-edit"></i> Edit Profile
-            </a>
-            <a href="manage_announcements.php" class="<?= $current_page=='manage_announcements.php'?'active':'' ?>">
-                <i class="fas fa-bullhorn"></i> Announcements
-            </a>
-            <a href="../logout.php">
-                <i class="fas fa-sign-out-alt"></i> Logout
-            </a>
-        </nav>
     </div>
-</div>
 
     <!-- Main Content -->
     <div class="main-content">
@@ -687,102 +801,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
             </div>
         </div>
 
-        <!-- Enrollments Table -->
-        <div class="table-section">
-            <div class="card-header">
-                <h3><i class="fas fa-list"></i> Current Enrollments</h3>
-            </div>
-            <div class="card-body">
-                <table class="enrollments-table">
-                    <thead>
-                        <tr>
-                            <th>Student</th>
-                            <th>Course</th>
-                            <th>Schedule</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if(!empty($grouped_enrollments)): ?>
-                            <?php foreach($grouped_enrollments as $enrollment): ?>
-                                <tr>
-                                    <td><?= htmlspecialchars($enrollment['student_name']) ?></td>
-                                    <td><?= htmlspecialchars($enrollment['course_name']) ?></td>
-                                    <td>
-                                        <?php foreach($enrollment['schedules'] as $schedule): ?>
-                                            <div style="margin-bottom: 5px;">
-                                                <strong><?= htmlspecialchars($schedule['day']) ?>:</strong>
-                                                <?= htmlspecialchars($schedule['start_time']) ?> - <?= htmlspecialchars($schedule['end_time']) ?>
-                                            </div>
-                                        <?php endforeach; ?>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <tr>
-                                <td colspan="3" style="text-align:center; padding: 30px;">
-                                    <i class="fas fa-inbox" style="font-size: 2.5rem; color: var(--text-light); margin-bottom: 15px;"></i>
-                                    <p style="color: var(--text-light); font-size: 1.1rem;">No enrollments found.</p>
-                                </td>
-                            </tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
-            </div>
-        </div>
 
-        <!-- Announcements Section -->
-        <div class="announcement-section">
-            <div class="card-header">
-                <h3><i class="fas fa-bullhorn"></i> Announcements</h3>
-            </div>
-            <div class="card-body">
-                <h4 style="color: var(--text-primary);">Post New Announcement</h4>
-                <form method="post" class="announcement-form">
-                    <input type="text" name="announcement_title" placeholder="Announcement Title" required>
-                    <textarea name="announcement_message" placeholder="Announcement Message" rows="4" required></textarea>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-paper-plane"></i> Post Announcement
-                    </button>
-                </form>
-                
-                <?php if($announcement_msg): ?>
-                    <div class="message <?= strpos($announcement_msg, 'successfully') !== false ? 'success' : 'error' ?>">
-                        <i class="fas fa-<?= strpos($announcement_msg, 'successfully') !== false ? 'check-circle' : 'exclamation-circle' ?>"></i>
-                        <?= $announcement_msg ?>
-                    </div>
-                <?php endif; ?>
-
-                <h4 style="margin-top: 30px; color: var(--text-primary);">Recent Announcements</h4>
-                <table class="announcements-table">
-                    <thead>
-                        <tr>
-                            <th>Title</th>
-                            <th>Message</th>
-                            <th>Posted At</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if($announcements): ?>
-                            <?php foreach($announcements as $a): ?>
-                                <tr>
-                                    <td><strong><?= htmlspecialchars($a['title']) ?></strong></td>
-                                    <td><?= nl2br(htmlspecialchars($a['message'])) ?></td>
-                                    <td><?= date('M d, Y h:i A', strtotime($a['created_at'])) ?></td>
-                                </tr>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <tr>
-                                <td colspan="3" style="text-align:center; padding: 30px;">
-                                    <i class="fas fa-bullhorn" style="font-size: 2.5rem; color: var(--text-light); margin-bottom: 15px;"></i>
-                                    <p style="color: var(--text-light); font-size: 1.1rem;">No announcements yet.</p>
-                                </td>
-                            </tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
 
     <script>
         function toggleSidebar() {

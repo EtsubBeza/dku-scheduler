@@ -94,22 +94,68 @@ if(isset($_POST['assign_instructor'])){
                     $message = "Selected user is not an instructor.";
                     $message_type = "error";
                 } else {
-                    // Update all schedules for this course and section
-                    $update_stmt = $pdo->prepare("UPDATE schedule SET instructor_id = ? WHERE course_id = ? AND section_number = ? AND year = 'freshman'");
-                    $update_stmt->execute([$instructor_id, $course_id, $section_number]);
-                    $affected_rows = $update_stmt->rowCount();
+                    // CHECK 1: Check if instructor is already assigned to this exact course+section
+                    $existing_assignment = $pdo->prepare("SELECT COUNT(*) FROM schedule WHERE course_id = ? AND section_number = ? AND instructor_id = ? AND year = 'freshman'");
+                    $existing_assignment->execute([$course_id, $section_number, $instructor_id]);
                     
-                    // Get course info
-                    $course_stmt = $pdo->prepare("SELECT course_code, course_name FROM courses WHERE course_id = ?");
-                    $course_stmt->execute([$course_id]);
-                    $course_data = $course_stmt->fetch();
-                    
-                    $message = "✅ Instructor '{$instructor_data['username']}' assigned to {$course_data['course_code']} - Section $section_number ($affected_rows sessions updated)!";
-                    $message_type = "success";
-                    
-                    // Refresh the page
-                    header("Location: assign_instructors.php?assigned=1");
-                    exit;
+                    if($existing_assignment->fetchColumn() > 0){
+                        $message = "This instructor is already assigned to this section.";
+                        $message_type = "error";
+                    } else {
+                        // CHECK 2: Check if instructor is already assigned to a DIFFERENT section of the SAME course
+                        $check_same_course = $pdo->prepare("
+                            SELECT COUNT(DISTINCT section_number) as sections_count 
+                            FROM schedule 
+                            WHERE course_id = ? 
+                            AND instructor_id = ? 
+                            AND year = 'freshman'
+                            AND section_number != ?
+                        ");
+                        $check_same_course->execute([$course_id, $instructor_id, $section_number]);
+                        $sections_count = $check_same_course->fetchColumn();
+                        
+                        if($sections_count > 0){
+                            $message = "This instructor is already assigned to a different section of this course. An instructor can only be assigned to ONE section per course.";
+                            $message_type = "error";
+                        } else {
+                            // CHECK 3: Get current instructor if any (for replacement warning)
+                            $current_instructor_stmt = $pdo->prepare("
+                                SELECT DISTINCT u.username 
+                                FROM schedule s 
+                                LEFT JOIN users u ON s.instructor_id = u.user_id 
+                                WHERE s.course_id = ? 
+                                AND s.section_number = ? 
+                                AND s.year = 'freshman' 
+                                LIMIT 1
+                            ");
+                            $current_instructor_stmt->execute([$course_id, $section_number]);
+                            $current_instructor = $current_instructor_stmt->fetch();
+                            $current_instructor_name = $current_instructor ? $current_instructor['username'] : 'TBA';
+                            
+                            // Proceed with assignment
+                            $update_stmt = $pdo->prepare("UPDATE schedule SET instructor_id = ? WHERE course_id = ? AND section_number = ? AND year = 'freshman'");
+                            $update_stmt->execute([$instructor_id, $course_id, $section_number]);
+                            $affected_rows = $update_stmt->rowCount();
+                            
+                            // Get course info
+                            $course_stmt = $pdo->prepare("SELECT course_code, course_name FROM courses WHERE course_id = ?");
+                            $course_stmt->execute([$course_id]);
+                            $course_data = $course_stmt->fetch();
+                            
+                            $message = "✅ Instructor '{$instructor_data['username']}' assigned to {$course_data['course_code']} - Section $section_number ($affected_rows sessions updated)!";
+                            
+                            if($current_instructor_name != 'TBA' && $current_instructor_name != $instructor_data['username']) {
+                                $message .= "\n⚠️ Note: Replaced previous instructor '$current_instructor_name'";
+                                $message_type = "warning";
+                            } else {
+                                $message_type = "success";
+                            }
+                            
+                            // Refresh the page
+                            header("Location: assign_instructors.php?assigned=1");
+                            exit;
+                        }
+                    }
                 }
             } catch (Exception $e) {
                 $message = "Error assigning instructor: " . $e->getMessage();
@@ -145,6 +191,28 @@ if(isset($_POST['bulk_assign_instructor'])){
                     $message = "Selected user is not an instructor.";
                     $message_type = "error";
                 } else {
+                    // For bulk assignment, we need to check course by course
+                    if($course_id > 0){
+                        // If a specific course is selected, check if instructor is already assigned to a section of this course
+                        $check_same_course = $pdo->prepare("
+                            SELECT COUNT(DISTINCT section_number) as sections_count 
+                            FROM schedule 
+                            WHERE course_id = ? 
+                            AND instructor_id = ? 
+                            AND year = 'freshman'
+                        ");
+                        $check_same_course->execute([$course_id, $instructor_id]);
+                        $sections_count = $check_same_course->fetchColumn();
+                        
+                        if($sections_count > 0){
+                            $message = "This instructor is already assigned to a section of this course. An instructor can only be assigned to ONE section per course.";
+                            $message_type = "error";
+                            
+                            header("Location: assign_instructors.php");
+                            exit;
+                        }
+                    }
+                    
                     // Build the WHERE clause
                     $where_clauses = ["year = 'freshman'"];
                     $params = [];
@@ -224,8 +292,122 @@ $sections_query = "
 
 $unassigned_sections = $pdo->query($sections_query)->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch all instructors
-$instructors = $pdo->query("SELECT user_id, username, email FROM users WHERE role = 'instructor' AND username != 'TBA' ORDER BY username")->fetchAll(PDO::FETCH_ASSOC);
+// Function to get available instructors for a specific section
+// An instructor is available if:
+// 1. NOT assigned to ANY course in course_assignments table (course-level assignments)
+// 2. NOT assigned to THIS specific course+section in schedule table
+// 3. NOT assigned to ANY OTHER section of THIS course in schedule table
+function getAvailableInstructors($pdo, $course_id = null, $section_number = null, $exclude_assigned = true) {
+    if (!$exclude_assigned) {
+        // Get all instructors (for reference/display only)
+        $query = "SELECT u.user_id, u.username, u.email FROM users u WHERE u.role = 'instructor' AND u.username != 'TBA' ORDER BY u.username";
+        return $pdo->query($query)->fetchAll(PDO::FETCH_ASSOC);
+    }
+    
+    // Build the query to exclude instructors who:
+    // 1. Are assigned to ANY course in course_assignments table
+    // 2. Are already assigned to THIS course (any section) in schedule table
+    $query = "
+        SELECT u.user_id, u.username, u.email 
+        FROM users u 
+        WHERE u.role = 'instructor' 
+        AND u.username != 'TBA'
+        AND u.user_id NOT IN (
+            SELECT DISTINCT ca.user_id 
+            FROM course_assignments ca
+            WHERE ca.status = 'assigned'
+        )";
+    
+    $params = [];
+    
+    // Also exclude instructors already assigned to THIS course (any section) in schedule table
+    if ($course_id) {
+        $query .= " AND u.user_id NOT IN (
+            SELECT DISTINCT s.instructor_id 
+            FROM schedule s 
+            WHERE s.course_id = ? 
+            AND s.instructor_id IS NOT NULL 
+            AND s.instructor_id > 0
+            AND s.year = 'freshman'
+        )";
+        
+        $params = array_merge($params, [$course_id]);
+    }
+    
+    $query .= " ORDER BY u.username";
+    
+    $stmt = $pdo->prepare($query);
+    $stmt->execute($params);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+// Function to get instructors who are already assigned to THIS course (any section)
+function getInstructorsAssignedToThisCourse($pdo, $course_id) {
+    $query = "
+        SELECT DISTINCT 
+            u.user_id, 
+            u.username, 
+            u.email,
+            GROUP_CONCAT(DISTINCT s.section_number ORDER BY s.section_number) as assigned_sections
+        FROM schedule s
+        JOIN users u ON s.instructor_id = u.user_id
+        WHERE s.course_id = ?
+        AND s.instructor_id IS NOT NULL
+        AND s.instructor_id > 0
+        AND s.year = 'freshman'
+        AND u.username != 'TBA'
+        GROUP BY u.user_id
+        ORDER BY u.username";
+    
+    $stmt = $pdo->prepare($query);
+    $stmt->execute([$course_id]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+// Function to get instructors already assigned to ANY course (for reference)
+function getAssignedInstructorsToAnyCourse($pdo) {
+    $query = "
+        SELECT DISTINCT 
+            u.user_id, 
+            u.username, 
+            u.email,
+            COUNT(ca.course_id) as total_courses_assigned
+        FROM course_assignments ca
+        JOIN users u ON ca.user_id = u.user_id
+        WHERE ca.status = 'assigned'
+        AND u.role = 'instructor'
+        GROUP BY u.user_id
+        ORDER BY u.username";
+    
+    return $pdo->query($query)->fetchAll(PDO::FETCH_ASSOC);
+}
+
+// Function to get instructor's current course assignments (for info display)
+function getInstructorCourseAssignments($pdo, $instructor_id) {
+    $query = "
+        SELECT 
+            ca.course_id,
+            c.course_code,
+            c.course_name,
+            ca.semester,
+            ca.academic_year,
+            ca.assigned_date
+        FROM course_assignments ca
+        JOIN courses c ON ca.course_id = c.course_id
+        WHERE ca.user_id = ?
+        AND ca.status = 'assigned'
+        ORDER BY ca.academic_year DESC, ca.semester, c.course_code";
+    
+    $stmt = $pdo->prepare($query);
+    $stmt->execute([$instructor_id]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+// Fetch all instructors (for bulk assignment - show all)
+$all_instructors = $pdo->query("SELECT user_id, username, email FROM users WHERE role = 'instructor' AND username != 'TBA' ORDER BY username")->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch instructors assigned to ANY course (for reference)
+$assigned_instructors = getAssignedInstructorsToAnyCourse($pdo);
 
 // Fetch distinct courses and sections for bulk assignment
 $courses = $pdo->query("SELECT DISTINCT c.course_id, c.course_code, c.course_name 
@@ -329,51 +511,188 @@ $current_page = basename($_SERVER['PHP_SELF']);
     --section-5: #f87171;
 }
 
+/* ================= University Header ================= */
+.university-header {
+    background: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%);
+    color: white;
+    padding: 0.5rem 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1201;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.dku-logo-img {
+    width: 45px;
+    height: 45px;
+    object-fit: contain;
+    border-radius: 5px;
+    background: white;
+    padding: 4px;
+}
+
+.system-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    opacity: 0.95;
+}
+
+.header-right {
+    font-size: 0.8rem;
+    opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+    .university-header {
+        padding: 0.5rem 15px;
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+    }
+    
+    .header-left, .header-right {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .system-title {
+        font-size: 0.8rem;
+    }
+    
+    .header-right {
+        font-size: 0.75rem;
+    }
+}
+
 /* ================= General Reset ================= */
 * { margin:0; padding:0; box-sizing:border-box; font-family: "Segoe UI", Arial, sans-serif; }
 body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x:hidden; }
 
+/* Adjust other elements for university header */
+.topbar {
+    top: 60px !important; /* Adjusted for university header */
+}
+
+.sidebar {
+    top: 60px !important; /* Adjusted for university header */
+    height: calc(100% - 60px) !important;
+}
+
+.overlay {
+    top: 60px; /* Adjusted for university header */
+    height: calc(100% - 60px);
+}
+
+.main-content {
+    margin-top: 60px; /* Added for university header */
+}
+
 /* ================= Topbar for Mobile ================= */
 .topbar {
     display: none;
-    position: fixed; top:0; left:0; width:100%;
-    background:var(--bg-sidebar); color:var(--text-sidebar);
-    padding:15px 20px;
+    position: fixed; 
+    top:60px; 
+    left:0; 
+    width:100%;
+    background:var(--bg-sidebar); 
+    color:var(--text-sidebar);
+    padding:12px 20px;
     z-index:1200;
-    justify-content:space-between; align-items:center;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    justify-content:space-between; 
+    align-items:center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 .menu-btn {
     font-size:26px;
     background:#1abc9c;
-    border:none; color:var(--text-sidebar);
+    border:none; 
+    color:var(--text-sidebar);
     cursor:pointer;
-    padding:10px 14px;
+    padding:8px 12px;
     border-radius:8px;
     font-weight:600;
     transition: background 0.3s, transform 0.2s;
 }
-.menu-btn:hover { background:#159b81; transform:translateY(-2px); }
+.menu-btn:hover { 
+    background:#159b81; 
+    transform:translateY(-2px); 
+}
 
 /* ================= Sidebar ================= */
 .sidebar { 
     position: fixed; 
-    top:0; left:0; 
+    top:60px; 
+    left:0;
     width:250px; 
-    height:100%; 
+    height:calc(100% - 60px);
     background:var(--bg-sidebar); 
     color:var(--text-sidebar);
     z-index:1100;
     transition: transform 0.3s ease;
-    padding: 20px 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.2);
 }
-.sidebar.hidden { transform:translateX(-260px); }
+.sidebar.hidden { 
+    transform:translateX(-260px); 
+}
 
+/* Sidebar Content (scrollable) */
+.sidebar-content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 20px 0;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+/* Custom scrollbar for sidebar */
+.sidebar-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sidebar-content::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 3px;
+}
+
+.sidebar-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+}
+
+.sidebar-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
+}
+
+[data-theme="dark"] .sidebar-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+[data-theme="dark"] .sidebar-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* Sidebar Profile */
 .sidebar-profile {
     text-align: center;
     margin-bottom: 25px;
     padding: 0 20px 20px;
     border-bottom: 1px solid rgba(255,255,255,0.2);
+    flex-shrink: 0;
 }
 
 .sidebar-profile img {
@@ -393,6 +712,7 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
     font-size: 16px;
 }
 
+/* Sidebar Title */
 .sidebar h2 {
     text-align: center;
     color: var(--text-sidebar);
@@ -401,119 +721,35 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
     padding: 0 20px;
 }
 
-.sidebar a { 
-    display:block; 
-    padding:12px 20px; 
-    color:var(--text-sidebar); 
-    text-decoration:none; 
-    transition: background 0.3s; 
-    border-bottom: 1px solid rgba(255,255,255,0.1);
+/* Sidebar Navigation */
+.sidebar nav {
     display: flex;
+    flex-direction: column;
+}
+
+.sidebar a { 
+    display: flex; 
     align-items: center;
     gap: 10px;
-    position: relative;
+    padding: 12px 20px; 
+    color: var(--text-sidebar); 
+    text-decoration: none; 
+    transition: all 0.3s; 
+    border-bottom: 1px solid rgba(255,255,255,0.1);
 }
-.sidebar a:hover, .sidebar a.active { background:#1abc9c; color:white; }
-
-/* ================= Sidebar Scrollability ================= */
-.sidebar { 
-    position: fixed; 
-    top:0; left:0; 
-    width:250px; 
-    height:100%; 
-    background:var(--bg-sidebar); 
-    color:var(--text-sidebar);
-    z-index:1100;
-    transition: transform 0.3s ease;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden; /* Hide overflow from main container */
+.sidebar a:hover, .sidebar a.active { 
+    background: #1abc9c; 
+    color: white; 
+    padding-left: 25px;
 }
 
-/* Scrollable sidebar content */
-.sidebar-scrollable {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: 20px 0;
-    display: flex;
-    flex-direction: column;
+.sidebar a i {
+    width: 20px;
+    text-align: center;
+    font-size: 1.1rem;
 }
 
-/* Custom scrollbar for sidebar */
-.sidebar-scrollable::-webkit-scrollbar {
-    width: 6px;
-}
-
-.sidebar-scrollable::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 3px;
-}
-
-.sidebar-scrollable::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.3);
-    border-radius: 3px;
-}
-
-.sidebar-scrollable::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.4);
-}
-
-/* For Firefox */
-.sidebar-scrollable {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.3) rgba(255, 255, 255, 0.1);
-}
-
-/* Keep profile and header fixed */
-.sidebar-profile, .sidebar h2 {
-    position: sticky;
-    top: 0;
-    background: var(--bg-sidebar);
-    z-index: 10;
-    padding-top: 10px;
-    margin-top: -10px;
-}
-
-.sidebar h2 {
-    top: 181px; /* Adjust based on profile section height */
-}
-
-/* Navigation container */
-.sidebar nav {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-height: 0; /* Allow shrinking */
-}
-
-/* Make logout button stay at bottom */
-
-/* Ensure active link is visible */
-.sidebar a.active {
-    position: relative;
-    z-index: 5;
-}
-
-/* Adjust for mobile */
-@media (max-width: 768px) {
-    .sidebar.active {
-        display: flex;
-        flex-direction: column;
-    }
-    
-    .sidebar-profile, .sidebar h2 {
-        position: relative;
-        top: 0;
-        margin-top: 0;
-    }
-    
-    .sidebar a[href="../logout.php"] {
-        position: relative;
-        bottom: auto;
-        margin-top: 0;
-    }
-}
+/* Pending approvals badge */
 .pending-badge {
     background: #ef4444;
     color: white;
@@ -527,13 +763,27 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
     margin-left: auto;
 }
 
+[data-theme="dark"] .pending-badge {
+    background: #dc2626;
+}
+
 /* ================= Overlay ================= */
 .overlay {
-    position: fixed; top:0; left:0; width:100%; height:100%;
-    background: rgba(0,0,0,0.4); z-index:1050;
-    display:none; opacity:0; transition: opacity 0.3s ease;
+    position: fixed; 
+    top:60px; 
+    left:0; 
+    width:100%; 
+    height:calc(100% - 60px);
+    background: rgba(0,0,0,0.4); 
+    z-index:1050;
+    display:none; 
+    opacity:0; 
+    transition: opacity 0.3s ease;
 }
-.overlay.active { display:block; opacity:1; }
+.overlay.active { 
+    display:block; 
+    opacity:1; 
+}
 
 /* ================= Main Content ================= */
 .main-content { 
@@ -543,6 +793,7 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
     background: var(--bg-primary);
     transition: all 0.3s ease;
     width: calc(100% - 250px);
+    margin-top: 60px;
 }
 
 /* Content Wrapper */
@@ -551,7 +802,7 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
     border-radius: 15px;
     padding: 30px;
     box-shadow: 0 4px 6px var(--shadow-color);
-    min-height: calc(100vh - 60px);
+    min-height: calc(100vh - 120px);
 }
 
 /* Header Styles */
@@ -721,6 +972,90 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
     margin-bottom: 15px;
 }
 
+/* ================= Instructor Status Indicators ================= */
+.instructor-option {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+}
+
+.instructor-status {
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 600;
+}
+
+.status-free {
+    background-color: #10b981;
+    color: white;
+}
+
+.status-assigned {
+    background-color: #ef4444;
+    color: white;
+}
+
+.status-busy {
+    background-color: #f59e0b;
+    color: #92400e;
+}
+
+[data-theme="dark"] .status-busy {
+    background-color: #78350f;
+    color: #fde68a;
+}
+
+/* ================= Assigned Instructors Info ================= */
+.assigned-info {
+    background: var(--bg-secondary);
+    padding: 12px 15px;
+    border-radius: 8px;
+    margin-top: 15px;
+    border: 1px solid var(--border-color);
+    font-size: 0.9rem;
+}
+
+.assigned-info h5 {
+    color: var(--text-primary);
+    margin-bottom: 8px;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.assigned-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 5px;
+}
+
+.assigned-chip {
+    background: var(--primary-color);
+    color: white;
+    padding: 4px 10px;
+    border-radius: 15px;
+    font-size: 0.8rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.assigned-chip.course-assigned {
+    background: #ef4444;
+}
+
+.assigned-chip.schedule-assigned {
+    background: #f59e0b;
+}
+
+.assigned-chip.course-busy {
+    background: #8b5cf6;
+}
+
 /* ================= Section Card ================= */
 .section-card {
     background: var(--bg-secondary);
@@ -842,6 +1177,29 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
     color: #a7f3d0;
 }
 
+/* Course Assignment Warning */
+.course-warning {
+    background: linear-gradient(135deg, #fef3c7, #fde68a);
+    border-left: 4px solid #f59e0b;
+    padding: 12px 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    color: #92400e;
+}
+
+[data-theme="dark"] .course-warning {
+    background: linear-gradient(135deg, #78350f, #92400e);
+    color: #fde68a;
+}
+
+.course-warning h5 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: 0.95rem;
+}
+
 /* Assignment Form */
 .assignment-form {
     background: var(--bg-card);
@@ -961,14 +1319,28 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
 
 /* Responsive adjustments */
 @media(max-width: 768px){
-    .topbar{ display:flex; }
-    .sidebar{ transform:translateX(-100%); }
-    .sidebar.active{ transform:translateX(0); }
+    .topbar{ 
+        display:flex;
+        top: 60px; /* Adjusted for mobile with header */
+    }
+    .sidebar{ 
+        transform:translateX(-100%); 
+        top: 120px; /* 60px header + 60px topbar */
+        height: calc(100% - 120px) !important;
+    }
+    .sidebar.active{ 
+        transform:translateX(0); 
+    }
+    .overlay {
+        top: 120px;
+        height: calc(100% - 120px);
+    }
     .main-content{ 
         margin-left:0; 
         padding: 15px;
-        padding-top: 80px;
+        padding-top: 140px; /* Adjusted for headers on mobile */
         width: 100%;
+        margin-top: 120px; /* 60px header + 60px topbar */
     }
     .content-wrapper {
         padding: 15px;
@@ -1011,10 +1383,26 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
     .btn {
         width: 100%;
     }
+    
+    .assigned-list {
+        flex-direction: column;
+        align-items: flex-start;
+    }
 }
 </style>
 </head>
 <body>
+
+<!-- University Header -->
+<div class="university-header">
+    <div class="header-left">
+        <img src="../assets/images/dku logo.jpg" alt="Debark University Logo" class="dku-logo-img">
+        <div class="system-title">Debark University Class Scheduling System</div>
+    </div>
+    <div class="header-right">
+        Assign Instructors
+    </div>
+</div>
 
 <!-- Mobile Topbar -->
 <div class="topbar">
@@ -1027,14 +1415,13 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
 
 <!-- Sidebar -->
 <div class="sidebar" id="sidebar">
-    <!-- Scrollable content wrapper -->
-    <div class="sidebar-scrollable">
+    <div class="sidebar-content">
         <div class="sidebar-profile">
             <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic"
                  onerror="this.onerror=null; this.src='../assets/default_profile.png';">
             <p><?= htmlspecialchars($current_user['username']) ?></p>
         </div>
-        <h2>Admin Panel</h2>
+        <h2>Admin Dashboard</h2>
         
         <!-- Navigation Container -->
         <nav>
@@ -1059,7 +1446,7 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
             <a href="manage_rooms.php" class="<?= $current_page=='manage_rooms.php'?'active':'' ?>">
                 <i class="fas fa-door-closed"></i> Manage Rooms
             </a>
-            <a href="manage_schedules.php">
+            <a href="manage_schedules.php" class="<?= $current_page=='manage_schedules.php'?'active':'' ?>">
                 <i class="fas fa-calendar-alt"></i> Manage Schedule
             </a>
             <a href="assign_instructors.php" class="active">
@@ -1080,6 +1467,7 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
         </nav>
     </div>
 </div>
+
 <!-- Main Content -->
 <div class="main-content">
     <div class="content-wrapper">
@@ -1088,6 +1476,10 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
             <div>
                 <h1>Assign Instructors to Classroom Sections</h1>
                 <p>Assign different instructors to the same courses in different classroom sections</p>
+                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 5px;">
+                    <i class="fas fa-info-circle"></i> 
+                    <strong>Rule:</strong> Each instructor can only be assigned to ONE section per course
+                </p>
             </div>
             <div class="user-info">
                 <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile" id="headerProfilePic"
@@ -1115,8 +1507,8 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
                     <div class="stat-label">Students Affected</div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-value"><?= count($instructors) ?></div>
-                    <div class="stat-label">Available Instructors</div>
+                    <div class="stat-value"><?= count($all_instructors) ?></div>
+                    <div class="stat-label">Total Instructors</div>
                 </div>
             </div>
         </div>
@@ -1140,9 +1532,36 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
                         <label for="bulk_instructor_id" class="required">Instructor:</label>
                         <select name="bulk_instructor_id" id="bulk_instructor_id" class="instructor-select" required>
                             <option value="">Select Instructor</option>
-                            <?php foreach($instructors as $instructor): ?>
-                                <option value="<?= $instructor['user_id'] ?>">
+                            <?php foreach($all_instructors as $instructor): 
+                                // Get instructor's current course assignments
+                                $course_assignments = getInstructorCourseAssignments($pdo, $instructor['user_id']);
+                                $has_course_assignments = count($course_assignments) > 0;
+                                
+                                // Check if instructor is already assigned to any section in schedule
+                                $schedule_assignments_stmt = $pdo->prepare("
+                                    SELECT COUNT(DISTINCT s.course_id) as course_count 
+                                    FROM schedule s 
+                                    WHERE s.instructor_id = ? 
+                                    AND s.year = 'freshman'
+                                ");
+                                $schedule_assignments_stmt->execute([$instructor['user_id']]);
+                                $schedule_course_count = $schedule_assignments_stmt->fetchColumn();
+                            ?>
+                                <option value="<?= $instructor['user_id'] ?>" 
+                                        data-course-assignments="<?= count($course_assignments) ?>"
+                                        data-has-assignments="<?= $has_course_assignments ? '1' : '0' ?>"
+                                        data-schedule-courses="<?= $schedule_course_count ?>">
                                     <?= htmlspecialchars($instructor['username']) ?> (<?= htmlspecialchars($instructor['email']) ?>)
+                                    <?php if($has_course_assignments || $schedule_course_count > 0): ?>
+                                        - 
+                                        <?php if($has_course_assignments): ?>
+                                            <?= count($course_assignments) ?> course(s) assigned
+                                        <?php endif; ?>
+                                        <?php if($schedule_course_count > 0): ?>
+                                            <?php if($has_course_assignments): ?> + <?php endif; ?>
+                                            <?= $schedule_course_count ?> section(s) assigned
+                                        <?php endif; ?>
+                                    <?php endif; ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
@@ -1180,10 +1599,31 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
                     </button>
                     <small style="display: block; margin-top: 10px; color: var(--text-secondary);">
                         This will assign the selected instructor to all schedules in the selected sections/courses that don't have an instructor assigned.
+                        <strong>Note:</strong> An instructor can only be assigned to ONE section per course.
                     </small>
                 </div>
             </form>
         </div>
+
+        <!-- Show instructors already assigned to courses -->
+        <?php if(!empty($assigned_instructors)): ?>
+        <div class="assigned-info">
+            <h5><i class="fas fa-user-tie"></i> Instructors Already Assigned to Courses (Course-level assignments):</h5>
+            <div class="assigned-list">
+                <?php foreach($assigned_instructors as $instructor): ?>
+                    <span class="assigned-chip course-assigned">
+                        <i class="fas fa-book"></i>
+                        <?= htmlspecialchars($instructor['username']) ?> 
+                        (<?= $instructor['total_courses_assigned'] ?> course(s))
+                    </span>
+                <?php endforeach; ?>
+            </div>
+            <small style="display: block; margin-top: 8px; color: var(--text-secondary);">
+                <i class="fas fa-info-circle"></i> 
+                These instructors already have course-level assignments and are not available for classroom section assignments.
+            </small>
+        </div>
+        <?php endif; ?>
 
         <!-- Individual Section Assignments -->
         <h2 class="page-title">
@@ -1206,6 +1646,15 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
         <?php else: ?>
             <?php foreach($unassigned_sections as $section): 
                 $section_color_class = 'section-' . (($section['section_number'] - 1) % 5 + 1);
+                
+                // Get available instructors for this specific section
+                $available_instructors = getAvailableInstructors($pdo, $section['course_id'], $section['section_number'], true);
+                
+                // Get all instructors (including those with course assignments)
+                $all_instructors_for_section = getAvailableInstructors($pdo, $section['course_id'], $section['section_number'], false);
+                
+                // Get instructors already assigned to this course (for warning)
+                $instructors_assigned_to_this_course = getInstructorsAssignedToThisCourse($pdo, $section['course_id']);
             ?>
                 <div class="section-card">
                     <div class="section-header">
@@ -1249,6 +1698,26 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
                         </div>
                     </div>
                     
+                    <!-- Show warning if this course already has assigned instructors -->
+                    <?php if(!empty($instructors_assigned_to_this_course)): ?>
+                        <div class="course-warning">
+                            <h5><i class="fas fa-exclamation-triangle"></i> This course already has instructors assigned to other sections:</h5>
+                            <div class="assigned-list">
+                                <?php foreach($instructors_assigned_to_this_course as $instructor): ?>
+                                    <span class="assigned-chip course-busy">
+                                        <i class="fas fa-chalkboard-teacher"></i>
+                                        <?= htmlspecialchars($instructor['username']) ?> 
+                                        (Section<?= $instructor['assigned_sections'] != '' ? 's ' . $instructor['assigned_sections'] : '' ?>)
+                                    </span>
+                                <?php endforeach; ?>
+                            </div>
+                            <small style="display: block; margin-top: 8px;">
+                                <i class="fas fa-info-circle"></i> 
+                                These instructors cannot be assigned to additional sections of this course.
+                            </small>
+                        </div>
+                    <?php endif; ?>
+                    
                     <div class="instructor-info">
                         <div class="instructor-current">
                             <strong>Current Instructor:</strong>
@@ -1268,36 +1737,95 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
                     
                     <div class="assignment-form">
                         <h4>Assign New Instructor to This Section:</h4>
-                        <form method="POST">
-                            <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-                            <input type="hidden" name="course_id" value="<?= $section['course_id'] ?>">
-                            <input type="hidden" name="section_number" value="<?= $section['section_number'] ?>">
-                            
-                            <div class="form-group">
-                                <label for="instructor_id_<?= $section['course_id'] ?>_<?= $section['section_number'] ?>" class="required">Select Instructor:</label>
-                                <select name="instructor_id" id="instructor_id_<?= $section['course_id'] ?>_<?= $section['section_number'] ?>" class="instructor-select" required>
-                                    <option value="">Select Instructor</option>
-                                    <?php foreach($instructors as $instructor): ?>
-                                        <option value="<?= $instructor['user_id'] ?>" 
-                                            <?= ($section['current_instructor_name'] == $instructor['username']) ? 'selected' : '' ?>>
-                                            <?= htmlspecialchars($instructor['username']) ?> (<?= htmlspecialchars($instructor['email']) ?>)
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
+                        <?php if(empty($available_instructors)): ?>
+                            <div class="message warning">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                No available instructors found for this course.
+                                <br>
+                                <small>All instructors are either assigned to courses or already assigned to sections of this course. Each instructor can only be assigned to ONE section per course.</small>
                             </div>
-                            
-                            <div class="assignment-actions">
-                                <button type="submit" name="assign_instructor" class="btn btn-primary">
-                                    <i class="fas fa-user-check"></i>
-                                    Assign to Section <?= $section['section_number'] ?>
-                                </button>
-                                <button type="button" class="btn btn-secondary" 
-                                        onclick="resetAssignment(<?= $section['course_id'] ?>, <?= $section['section_number'] ?>)">
-                                    <i class="fas fa-redo"></i>
-                                    Reset
-                                </button>
-                            </div>
-                        </form>
+                        <?php else: ?>
+                            <form method="POST">
+                                <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+                                <input type="hidden" name="course_id" value="<?= $section['course_id'] ?>">
+                                <input type="hidden" name="section_number" value="<?= $section['section_number'] ?>">
+                                
+                                <div class="form-group">
+                                    <label for="instructor_id_<?= $section['course_id'] ?>_<?= $section['section_number'] ?>" class="required">Select Instructor:</label>
+                                    <select name="instructor_id" id="instructor_id_<?= $section['course_id'] ?>_<?= $section['section_number'] ?>" class="instructor-select" required>
+                                        <option value="">Select Available Instructor</option>
+                                        
+                                        <?php if(!empty($available_instructors)): ?>
+                                        <optgroup label="Available Instructors">
+                                        <?php foreach($available_instructors as $instructor): ?>
+                                            <option value="<?= $instructor['user_id'] ?>" 
+                                                <?= ($section['current_instructor_name'] == $instructor['username']) ? 'selected' : '' ?>
+                                                data-is-available="1">
+                                                <span class="instructor-option">
+                                                    <span>
+                                                        <?= htmlspecialchars($instructor['username']) ?> (<?= htmlspecialchars($instructor['email']) ?>)
+                                                    </span>
+                                                    <span class="instructor-status status-free">Available</span>
+                                                </span>
+                                            </option>
+                                        <?php endforeach; ?>
+                                        </optgroup>
+                                        <?php endif; ?>
+                                        
+                                        <?php if(count($available_instructors) < count($all_instructors_for_section)): ?>
+                                        <optgroup label="Instructors with Course Assignments (Not Recommended)">
+                                        <?php 
+                                        // Find instructors who are not in the available list (have course assignments)
+                                        $busy_instructors = [];
+                                        foreach($all_instructors_for_section as $instructor) {
+                                            $is_available = false;
+                                            foreach($available_instructors as $available) {
+                                                if($available['user_id'] == $instructor['user_id']) {
+                                                    $is_available = true;
+                                                    break;
+                                                }
+                                            }
+                                            if(!$is_available) {
+                                                $busy_instructors[] = $instructor;
+                                            }
+                                        }
+                                        
+                                        foreach($busy_instructors as $instructor): 
+                                            $course_assignments = getInstructorCourseAssignments($pdo, $instructor['user_id']);
+                                            $assignment_count = count($course_assignments);
+                                        ?>
+                                            <option value="<?= $instructor['user_id'] ?>" 
+                                                    data-course-assignments="<?= $assignment_count ?>"
+                                                    data-is-available="0"
+                                                    style="color: #ef4444;">
+                                                <span class="instructor-option">
+                                                    <span>
+                                                        <?= htmlspecialchars($instructor['username']) ?> (<?= htmlspecialchars($instructor['email']) ?>)
+                                                    </span>
+                                                    <span class="instructor-status status-assigned">
+                                                        <?= $assignment_count ?> course(s) assigned
+                                                    </span>
+                                                </span>
+                                            </option>
+                                        <?php endforeach; ?>
+                                        </optgroup>
+                                        <?php endif; ?>
+                                    </select>
+                                </div>
+                                
+                                <div class="assignment-actions">
+                                    <button type="submit" name="assign_instructor" class="btn btn-primary">
+                                        <i class="fas fa-user-check"></i>
+                                        Assign to Section <?= $section['section_number'] ?>
+                                    </button>
+                                    <button type="button" class="btn btn-secondary" 
+                                            onclick="resetAssignment(<?= $section['course_id'] ?>, <?= $section['section_number'] ?>)">
+                                        <i class="fas fa-redo"></i>
+                                        Reset
+                                    </button>
+                                </div>
+                            </form>
+                        <?php endif; ?>
                     </div>
                 </div>
             <?php endforeach; ?>
@@ -1334,16 +1862,29 @@ document.getElementById('bulkAssignmentForm').addEventListener('submit', functio
         return;
     }
     
-    const instructorName = instructorSelect.options[instructorSelect.selectedIndex].text;
+    const selectedOption = instructorSelect.options[instructorSelect.selectedIndex];
+    const hasAssignments = selectedOption.getAttribute('data-has-assignments') === '1';
+    const scheduleCourses = parseInt(selectedOption.getAttribute('data-schedule-courses') || '0');
+    const instructorName = selectedOption.text.split('(')[0].trim();
     const courseName = courseSelect.value != 0 ? courseSelect.options[courseSelect.selectedIndex].text : 'All Courses';
     const sectionName = sectionSelect.value != 0 ? sectionSelect.options[sectionSelect.selectedIndex].text : 'All Sections';
+    
+    let warningMessage = '';
+    if (hasAssignments) {
+        warningMessage += `\n⚠️ WARNING: This instructor already has course assignments!\n`;
+    }
+    if (scheduleCourses > 0 && courseSelect.value != 0) {
+        warningMessage += `\n⚠️ WARNING: This instructor is already assigned to ${scheduleCourses} course section(s)!\n`;
+    }
     
     const confirmation = confirm(
         `📚 Bulk Instructor Assignment:\n\n` +
         `• Instructor: ${instructorName}\n` +
         `• Course Filter: ${courseName}\n` +
-        `• Section Filter: ${sectionName}\n\n` +
-        `This will assign the instructor to ALL sessions in the selected sections/courses.\n` +
+        `• Section Filter: ${sectionName}\n` +
+        warningMessage +
+        `\nThis will assign the instructor to ALL sessions in the selected sections/courses.\n` +
+        `⚠️ IMPORTANT: An instructor can only be assigned to ONE section per course.\n` +
         `Any existing instructor assignments will be replaced.\n\n` +
         `Continue?`
     );
@@ -1353,19 +1894,31 @@ document.getElementById('bulkAssignmentForm').addEventListener('submit', functio
     }
 });
 
-// Individual assignment confirmation
+// Individual assignment confirmation with busy instructor warning
 document.querySelectorAll('.assignment-form form').forEach(form => {
     form.addEventListener('submit', function(e) {
         const courseCode = this.closest('.section-card').querySelector('.section-title').textContent.trim();
         const sectionNumber = this.querySelector('input[name="section_number"]').value;
         const instructorSelect = this.querySelector('select[name="instructor_id"]');
-        const instructorName = instructorSelect.options[instructorSelect.selectedIndex].text;
+        const selectedOption = instructorSelect.options[instructorSelect.selectedIndex];
+        const instructorName = selectedOption.textContent.split('(')[0].trim();
+        
+        // Check if selected instructor has course assignments
+        const isAvailable = !selectedOption.hasAttribute('data-is-available') || selectedOption.getAttribute('data-is-available') === '1';
+        
+        let warningMessage = '';
+        if (!isAvailable) {
+            const courseAssignments = selectedOption.getAttribute('data-course-assignments') || '0';
+            warningMessage = `\n⚠️ WARNING: This instructor already has ${courseAssignments} course assignment(s)!\n`;
+        }
         
         const confirmation = confirm(
             `📚 Assign Instructor to Section ${sectionNumber}\n\n` +
             `• Course: ${courseCode}\n` +
             `• Section: ${sectionNumber}\n` +
-            `• Instructor: ${instructorName}\n\n` +
+            `• Instructor: ${instructorName}\n` +
+            warningMessage +
+            `\n⚠️ IMPORTANT: An instructor can only be assigned to ONE section per course.\n` +
             `This will update all sessions in this section with the selected instructor.\n` +
             `Any existing instructor will be replaced.\n\n` +
             `Continue?`
@@ -1405,6 +1958,31 @@ document.addEventListener('DOMContentLoaded', function() {
         if(select) {
             select.focus();
         }
+    });
+    
+    // Set active state for current page in sidebar
+    const currentPage = window.location.pathname.split('/').pop();
+    const navLinks = document.querySelectorAll('.sidebar a');
+    
+    navLinks.forEach(link => {
+        const linkPage = link.getAttribute('href');
+        if (linkPage === currentPage) {
+            link.classList.add('active');
+        }
+    });
+    
+    // Highlight busy instructors in dropdowns
+    document.querySelectorAll('.instructor-select').forEach(select => {
+        select.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            if (selectedOption.hasAttribute('data-is-available') && selectedOption.getAttribute('data-is-available') === '0') {
+                this.style.borderColor = '#ef4444';
+                this.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.2)';
+            } else {
+                this.style.borderColor = '';
+                this.style.boxShadow = '';
+            }
+        });
     });
 });
 </script>

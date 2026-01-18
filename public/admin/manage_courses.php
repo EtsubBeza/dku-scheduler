@@ -342,22 +342,110 @@ $current_page = basename($_SERVER['PHP_SELF']);
 * { margin:0; padding:0; box-sizing:border-box; font-family: "Segoe UI", Arial, sans-serif;}
 body { display:flex; min-height:100vh; background: var(--bg-primary); position:relative; }
 
+/* ================= University Header ================= */
+.university-header {
+    background: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%);
+    color: white;
+    padding: 0.5rem 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1201;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.dku-logo-img {
+    width: 45px;
+    height: 45px;
+    object-fit: contain;
+    border-radius: 5px;
+    background: white;
+    padding: 4px;
+}
+
+.system-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    opacity: 0.95;
+}
+
+.header-right {
+    font-size: 0.8rem;
+    opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+    .university-header {
+        padding: 0.5rem 15px;
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+    }
+    
+    .header-left, .header-right {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .system-title {
+        font-size: 0.8rem;
+    }
+    
+    .header-right {
+        font-size: 0.75rem;
+    }
+}
+
+/* Adjust other elements for university header */
+.topbar {
+    top: 60px !important; /* Adjusted for university header */
+}
+
+.sidebar {
+    top: 60px !important; /* Adjusted for university header */
+    height: calc(100% - 60px) !important;
+}
+
+.overlay {
+    top: 60px; /* Adjusted for university header */
+    height: calc(100% - 60px);
+}
+
+.main-content {
+    margin-top: 60px; /* Added for university header */
+}
+
 /* ================= Topbar for Mobile ================= */
 .topbar {
     display: none;
-    position: fixed; top:0; left:0; width:100%;
-    background:var(--bg-sidebar); color:var(--text-sidebar);
-    padding:15px 20px;
+    position: fixed; 
+    top:60px; 
+    left:0; 
+    width:100%;
+    background:var(--bg-sidebar); 
+    color:var(--text-sidebar);
+    padding:12px 20px;
     z-index:1200;
-    justify-content:space-between; align-items:center;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    justify-content:space-between; 
+    align-items:center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 .menu-btn {
     font-size:26px;
     background:#1abc9c;
     border:none; color:var(--text-sidebar);
     cursor:pointer;
-    padding:10px 14px;
+    padding:8px 12px;
     border-radius:8px;
     font-weight:600;
     transition: background 0.3s, transform 0.2s;
@@ -367,127 +455,64 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); position:r
 /* ================= Sidebar ================= */
 .sidebar { 
     position: fixed; 
-    top:0; left:0; 
+    top:60px; 
+    left:0;
     width:250px; 
-    height:100vh; 
+    height:calc(100% - 60px);
     background:var(--bg-sidebar); 
     color:var(--text-sidebar);
     z-index:1100;
     transition: transform 0.3s ease;
-    padding: 20px 0;
-    box-shadow: 2px 0 10px rgba(0,0,0,0.2);
-}
-
-.sidebar-profile {
-    text-align: center;
-    margin-bottom: 25px;
-    padding: 0 20px 20px;
-    border-bottom: 1px solid rgba(255,255,255,0.2);
-}
-
-.sidebar-profile img {
-    width: 100px;
-    height: 100px;
-    border-radius: 50%;
-    object-fit: cover;
-    margin-bottom: 10px;
-    border: 2px solid #1abc9c;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-}
-
-.sidebar-profile p {
-    color: var(--text-sidebar);
-    font-weight: bold;
-    margin: 0;
-    font-size: 16px;
-}
-
-.sidebar h2 {
-    text-align: center;
-    color: var(--text-sidebar);
-    margin-bottom: 25px;
-    font-size: 22px;
-    padding: 0 20px;
-}
-
-.sidebar a { 
-    display:block; 
-    padding:12px 20px; 
-    color:var(--text-sidebar); 
-    text-decoration:none; 
-    transition: background 0.3s; 
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    position: relative;
-}
-.sidebar a:hover, .sidebar a.active { background:#1abc9c; color:white; }
-
-/* ================= Sidebar with Scrollability ================= */
-.sidebar { 
-    position: fixed; 
-    top:0; left:0; 
-    width:250px; 
-    height:100vh; 
-    background:var(--bg-sidebar); 
-    color:var(--text-sidebar);
-    z-index:1100;
-    transition: transform 0.3s ease;
-    padding: 20px 0;
-    box-shadow: 2px 0 10px rgba(0,0,0,0.2);
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.2);
 }
 
-/* Scrollable sidebar content */
-.sidebar-scrollable {
+/* Sidebar Content (scrollable) */
+.sidebar-content {
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
-    display: flex;
-    flex-direction: column;
+    padding: 20px 0;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
 }
 
-/* Custom scrollbar styling for sidebar */
-.sidebar-scrollable::-webkit-scrollbar {
+/* Custom scrollbar for sidebar */
+.sidebar-content::-webkit-scrollbar {
     width: 6px;
 }
 
-.sidebar-scrollable::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.1);
+.sidebar-content::-webkit-scrollbar-track {
+    background: transparent;
     border-radius: 3px;
 }
 
-.sidebar-scrollable::-webkit-scrollbar-thumb {
+.sidebar-content::-webkit-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.3);
     border-radius: 3px;
 }
 
-.sidebar-scrollable::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.4);
+.sidebar-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
 }
 
-/* For Firefox */
-.sidebar-scrollable {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.3) rgba(255, 255, 255, 0.1);
+[data-theme="dark"] .sidebar-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
 }
 
-.sidebar.hidden { transform:translateX(-260px); }
+[data-theme="dark"] .sidebar-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
 
+/* Sidebar Profile */
 .sidebar-profile {
     text-align: center;
     margin-bottom: 25px;
     padding: 0 20px 20px;
     border-bottom: 1px solid rgba(255,255,255,0.2);
-    position: sticky;
-    top: 0;
-    background: var(--bg-sidebar);
-    z-index: 10;
-    padding-top: 10px;
-    margin-top: -10px;
+    flex-shrink: 0;
 }
 
 .sidebar-profile img {
@@ -507,108 +532,100 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); position:r
     font-size: 16px;
 }
 
+/* Sidebar Title */
 .sidebar h2 {
     text-align: center;
     color: var(--text-sidebar);
     margin-bottom: 25px;
     font-size: 22px;
     padding: 0 20px;
-    position: sticky;
-    top: 181px;
-    background: var(--bg-sidebar);
-    z-index: 10;
 }
 
-/* Navigation container */
+/* Sidebar Navigation */
 .sidebar nav {
-    flex: 1;
     display: flex;
     flex-direction: column;
 }
 
 .sidebar a { 
-    display:block; 
-    padding:12px 20px; 
-    color:var(--text-sidebar); 
-    text-decoration:none; 
-    transition: background 0.3s; 
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-    display: flex;
+    display: flex; 
     align-items: center;
     gap: 10px;
+    padding: 12px 20px; 
+    color: var(--text-sidebar); 
+    text-decoration: none; 
+    transition: all 0.3s; 
+    border-bottom: 1px solid rgba(255,255,255,0.1);
     position: relative;
 }
-.sidebar a:hover, .sidebar a.active { background:#1abc9c; color:white; }
+.sidebar a:hover, .sidebar a.active { 
+    background: #1abc9c; 
+    color: white; 
+    padding-left: 25px;
+}
 
+.sidebar a i {
+    width: 20px;
+    text-align: center;
+    font-size: 1.1rem;
+}
+
+/* Pending badge */
 .pending-badge {
     position: absolute;
     right: 15px;
     background: #ef4444;
     color: white;
-    border-radius: 50%;
-    width: 20px;
-    height: 20px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.75rem;
-    margin-left: auto;
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-weight: bold;
+    animation: pulse 2s infinite;
 }
 
-/* Logout button - pushes to bottom */
-.sidebar a[href="../logout.php"] {
-    margin-top: auto;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-/* Adjust for mobile */
-@media(max-width: 768px){
-    .sidebar { 
-        transform:translateX(-100%); 
-        width: 250px;
-    }
-    .sidebar.active { transform:translateX(0); }
-    
-    .sidebar-profile, .sidebar h2 {
-        position: relative;
-        top: 0;
-        margin-top: 0;
-        padding-top: 0;
-    }
-    
-    .sidebar a[href="../logout.php"] {
-        margin-top: 0;
-    }
-}
-.pending-badge {
-    background: #ef4444;
-    color: white;
-    border-radius: 50%;
-    width: 20px;
-    height: 20px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.75rem;
-    margin-left: auto;
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
 }
 
 /* ================= Overlay ================= */
 .overlay {
-    position: fixed; top:0; left:0; width:100%; height:100%;
-    background: rgba(0,0,0,0.4); z-index:1050;
-    display:none; opacity:0; transition: opacity 0.3s ease;
+    position: fixed; 
+    top:60px; 
+    left:0; 
+    width:100%; 
+    height:calc(100% - 60px);
+    background: rgba(0,0,0,0.4); 
+    z-index:1050;
+    display:none; 
+    opacity:0; 
+    transition: opacity 0.3s ease;
 }
-.overlay.active { display:block; opacity:1; }
+.overlay.active { 
+    display:block; 
+    opacity:1; 
+}
 
 /* ================= Main Content ================= */
-.main-content { 
-    margin-left:250px; 
-    padding:30px;
-    min-height:100vh;
-    background: var(--bg-primary);
-    transition: all 0.3s ease;
-    width: calc(100% - 250px);
+.main-content {
+  margin-left: 250px;
+  padding: 30px;
+  min-height: 100vh;
+  background: var(--bg-primary);
+  transition: all 0.3s ease;
+  margin-top: 60px;
+  width: calc(100% - 250px);
+}
+
+@media (max-width: 768px) {
+    .main-content {
+        margin-left: 0;
+        padding: 15px;
+        padding-top: 140px; /* Adjusted for headers on mobile */
+        margin-top: 120px; /* 60px header + 60px topbar */
+        width: 100%;
+    }
 }
 
 /* Header Styles */
@@ -617,7 +634,8 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); position:r
     justify-content: space-between;
     align-items: center;
     margin-bottom: 30px;
-    padding: 20px 0;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border-color);
 }
 
 .header h1 {
@@ -1058,15 +1076,51 @@ input.checking {
 }
 
 @media(max-width: 768px){
-    .topbar{ display:flex; }
-    .sidebar{ transform:translateX(-100%); }
-    .sidebar.active{ transform:translateX(0); }
-    .main-content{ 
-        margin-left:0; 
-        padding: 20px;
-        padding-top: 80px;
-        width: 100%;
+    .university-header {
+        padding: 0.5rem 15px;
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
     }
+    
+    .header-left, .header-right {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .system-title {
+        font-size: 0.8rem;
+    }
+    
+    .header-right {
+        font-size: 0.75rem;
+    }
+    
+    .topbar { 
+        display:flex;
+        top: 60px; /* Adjusted for mobile with header */
+    }
+    
+    .sidebar { 
+        transform:translateX(-100%); 
+        top: 120px; /* 60px header + 60px topbar */
+        height: calc(100% - 120px) !important;
+    }
+    
+    .sidebar.active { 
+        transform:translateX(0); 
+    }
+    
+    .overlay {
+        top: 120px;
+        height: calc(100% - 120px);
+    }
+    
+    .main-content {
+        padding-top: 140px; /* Adjusted for headers on mobile */
+        margin-top: 120px; /* 60px header + 60px topbar */
+    }
+    
     .header { 
         flex-direction: column; 
         gap: 15px; 
@@ -1139,304 +1193,314 @@ input.checking {
 </style>
 </head>
 <body>
-
-<!-- Mobile Topbar -->
-<div class="topbar">
-    <button class="menu-btn" onclick="toggleMenu()">☰</button>
-    <span>Manage Courses</span>
-</div>
-
-<!-- Overlay for Mobile -->
-<div class="overlay" onclick="toggleMenu()"></div>
-<!-- Sidebar -->
-<div class="sidebar" id="sidebar">
-    <!-- Scrollable content wrapper -->
-    <div class="sidebar-scrollable">
-        <div class="sidebar-profile">
-            <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic"
-                 onerror="this.onerror=null; this.src='../assets/default_profile.png';">
-            <p><?= htmlspecialchars($current_user['username']) ?></p>
+    <!-- University Header -->
+    <div class="university-header">
+        <div class="header-left">
+            <img src="../assets/images/dku logo.jpg" alt="Debark University Logo" class="dku-logo-img">
+            <div class="system-title">Debark University Class Scheduling System</div>
         </div>
-        <h2>Admin Panel</h2>
-        
-        <!-- Navigation Container -->
-        <nav>
-            <a href="dashboard.php" class="<?= $current_page=='dashboard.php'?'active':'' ?>">
-                <i class="fas fa-home"></i> Dashboard
-            </a>
-            <a href="manage_users.php" class="<?= $current_page=='manage_users.php'?'active':'' ?>">
-                <i class="fas fa-users"></i> Manage Users
-            </a>
-            <a href="approve_users.php" class="<?= $current_page=='approve_users.php'?'active':'' ?>">
-                <i class="fas fa-user-check"></i> Approve Users
-                <?php if($pending_approvals > 0): ?>
-                    <span class="pending-badge"><?= $pending_approvals ?></span>
-                <?php endif; ?>
-            </a>
-            <a href="manage_departments.php" class="<?= $current_page=='manage_departments.php'?'active':'' ?>">
-                <i class="fas fa-building"></i> Manage Departments
-            </a>
-            <a href="manage_courses.php" class="<?= $current_page=='manage_courses.php'?'active':'' ?>">
-                <i class="fas fa-book"></i> Manage Courses
-            </a>
-            <a href="manage_rooms.php" class="<?= $current_page=='manage_rooms.php'?'active':'' ?>">
-                <i class="fas fa-door-closed"></i> Manage Rooms
-            </a>
-            <a href="manage_schedules.php" class="<?= $current_page=='manage_schedules.php'?'active':'' ?>">
-                <i class="fas fa-calendar-alt"></i> Manage Schedule
-            </a>
-            <a href="assign_instructors.php" class="<?= $current_page=='assign_instructors.php'?'active':'' ?>">
-                <i class="fas fa-user-graduate"></i> Assign Instructors
-            </a>
-            <a href="admin_exam_schedules.php" class="<?= $current_page=='admin_exam_schedules.php'?'active':'' ?>">
-                <i class="fas fa-clipboard-list"></i> Exam Scheduling
-            </a>
-            <a href="manage_announcements.php" class="<?= $current_page=='manage_announcements.php'?'active':'' ?>">
-                <i class="fas fa-bullhorn"></i> Manage Announcements
-            </a>
-            <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
-                <i class="fas fa-user-edit"></i> Edit Profile
-            </a>
-            <a href="../logout.php">
-                <i class="fas fa-sign-out-alt"></i> Logout
-            </a>
-        </nav>
+        <div class="header-right">
+            Manage Courses
+        </div>
     </div>
-</div>
 
-<!-- Main Content -->
-<div class="main-content">
-    <div class="header">
-        <h1>Manage Courses</h1>
-        <div class="user-info">
-            <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile" id="headerProfilePic"
-                 onerror="this.onerror=null; this.src='../assets/default_profile.png';">
-            <div>
-                <div><?= htmlspecialchars($current_user['username']) ?></div>
-                <small>Administrator</small>
+    <!-- Mobile Topbar -->
+    <div class="topbar">
+        <button class="menu-btn" onclick="toggleMenu()">☰</button>
+        <span>Manage Courses</span>
+    </div>
+
+    <!-- Overlay for Mobile -->
+    <div class="overlay" onclick="toggleMenu()"></div>
+
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-content">
+            <div class="sidebar-profile">
+                <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic"
+                     onerror="this.onerror=null; this.src='../assets/default_profile.png';">
+                <p><?= htmlspecialchars($current_user['username']) ?></p>
+            </div>
+            <h2>Admin Dashboard</h2>
+            
+            <!-- Navigation Links -->
+            <nav>
+                <a href="dashboard.php" class="<?= $current_page=='dashboard.php'?'active':'' ?>">
+                    <i class="fas fa-home"></i> Dashboard
+                </a>
+                <a href="manage_users.php" class="<?= $current_page=='manage_users.php'?'active':'' ?>">
+                    <i class="fas fa-users"></i> Manage Users
+                </a>
+                <a href="approve_users.php" class="<?= $current_page=='approve_users.php'?'active':'' ?>">
+                    <i class="fas fa-user-check"></i> Approve Users
+                    <?php if($pending_approvals > 0): ?>
+                        <span class="pending-badge"><?= $pending_approvals ?></span>
+                    <?php endif; ?>
+                </a>
+                <a href="manage_departments.php" class="<?= $current_page=='manage_departments.php'?'active':'' ?>">
+                    <i class="fas fa-building"></i> Manage Departments
+                </a>
+                <a href="manage_courses.php" class="active">
+                    <i class="fas fa-book"></i> Manage Courses
+                </a>
+                <a href="manage_rooms.php" class="<?= $current_page=='manage_rooms.php'?'active':'' ?>">
+                    <i class="fas fa-door-closed"></i> Manage Rooms
+                </a>
+                <a href="manage_schedules.php" class="<?= $current_page=='manage_schedules.php'?'active':'' ?>">
+                    <i class="fas fa-calendar-alt"></i> Manage Schedule
+                </a>
+                <a href="assign_instructors.php" class="<?= $current_page=='assign_instructors.php'?'active':'' ?>">
+                    <i class="fas fa-user-graduate"></i> Assign Instructors
+                </a>
+                <a href="admin_exam_schedules.php" class="<?= $current_page=='admin_exam_schedules.php'?'active':'' ?>">
+                    <i class="fas fa-clipboard-list"></i> Exam Scheduling
+                </a>
+                <a href="manage_announcements.php" class="<?= $current_page=='manage_announcements.php'?'active':'' ?>">
+                    <i class="fas fa-bullhorn"></i> Manage Announcements
+                </a>
+                <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
+                    <i class="fas fa-user-edit"></i> Edit Profile
+                </a>
+                <a href="../logout.php">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </nav>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="header">
+            <h1>Manage Courses</h1>
+            <div class="user-info">
+                <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile" id="headerProfilePic"
+                     onerror="this.onerror=null; this.src='../assets/default_profile.png';">
+                <div>
+                    <div><?= htmlspecialchars($current_user['username']) ?></div>
+                    <small>Administrator</small>
+                </div>
+            </div>
+        </div>
+
+        <?php if($message): ?>
+            <div class="message <?= $message_type ?>">
+                <i class="fas fa-<?= $message_type === 'error' ? 'exclamation-circle' : ($message_type === 'warning' ? 'exclamation-triangle' : 'check-circle') ?>"></i>
+                <?= htmlspecialchars($message) ?>
+            </div>
+        <?php endif; ?>
+
+        <!-- Add/Edit Course Form Card -->
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-<?= isset($edit_course) ? 'edit' : 'plus-circle' ?>"></i> <?= isset($edit_course) ? 'Edit Course' : 'Add New Course' ?></h3>
+            </div>
+            <div class="card-body">
+                <form method="POST" id="courseForm" onsubmit="return validateForm()">
+                    <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+                    <input type="hidden" name="course_id" value="<?= $edit_course['course_id'] ?? '' ?>">
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="course_code" class="required">Course Code</label>
+                            <input type="text" name="course_code" id="course_code" class="form-control" 
+                                   placeholder="e.g., CS101" required
+                                   value="<?= htmlspecialchars($edit_course['course_code'] ?? '') ?>"
+                                   oninput="checkCourseCode()">
+                            <div id="course-code-feedback"></div>
+                        </div>
+                        <div class="form-group">
+                            <label for="course_name" class="required">Course Name</label>
+                            <input type="text" name="course_name" id="course_name" class="form-control" 
+                                   placeholder="e.g., Introduction to Programming" required
+                                   value="<?= htmlspecialchars($edit_course['course_name'] ?? '') ?>">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="department_id" id="department_label" class="required">Department</label>
+                            <select name="department_id" id="department_id" class="form-control" required>
+                                <option value="">Select Department</option>
+                                <?php foreach($departments as $d): ?>
+                                    <option value="<?= $d['department_id'] ?>" 
+                                            data-category="<?= htmlspecialchars($d['category']) ?>"
+                                            <?= (isset($edit_course) && $edit_course['department_id']==$d['department_id'])?'selected':'' ?>>
+                                        <?= htmlspecialchars($d['department_name']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <small class="hours-info" id="department_hint">Required for non-freshman courses</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="credit_hours" class="required">Credit Hours</label>
+                            <select name="credit_hours" id="credit_hours" class="form-control" required>
+                                <option value="">Select Credit Hours</option>
+                                <option value="1" <?= (isset($edit_course) && $edit_course['credit_hours']==1)?'selected':'' ?>>1 Credit Hour</option>
+                                <option value="2" <?= (isset($edit_course) && $edit_course['credit_hours']==2)?'selected':'' ?>>2 Credit Hours</option>
+                                <option value="3" <?= (!isset($edit_course) || (isset($edit_course) && $edit_course['credit_hours']==3))?'selected':'' ?>>3 Credit Hours</option>
+                                <option value="4" <?= (isset($edit_course) && $edit_course['credit_hours']==4)?'selected':'' ?>>4 Credit Hours</option>
+                                <option value="5" <?= (isset($edit_course) && $edit_course['credit_hours']==5)?'selected':'' ?>>5 Credit Hours</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <div class="checkbox-group">
+                            <input type="checkbox" name="is_freshman" id="is_freshman" value="1" 
+                                   <?= (isset($edit_course) && $edit_course['is_freshman'])?'checked':'' ?>>
+                            <label for="is_freshman">
+                                <strong>This is a Freshman Course</strong> (general education course for all departments)
+                            </label>
+                        </div>
+                        <small class="hours-info">Freshman courses are not tied to a specific department. Department selection becomes optional.</small>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="category" class="required">Course Category</label>
+                            <select name="category" id="category" class="form-control" required>
+                                <option value="Compulsory" <?= (!isset($edit_course) || (isset($edit_course) && $edit_course['category']=='Compulsory'))?'selected':'' ?>>Compulsory</option>
+                                <option value="Elective" <?= (isset($edit_course) && $edit_course['category']=='Elective')?'selected':'' ?>>Elective</option>
+                                <option value="Optional" <?= (isset($edit_course) && $edit_course['category']=='Optional')?'selected':'' ?>>Optional</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="contact_hours" class="required">Contact Hours (Theory)</label>
+                            <input type="number" name="contact_hours" id="contact_hours" class="form-control" 
+                                   min="0" max="5" value="<?= $edit_course['contact_hours'] ?? 3 ?>" required>
+                            <small class="hours-info">Classroom teaching hours</small>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="lab_hours" class="required">Lab Hours</label>
+                            <input type="number" name="lab_hours" id="lab_hours" class="form-control" 
+                                   min="0" max="5" value="<?= $edit_course['lab_hours'] ?? 0 ?>" required>
+                            <small class="hours-info">Laboratory/practical hours</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="tutorial_hours" class="required">Tutorial Hours</label>
+                            <input type="number" name="tutorial_hours" id="tutorial_hours" class="form-control" 
+                                   min="0" max="5" value="<?= $edit_course['tutorial_hours'] ?? 0 ?>" required>
+                            <small class="hours-info">Tutorial/discussion hours</small>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="prerequisite">Prerequisite Course</label>
+                            <input type="text" name="prerequisite" id="prerequisite" class="form-control" 
+                                   placeholder="e.g., CS101, MATH102 or None"
+                                   value="<?= htmlspecialchars($edit_course['prerequisite'] ?? '') ?>">
+                            <small class="hours-info">Enter course codes separated by commas</small>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="description">Course Description</label>
+                        <textarea name="description" id="description" class="form-control" rows="3" 
+                                  placeholder="Brief course description..."><?= htmlspecialchars($edit_course['description'] ?? '') ?></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <button type="submit" name="<?= isset($edit_course) ? 'edit_course' : 'add_course' ?>" 
+                                class="btn btn-primary" id="submit-btn">
+                            <i class="fas fa-<?= isset($edit_course) ? 'save' : 'plus-circle' ?>"></i>
+                            <?= isset($edit_course) ? 'Update Course' : 'Add Course' ?>
+                        </button>
+                        <?php if(isset($edit_course)): ?>
+                            <a class="cancel-btn" href="manage_courses.php">
+                                <i class="fas fa-times"></i> Cancel
+                            </a>
+                        <?php endif; ?>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Existing Courses Card -->
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-book"></i> All Courses (<?= count($courses) ?>)</h3>
+            </div>
+            <div class="card-body">
+                <?php if($courses): ?>
+                    <div class="table-container">
+                        <table class="courses-table">
+                            <thead>
+                                <tr>
+                                    <th>Code</th>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Department</th>
+                                    <th>Credits</th>
+                                    <th>Category</th>
+                                    <th>Hours (C/L/T)</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach($courses as $c): ?>
+                                <tr>
+                                    <td data-label="Code"><strong><?= htmlspecialchars($c['course_code']) ?></strong></td>
+                                    <td data-label="Name"><?= htmlspecialchars($c['course_name']) ?></td>
+                                    <td data-label="Type">
+                                        <?php if($c['is_freshman']): ?>
+                                            <span class="course-badge badge-freshman">Freshman</span>
+                                        <?php else: ?>
+                                            <span class="course-badge badge-regular">Regular</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td data-label="Department">
+                                        <?php if($c['department_name']): ?>
+                                            <?= htmlspecialchars($c['department_name']) ?>
+                                            <br><small><?= $c['dept_category'] ?></small>
+                                        <?php else: ?>
+                                            <em>General (Freshman)</em>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td data-label="Credits"><?= $c['credit_hours'] ?></td>
+                                    <td data-label="Category">
+                                        <?= $c['course_category'] ?>
+                                        <span class="course-badge badge-<?= strtolower($c['course_category']) ?>">
+                                            <?= $c['course_category'] ?>
+                                        </span>
+                                    </td>
+                                    <td data-label="Hours">
+                                        <strong><?= $c['contact_hours'] ?>/<?= $c['lab_hours'] ?>/<?= $c['tutorial_hours'] ?></strong>
+                                        <br>
+                                        <small class="hours-info">(Theory/Lab/Tutorial)</small>
+                                    </td>
+                                    <td data-label="Actions">
+                                        <div class="action-buttons">
+                                            <a class="action-link" href="manage_courses.php?edit=<?= $c['course_id'] ?>">
+                                                <i class="fas fa-edit"></i> Edit
+                                            </a>
+                                            <form method="POST" style="display:inline;" onsubmit="return confirmDelete(this, '<?= htmlspecialchars(addslashes($c['course_name'])) ?>')">
+                                                <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+                                                <input type="hidden" name="course_id" value="<?= $c['course_id'] ?>">
+                                                <button type="submit" name="delete_course" class="action-link delete">
+                                                    <i class="fas fa-trash"></i> Delete
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php else: ?>
+                    <div class="empty-state">
+                        <i class="fas fa-book"></i>
+                        <h3>No Courses Found</h3>
+                        <p>No courses found in the system yet. Add your first course using the form above.</p>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
-
-    <?php if($message): ?>
-        <div class="message <?= $message_type ?>">
-            <i class="fas fa-<?= $message_type === 'error' ? 'exclamation-circle' : ($message_type === 'warning' ? 'exclamation-triangle' : 'check-circle') ?>"></i>
-            <?= htmlspecialchars($message) ?>
-        </div>
-    <?php endif; ?>
-
-    <!-- Add/Edit Course Form Card -->
-    <div class="card">
-        <div class="card-header">
-            <h3><i class="fas fa-<?= isset($edit_course) ? 'edit' : 'plus-circle' ?>"></i> <?= isset($edit_course) ? 'Edit Course' : 'Add New Course' ?></h3>
-        </div>
-        <div class="card-body">
-            <form method="POST" id="courseForm" onsubmit="return validateForm()">
-                <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-                <input type="hidden" name="course_id" value="<?= $edit_course['course_id'] ?? '' ?>">
-                
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="course_code" class="required">Course Code</label>
-                        <input type="text" name="course_code" id="course_code" class="form-control" 
-                               placeholder="e.g., CS101" required
-                               value="<?= htmlspecialchars($edit_course['course_code'] ?? '') ?>"
-                               oninput="checkCourseCode()">
-                        <div id="course-code-feedback"></div>
-                    </div>
-                    <div class="form-group">
-                        <label for="course_name" class="required">Course Name</label>
-                        <input type="text" name="course_name" id="course_name" class="form-control" 
-                               placeholder="e.g., Introduction to Programming" required
-                               value="<?= htmlspecialchars($edit_course['course_name'] ?? '') ?>">
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="department_id" id="department_label" class="required">Department</label>
-                        <select name="department_id" id="department_id" class="form-control" required>
-                            <option value="">Select Department</option>
-                            <?php foreach($departments as $d): ?>
-                                <option value="<?= $d['department_id'] ?>" 
-                                        data-category="<?= htmlspecialchars($d['category']) ?>"
-                                        <?= (isset($edit_course) && $edit_course['department_id']==$d['department_id'])?'selected':'' ?>>
-                                    <?= htmlspecialchars($d['department_name']) ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                        <small class="hours-info" id="department_hint">Required for non-freshman courses</small>
-                    </div>
-                    <div class="form-group">
-                        <label for="credit_hours" class="required">Credit Hours</label>
-                        <select name="credit_hours" id="credit_hours" class="form-control" required>
-                            <option value="">Select Credit Hours</option>
-                            <option value="1" <?= (isset($edit_course) && $edit_course['credit_hours']==1)?'selected':'' ?>>1 Credit Hour</option>
-                            <option value="2" <?= (isset($edit_course) && $edit_course['credit_hours']==2)?'selected':'' ?>>2 Credit Hours</option>
-                            <option value="3" <?= (!isset($edit_course) || (isset($edit_course) && $edit_course['credit_hours']==3))?'selected':'' ?>>3 Credit Hours</option>
-                            <option value="4" <?= (isset($edit_course) && $edit_course['credit_hours']==4)?'selected':'' ?>>4 Credit Hours</option>
-                            <option value="5" <?= (isset($edit_course) && $edit_course['credit_hours']==5)?'selected':'' ?>>5 Credit Hours</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <div class="checkbox-group">
-                        <input type="checkbox" name="is_freshman" id="is_freshman" value="1" 
-                               <?= (isset($edit_course) && $edit_course['is_freshman'])?'checked':'' ?>>
-                        <label for="is_freshman">
-                            <strong>This is a Freshman Course</strong> (general education course for all departments)
-                        </label>
-                    </div>
-                    <small class="hours-info">Freshman courses are not tied to a specific department. Department selection becomes optional.</small>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="category" class="required">Course Category</label>
-                        <select name="category" id="category" class="form-control" required>
-                            <option value="Compulsory" <?= (!isset($edit_course) || (isset($edit_course) && $edit_course['category']=='Compulsory'))?'selected':'' ?>>Compulsory</option>
-                            <option value="Elective" <?= (isset($edit_course) && $edit_course['category']=='Elective')?'selected':'' ?>>Elective</option>
-                            <option value="Optional" <?= (isset($edit_course) && $edit_course['category']=='Optional')?'selected':'' ?>>Optional</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="contact_hours" class="required">Contact Hours (Theory)</label>
-                        <input type="number" name="contact_hours" id="contact_hours" class="form-control" 
-                               min="0" max="5" value="<?= $edit_course['contact_hours'] ?? 3 ?>" required>
-                        <small class="hours-info">Classroom teaching hours</small>
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="lab_hours" class="required">Lab Hours</label>
-                        <input type="number" name="lab_hours" id="lab_hours" class="form-control" 
-                               min="0" max="5" value="<?= $edit_course['lab_hours'] ?? 0 ?>" required>
-                        <small class="hours-info">Laboratory/practical hours</small>
-                    </div>
-                    <div class="form-group">
-                        <label for="tutorial_hours" class="required">Tutorial Hours</label>
-                        <input type="number" name="tutorial_hours" id="tutorial_hours" class="form-control" 
-                               min="0" max="5" value="<?= $edit_course['tutorial_hours'] ?? 0 ?>" required>
-                        <small class="hours-info">Tutorial/discussion hours</small>
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="prerequisite">Prerequisite Course</label>
-                        <input type="text" name="prerequisite" id="prerequisite" class="form-control" 
-                               placeholder="e.g., CS101, MATH102 or None"
-                               value="<?= htmlspecialchars($edit_course['prerequisite'] ?? '') ?>">
-                        <small class="hours-info">Enter course codes separated by commas</small>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label for="description">Course Description</label>
-                    <textarea name="description" id="description" class="form-control" rows="3" 
-                              placeholder="Brief course description..."><?= htmlspecialchars($edit_course['description'] ?? '') ?></textarea>
-                </div>
-
-                <div class="form-group">
-                    <button type="submit" name="<?= isset($edit_course) ? 'edit_course' : 'add_course' ?>" 
-                            class="btn btn-primary" id="submit-btn">
-                        <i class="fas fa-<?= isset($edit_course) ? 'save' : 'plus-circle' ?>"></i>
-                        <?= isset($edit_course) ? 'Update Course' : 'Add Course' ?>
-                    </button>
-                    <?php if(isset($edit_course)): ?>
-                        <a class="cancel-btn" href="manage_courses.php">
-                            <i class="fas fa-times"></i> Cancel
-                        </a>
-                    <?php endif; ?>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Existing Courses Card -->
-    <div class="card">
-        <div class="card-header">
-            <h3><i class="fas fa-book"></i> All Courses (<?= count($courses) ?>)</h3>
-        </div>
-        <div class="card-body">
-            <?php if($courses): ?>
-                <div class="table-container">
-                    <table class="courses-table">
-                        <thead>
-                            <tr>
-                                <th>Code</th>
-                                <th>Name</th>
-                                <th>Type</th>
-                                <th>Department</th>
-                                <th>Credits</th>
-                                <th>Category</th>
-                                <th>Hours (C/L/T)</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach($courses as $c): ?>
-                            <tr>
-                                <td data-label="Code"><strong><?= htmlspecialchars($c['course_code']) ?></strong></td>
-                                <td data-label="Name"><?= htmlspecialchars($c['course_name']) ?></td>
-                                <td data-label="Type">
-                                    <?php if($c['is_freshman']): ?>
-                                        <span class="course-badge badge-freshman">Freshman</span>
-                                    <?php else: ?>
-                                        <span class="course-badge badge-regular">Regular</span>
-                                    <?php endif; ?>
-                                </td>
-                                <td data-label="Department">
-                                    <?php if($c['department_name']): ?>
-                                        <?= htmlspecialchars($c['department_name']) ?>
-                                        <br><small><?= $c['dept_category'] ?></small>
-                                    <?php else: ?>
-                                        <em>General (Freshman)</em>
-                                    <?php endif; ?>
-                                </td>
-                                <td data-label="Credits"><?= $c['credit_hours'] ?></td>
-                                <td data-label="Category">
-                                    <?= $c['course_category'] ?>
-                                    <span class="course-badge badge-<?= strtolower($c['course_category']) ?>">
-                                        <?= $c['course_category'] ?>
-                                    </span>
-                                </td>
-                                <td data-label="Hours">
-                                    <strong><?= $c['contact_hours'] ?>/<?= $c['lab_hours'] ?>/<?= $c['tutorial_hours'] ?></strong>
-                                    <br>
-                                    <small class="hours-info">(Theory/Lab/Tutorial)</small>
-                                </td>
-                                <td data-label="Actions">
-                                    <div class="action-buttons">
-                                        <a class="action-link" href="manage_courses.php?edit=<?= $c['course_id'] ?>">
-                                            <i class="fas fa-edit"></i> Edit
-                                        </a>
-                                        <form method="POST" style="display:inline;" onsubmit="return confirmDelete(this, '<?= htmlspecialchars(addslashes($c['course_name'])) ?>')">
-                                            <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-                                            <input type="hidden" name="course_id" value="<?= $c['course_id'] ?>">
-                                            <button type="submit" name="delete_course" class="action-link delete">
-                                                <i class="fas fa-trash"></i> Delete
-                                            </button>
-                                        </form>
-                                    </div>
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-            <?php else: ?>
-                <div class="empty-state">
-                    <i class="fas fa-book"></i>
-                    <h3>No Courses Found</h3>
-                    <p>No courses found in the system yet. Add your first course using the form above.</p>
-                </div>
-            <?php endif; ?>
-        </div>
-    </div>
-</div>
 
 <script>
 // Toggle sidebar for mobile

@@ -84,120 +84,183 @@ $current_page = basename($_SERVER['PHP_SELF']);
 <style>
 * { box-sizing: border-box; margin:0; padding:0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
 
+/* ================= University Header ================= */
+.university-header {
+    background: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%);
+    color: white;
+    padding: 0.5rem 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1201;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.dku-logo-img {
+    width: 45px;
+    height: 45px;
+    object-fit: contain;
+    border-radius: 5px;
+    background: white;
+    padding: 4px;
+}
+
+.system-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    opacity: 0.95;
+}
+
+.header-right {
+    font-size: 0.8rem;
+    opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+    .university-header {
+        padding: 0.5rem 15px;
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+    }
+    
+    .header-left, .header-right {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .system-title {
+        font-size: 0.8rem;
+    }
+    
+    .header-right {
+        font-size: 0.75rem;
+    }
+}
+
+/* Adjust other elements for university header */
+.topbar {
+    top: 60px !important; /* Adjusted for university header */
+}
+
+.sidebar {
+    top: 60px !important; /* Adjusted for university header */
+    height: calc(100% - 60px) !important;
+}
+
+.overlay {
+    top: 60px; /* Adjusted for university header */
+    height: calc(100% - 60px);
+}
+
+.main-content {
+    margin-top: 60px; /* Added for university header */
+}
+
 /* ================= Topbar for Hamburger ================= */
 .topbar {
     display: none;
-    position: fixed; top:0; left:0; width:100%;
-    background:var(--bg-sidebar); color:var(--text-sidebar);
-    padding:15px 20px;
+    position: fixed; 
+    top:60px; 
+    left:0; 
+    width:100%;
+    background:var(--bg-sidebar); 
+    color:var(--text-sidebar);
+    padding:12px 20px;
     z-index:1200;
-    justify-content:space-between; align-items:center;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    justify-content:space-between; 
+    align-items:center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 .menu-btn {
     font-size:26px;
     background:#1abc9c;
-    border:none; color:var(--text-sidebar);
+    border:none; 
+    color:var(--text-sidebar);
     cursor:pointer;
-    padding:10px 14px;
+    padding:8px 12px;
     border-radius:8px;
     font-weight:600;
     transition: background 0.3s, transform 0.2s;
 }
-.menu-btn:hover { background:#159b81; transform:translateY(-2px); }
+.menu-btn:hover { 
+    background:#159b81; 
+    transform:translateY(-2px); 
+}
 
-/* ================= Scrollable Sidebar ================= */
+/* ================= Sidebar ================= */
 .sidebar {
-    position: fixed; top:0; left:0;
-    width:250px; height:100vh;
-    background:var(--bg-sidebar); color:var(--text-sidebar);
+    position: fixed; 
+    top:60px; 
+    left:0;
+    width:250px; 
+    height:calc(100% - 60px);
+    background:var(--bg-sidebar); 
+    color:var(--text-sidebar);
     z-index:1100;
     transition: transform 0.3s ease;
-    padding: 20px 0;
-    overflow-y: auto; /* Enable vertical scrolling */
-    overflow-x: hidden; /* Prevent horizontal scrolling */
     display: flex;
     flex-direction: column;
-    box-shadow: 2px 0 10px rgba(0,0,0,0.1);
-    scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+    overflow: hidden;
 }
-
-/* Custom scrollbar for WebKit browsers */
-.sidebar::-webkit-scrollbar {
-    width: 6px;
-}
-
-.sidebar::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 3px;
-}
-
-.sidebar::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.3);
-    border-radius: 3px;
-    transition: background 0.3s;
-}
-
-.sidebar::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.5);
-}
-
-[data-theme="dark"] .sidebar::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
-}
-
-[data-theme="dark"] .sidebar::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.3);
-}
-
 .sidebar.hidden { 
     transform:translateX(-260px); 
 }
 
-.sidebar a { 
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding:14px 20px; 
-    color:var(--text-sidebar); 
-    text-decoration:none; 
-    transition: all 0.3s; 
-    border-bottom: 1px solid rgba(255,255,255,0.08);
-    margin: 2px 10px;
-    border-radius: 8px;
-    font-size: 15px;
-    flex-shrink: 0;
-}
-.sidebar a:hover { 
-    background:rgba(255,255,255,0.1); 
-    color:white;
-    transform: translateX(5px);
-}
-.sidebar a.active { 
-    background:#1abc9c; 
-    color:white;
-    font-weight: 600;
-    box-shadow: 0 4px 12px rgba(26, 188, 156, 0.3);
+/* Sidebar Content (scrollable) */
+.sidebar-content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 20px 0;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
 }
 
-.sidebar a i {
-    font-size: 18px;
-    width: 24px;
-    text-align: center;
+/* Custom scrollbar for sidebar */
+.sidebar-content::-webkit-scrollbar {
+    width: 6px;
 }
 
+.sidebar-content::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 3px;
+}
+
+.sidebar-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+}
+
+.sidebar-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
+}
+
+[data-theme="dark"] .sidebar-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+[data-theme="dark"] .sidebar-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* Sidebar Profile */
 .sidebar-profile {
     text-align: center;
     margin-bottom: 25px;
     padding: 0 20px 20px;
-    border-bottom: 1px solid rgba(255,255,255,0.15);
+    border-bottom: 1px solid rgba(255,255,255,0.2);
     flex-shrink: 0;
-    position: sticky;
-    top: 0;
-    z-index: 5;
-    background: var(--bg-sidebar);
-    backdrop-filter: blur(5px);
 }
 
 .sidebar-profile img {
@@ -205,68 +268,67 @@ $current_page = basename($_SERVER['PHP_SELF']);
     height: 100px;
     border-radius: 50%;
     object-fit: cover;
-    margin-bottom: 12px;
-    border: 3px solid #1abc9c;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-    transition: transform 0.3s;
-}
-
-.sidebar-profile img:hover {
-    transform: scale(1.05);
+    margin-bottom: 10px;
+    border: 2px solid #1abc9c;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
 }
 
 .sidebar-profile p {
     color: var(--text-sidebar);
     font-weight: bold;
     margin: 0;
-    font-size: 17px;
-    letter-spacing: 0.5px;
+    font-size: 16px;
 }
 
-/* Sidebar title */
+/* Sidebar Title */
 .sidebar h2 {
     text-align: center;
     color: var(--text-sidebar);
     margin-bottom: 25px;
     font-size: 22px;
     padding: 0 20px;
-    flex-shrink: 0;
-    position: sticky;
-    top: 165px;
-    z-index: 4;
-    background: var(--bg-sidebar);
-    padding: 15px 20px;
-    margin: 0;
 }
 
-/* Optional fade effect at bottom when scrolling */
-.sidebar::after {
-    content: '';
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    width: 250px;
-    height: 40px;
-    background: linear-gradient(to bottom, transparent, var(--bg-sidebar) 90%);
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.3s;
-    z-index: 3;
+/* Sidebar Navigation */
+.sidebar nav {
+    display: flex;
+    flex-direction: column;
 }
 
-.sidebar.scrolled::after {
-    opacity: 1;
+.sidebar a { 
+    display: flex; 
+    align-items: center;
+    gap: 10px;
+    padding: 12px 20px; 
+    color: var(--text-sidebar); 
+    text-decoration: none; 
+    transition: all 0.3s; 
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.sidebar a:hover, .sidebar a.active { 
+    background: #1abc9c; 
+    color: white; 
+    padding-left: 25px;
+}
+
+.sidebar a i {
+    width: 20px;
+    text-align: center;
+    font-size: 1.1rem;
 }
 
 /* ================= Overlay ================= */
 .overlay {
-    position: fixed; top:0; left:0; width:100%; height:100%;
-    background: rgba(0,0,0,0.5); 
-    z-index:1099;
+    position: fixed; 
+    top:60px; 
+    left:0; 
+    width:100%; 
+    height:calc(100% - 60px);
+    background: rgba(0,0,0,0.4); 
+    z-index:1050;
     display:none; 
     opacity:0; 
     transition: opacity 0.3s ease;
-    backdrop-filter: blur(3px);
 }
 .overlay.active { 
     display:block; 
@@ -276,46 +338,20 @@ $current_page = basename($_SERVER['PHP_SELF']);
 /* ================= Main content ================= */
 .main-content {
     margin-left: 250px;
-    padding:25px 30px;
-    min-height:100vh;
-    background: var(--bg-primary);
-    transition: all 0.3s ease;
-}
-
-/* ================= Responsive ================= */
-@media (max-width: 768px) {
-    .topbar { 
-        display: flex; 
-    }
-    .sidebar { 
-        width: 280px;
-        transform: translateX(-100%); 
-    }
-    .sidebar.active { 
-        transform: translateX(0); 
-        box-shadow: 5px 0 25px rgba(0,0,0,0.3);
-    }
-    .main-content { 
-        margin-left: 0; 
-        padding: 15px; 
-    }
-    .sidebar::after {
-        width: 280px;
-    }
-    .overlay.active {
-        z-index: 1000;
-    }
-}
-
-/* The rest of your CSS (Content Wrapper, Announcements, etc.) remains exactly the same... */
-
-/* ================= Main content ================= */
-.main-content {
-    margin-left: 250px;
     padding:20px;
     min-height:100vh;
     background: var(--bg-primary);
     transition: all 0.3s ease;
+    margin-top: 60px;
+}
+
+@media (max-width: 768px) {
+    .main-content {
+        margin-left: 0;
+        padding: 15px;
+        padding-top: 140px; /* Adjusted for headers on mobile */
+        margin-top: 120px; /* 60px header + 60px topbar */
+    }
 }
 
 /* Content Wrapper */
@@ -648,29 +684,106 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
 /* ================= Responsive ================= */
 @media (max-width: 768px) {
-    .topbar { display: flex; }
-    .sidebar { transform: translateX(-100%); }
-    .sidebar.active { transform: translateX(0); }
-    .main-content { margin-left: 0; padding: 15px; }
-    .content-wrapper { padding: 20px; border-radius: 0; }
-    .header { flex-direction: column; gap: 15px; align-items: flex-start; }
-    .header h1 { font-size: 1.8rem; }
-    .announcement-card { padding: 20px; }
+    .university-header {
+        padding: 0.5rem 15px;
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+    }
+    
+    .header-left, .header-right {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .system-title {
+        font-size: 0.8rem;
+    }
+    
+    .header-right {
+        font-size: 0.75rem;
+    }
+    
+    .topbar { 
+        display:flex;
+        top: 60px; /* Adjusted for mobile with header */
+    }
+    
+    .sidebar { 
+        transform:translateX(-100%); 
+        top: 120px; /* 60px header + 60px topbar */
+        height: calc(100% - 120px) !important;
+    }
+    
+    .sidebar.active { 
+        transform:translateX(0); 
+    }
+    
+    .overlay {
+        top: 120px;
+        height: calc(100% - 120px);
+    }
+    
+    .main-content {
+        padding-top: 140px; /* Adjusted for headers on mobile */
+        margin-top: 120px; /* 60px header + 60px topbar */
+    }
+    
+    .header { 
+        flex-direction: column; 
+        gap: 15px; 
+        align-items: flex-start; 
+    }
+    
+    .header h1 { 
+        font-size: 1.8rem; 
+    }
+    
+    .announcement-card { 
+        padding: 20px; 
+    }
+    
     .attachment-image, .attachment-video { 
         max-width: 100%;
         max-height: 250px;
     }
+    
     .add-comment-form {
         flex-direction: column;
     }
+    
     .add-comment-form button {
         width: 100%;
     }
 }
+
+/* Improved sidebar icons */
+.sidebar a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.sidebar a i {
+    width: 20px;
+    text-align: center;
+    font-size: 1.1rem;
+}
 </style>
 </head>
 <body>
-     <!-- Topbar for Mobile -->
+    <!-- University Header -->
+    <div class="university-header">
+        <div class="header-left">
+            <img src="../assets/images/dku logo.jpg" alt="Debark University Logo" class="dku-logo-img">
+            <div class="system-title">Debark University Class Scheduling System</div>
+        </div>
+        <div class="header-right">
+            Announcements
+        </div>
+    </div>
+
+    <!-- Topbar for Mobile -->
     <div class="topbar">
         <button class="menu-btn" onclick="toggleSidebar()">☰</button>
         <h2>Announcements</h2>
@@ -679,34 +792,39 @@ $current_page = basename($_SERVER['PHP_SELF']);
     <!-- Overlay for Mobile -->
     <div class="overlay" onclick="toggleSidebar()"></div>
 
-    <!-- Scrollable Sidebar -->
+    <!-- Sidebar -->
     <div class="sidebar" id="sidebar">
-        <div class="sidebar-profile">
-            <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic">
-            <p><?= htmlspecialchars($user['username'] ?? 'Student') ?></p>
+        <div class="sidebar-content">
+            <div class="sidebar-profile">
+                <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic">
+                <p><?= htmlspecialchars($user['username'] ?? 'Student') ?></p>
+            </div>
+            
+            <h2>Student Dashboard</h2>
+            
+            <nav>
+                <a href="student_dashboard.php" class="<?= $current_page=='student_dashboard.php'?'active':'' ?>">
+                    <i class="fas fa-home"></i> Dashboard
+                </a>
+                <a href="my_schedule.php" class="<?= $current_page=='my_schedule.php'?'active':'' ?>">
+                    <i class="fas fa-calendar-alt"></i> My Schedule
+                </a>
+                <a href="view_exam_schedules.php" class="<?= $current_page=='view_exam_schedules.php'?'active':'' ?>">
+                    <i class="fas fa-clipboard-list"></i> Exam Schedule
+                </a>
+                <a href="view_announcements.php" class="active">
+                    <i class="fas fa-bullhorn"></i> Announcements
+                </a>
+                <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
+                    <i class="fas fa-user-edit"></i> Edit Profile
+                </a>
+                <a href="../logout.php">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </nav>
         </div>
-        
-        <h2>Student Dashboard</h2>
-        
-        <a href="student_dashboard.php" class="<?= $current_page=='student_dashboard.php'?'active':'' ?>">
-            <i class="fas fa-home"></i> Dashboard
-        </a>
-        <a href="my_schedule.php" class="<?= $current_page=='my_schedule.php'?'active':'' ?>">
-            <i class="fas fa-calendar-alt"></i> My Schedule
-        </a>
-        <a href="view_exam_schedules.php" class="<?= $current_page=='view_exam_schedules.php'?'active':'' ?>">
-            <i class="fas fa-clipboard-list"></i> Exam Schedule
-        </a>
-        <a href="view_announcements.php" class="<?= $current_page=='view_announcements.php'?'active':'' ?>">
-            <i class="fas fa-bullhorn"></i> Announcements
-        </a>
-        <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
-            <i class="fas fa-user-edit"></i> Edit Profile
-        </a>
-        <a href="../logout.php">
-            <i class="fas fa-sign-out-alt"></i> Logout
-        </a>
     </div>
+
     <!-- Main Content -->
     <div class="main-content">
         <div class="content-wrapper">

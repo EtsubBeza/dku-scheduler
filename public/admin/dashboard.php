@@ -77,52 +77,191 @@ $current_page = basename($_SERVER['PHP_SELF']);
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin Dashboard</title>
+<title>Admin Dashboard | Debark University</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <!-- Include Dark Mode CSS -->
 <link rel="stylesheet" href="../../assets/css/darkmode.css">
 <style>
 * { box-sizing: border-box; margin:0; padding:0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
 
+/* ================= University Header ================= */
+.university-header {
+    background: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%);
+    color: white;
+    padding: 0.5rem 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1201;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.dku-logo-img {
+    width: 45px;
+    height: 45px;
+    object-fit: contain;
+    border-radius: 5px;
+    background: white;
+    padding: 4px;
+}
+
+.system-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    opacity: 0.95;
+}
+
+.header-right {
+    font-size: 0.8rem;
+    opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+    .university-header {
+        padding: 0.5rem 15px;
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+    }
+    
+    .header-left, .header-right {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .system-title {
+        font-size: 0.8rem;
+    }
+    
+    .header-right {
+        font-size: 0.75rem;
+    }
+}
+
+/* Adjust other elements for university header */
+.topbar {
+    top: 60px !important; /* Adjusted for university header */
+}
+
+.sidebar {
+    top: 60px !important; /* Adjusted for university header */
+    height: calc(100% - 60px) !important;
+}
+
+.overlay {
+    top: 60px; /* Adjusted for university header */
+    height: calc(100% - 60px);
+}
+
+.main-content {
+    margin-top: 60px; /* Added for university header */
+}
+
 /* ================= Topbar for Hamburger ================= */
 .topbar {
     display: none;
-    position: fixed; top:0; left:0; width:100%;
-    background:var(--bg-sidebar); color:var(--text-sidebar);
-    padding:15px 20px;
+    position: fixed; 
+    top:60px; 
+    left:0; 
+    width:100%;
+    background:var(--bg-sidebar); 
+    color:var(--text-sidebar);
+    padding:12px 20px;
     z-index:1200;
-    justify-content:space-between; align-items:center;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    justify-content:space-between; 
+    align-items:center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 .menu-btn {
     font-size:26px;
     background:#1abc9c;
-    border:none; color:var(--text-sidebar);
+    border:none; 
+    color:var(--text-sidebar);
     cursor:pointer;
-    padding:10px 14px;
+    padding:8px 12px;
     border-radius:8px;
     font-weight:600;
     transition: background 0.3s, transform 0.2s;
 }
-.menu-btn:hover { background:#159b81; transform:translateY(-2px); }
+.menu-btn:hover { 
+    background:#159b81; 
+    transform:translateY(-2px); 
+}
 
 /* ================= Sidebar ================= */
 .sidebar {
-    position: fixed; top:0; left:0;
-    width:250px; height:100%;
-    background:var(--bg-sidebar); color:var(--text-sidebar);
+    position: fixed; 
+    top:60px; 
+    left:0;
+    width:250px; 
+    height:calc(100% - 60px);
+    background:var(--bg-sidebar); 
+    color:var(--text-sidebar);
     z-index:1100;
     transition: transform 0.3s ease;
-    padding: 20px 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     box-shadow: 2px 0 10px rgba(0,0,0,0.2);
 }
-.sidebar.hidden { transform:translateX(-260px); }
+.sidebar.hidden { 
+    transform:translateX(-260px); 
+}
 
+/* Sidebar Content (scrollable) */
+.sidebar-content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 20px 0;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+/* Custom scrollbar for sidebar */
+.sidebar-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sidebar-content::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 3px;
+}
+
+.sidebar-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+}
+
+.sidebar-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
+}
+
+[data-theme="dark"] .sidebar-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+[data-theme="dark"] .sidebar-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* Sidebar Profile */
 .sidebar-profile {
     text-align: center;
     margin-bottom: 25px;
     padding: 0 20px 20px;
     border-bottom: 1px solid rgba(255,255,255,0.2);
+    flex-shrink: 0;
 }
 
 .sidebar-profile img {
@@ -142,6 +281,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
     font-size: 16px;
 }
 
+/* Sidebar Title */
 .sidebar h2 {
     text-align: center;
     color: var(--text-sidebar);
@@ -150,105 +290,51 @@ $current_page = basename($_SERVER['PHP_SELF']);
     padding: 0 20px;
 }
 
-.sidebar a { 
-    display:block; 
-    padding:12px 20px; 
-    color:var(--text-sidebar); 
-    text-decoration:none; 
-    transition: background 0.3s; 
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-.sidebar a:hover, .sidebar a.active { background:#1abc9c; color:white; }
-/* ================= Sidebar ================= */
-.sidebar {
-    position: fixed; top:0; left:0;
-    width:250px; height:100%;
-    background:var(--bg-sidebar); color:var(--text-sidebar);
-    z-index:1100;
-    transition: transform 0.3s ease;
-    box-shadow: 2px 0 10px rgba(0,0,0,0.2);
+/* Sidebar Navigation */
+.sidebar nav {
     display: flex;
     flex-direction: column;
 }
 
-/* Sidebar scrollable content */
-.sidebar-content {
-    flex: 1;
-    overflow-y: auto;
-    padding: 20px 0;
-}
-
-/* Custom scrollbar for sidebar */
-.sidebar-content::-webkit-scrollbar {
-    width: 6px;
-}
-
-.sidebar-content::-webkit-scrollbar-track {
-    background: rgba(255,255,255,0.1);
-    border-radius: 3px;
-}
-
-.sidebar-content::-webkit-scrollbar-thumb {
-    background: rgba(255,255,255,0.3);
-    border-radius: 3px;
-}
-
-.sidebar-content::-webkit-scrollbar-thumb:hover {
-    background: rgba(255,255,255,0.4);
-}
-
-/* For Firefox */
-.sidebar-content {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(255,255,255,0.3) rgba(255,255,255,0.1);
-}
-
-.sidebar-profile {
-    text-align: center;
-    margin-bottom: 25px;
-    padding: 0 20px 20px;
-    border-bottom: 1px solid rgba(255,255,255,0.2);
-    flex-shrink: 0; /* Prevent shrinking */
-}
-
-.sidebar h2 {
-    text-align: center;
-    color: var(--text-sidebar);
-    margin-bottom: 25px;
-    font-size: 22px;
-    padding: 0 20px;
-    flex-shrink: 0; /* Prevent shrinking */
-}
-
-/* Sidebar navigation items */
-.sidebar nav {
-    flex: 1;
-    overflow-y: auto;
-}
-
 .sidebar a { 
-    display:block; 
-    padding:12px 20px; 
-    color:var(--text-sidebar); 
-    text-decoration:none; 
-    transition: background 0.3s; 
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-    display: flex;
+    display: flex; 
     align-items: center;
     gap: 10px;
-    flex-shrink: 0; /* Prevent shrinking */
+    padding: 12px 20px; 
+    color: var(--text-sidebar); 
+    text-decoration: none; 
+    transition: all 0.3s; 
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.sidebar a:hover, .sidebar a.active { 
+    background: #1abc9c; 
+    color: white; 
+    padding-left: 25px;
+}
+
+.sidebar a i {
+    width: 20px;
+    text-align: center;
+    font-size: 1.1rem;
 }
 
 /* ================= Overlay ================= */
 .overlay {
-    position: fixed; top:0; left:0; width:100%; height:100%;
-    background: rgba(0,0,0,0.4); z-index:1050;
-    display:none; opacity:0; transition: opacity 0.3s ease;
+    position: fixed; 
+    top:60px; 
+    left:0; 
+    width:100%; 
+    height:calc(100% - 60px);
+    background: rgba(0,0,0,0.4); 
+    z-index:1050;
+    display:none; 
+    opacity:0; 
+    transition: opacity 0.3s ease;
 }
-.overlay.active { display:block; opacity:1; }
+.overlay.active { 
+    display:block; 
+    opacity:1; 
+}
 
 /* ================= Main content ================= */
 .main-content {
@@ -257,6 +343,16 @@ $current_page = basename($_SERVER['PHP_SELF']);
     min-height:100vh;
     background: var(--bg-primary);
     transition: all 0.3s ease;
+    margin-top: 60px;
+}
+
+@media (max-width: 768px) {
+    .main-content {
+        margin-left: 0;
+        padding: 15px;
+        padding-top: 140px; /* Adjusted for headers on mobile */
+        margin-top: 120px; /* 60px header + 60px topbar */
+    }
 }
 
 /* Content Wrapper */
@@ -388,58 +484,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
     transform:translateY(-2px); 
 }
 
-/* Stats Cards */
-.stats-cards {
-    display: flex;
-    gap: 20px;
-    margin-bottom: 30px;
-    flex-wrap: wrap;
-}
-
-.stat-card {
-    flex: 1;
-    min-width: 200px;
-    background: var(--bg-card);
-    padding: 25px;
-    border-radius: 12px;
-    box-shadow: 0 4px 6px var(--shadow-color);
-    border: 1px solid var(--border-color);
-    text-align: center;
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-
-.stat-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 15px var(--shadow-lg);
-}
-
-.stat-card h3 {
-    font-size: 1rem;
-    color: var(--text-secondary);
-    margin-bottom: 10px;
-    font-weight: 600;
-}
-
-.stat-card .number {
-    font-size: 2rem;
-    font-weight: bold;
-    color: var(--text-primary);
-    margin-bottom: 10px;
-}
-
-.stat-card .icon {
-    font-size: 2rem;
-    margin-bottom: 15px;
-    display: block;
-}
-
-/* Icon colors */
-.stat-card .fa-user-graduate.icon { color: #3b82f6; }
-.stat-card .fa-chalkboard-teacher.icon { color: #10b981; }
-.stat-card .fa-book.icon { color: #8b5cf6; }
-.stat-card .fa-door-closed.icon { color: #f59e0b; }
-.stat-card .fa-user-clock.icon { color: #ef4444; }
-
 /* Pending approvals badge */
 .pending-badge {
     background: #ef4444;
@@ -453,56 +497,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
 [data-theme="dark"] .pending-badge {
     background: #dc2626;
-}
-
-/* Quick Actions Section */
-.quick-actions {
-    margin-top: 30px;
-    padding-top: 20px;
-    border-top: 1px solid var(--border-color);
-}
-
-.quick-actions h2 {
-    color: var(--text-primary);
-    margin-bottom: 20px;
-    font-size: 1.5rem;
-    font-weight: 600;
-}
-
-.action-buttons {
-    display: flex;
-    gap: 15px;
-    flex-wrap: wrap;
-}
-
-.action-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 12px 20px;
-    background: linear-gradient(135deg, #3b82f6, #2563eb);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: 600;
-    font-size: 0.9rem;
-    text-decoration: none;
-    transition: all 0.3s;
-}
-
-.action-btn:hover {
-    background: linear-gradient(135deg, #2563eb, #1d4ed8);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(37, 99, 235, 0.3);
-}
-
-[data-theme="dark"] .action-btn {
-    background: linear-gradient(135deg, #2563eb, #1d4ed8);
-}
-
-[data-theme="dark"] .action-btn:hover {
-    background: linear-gradient(135deg, #1d4ed8, #1e40af);
 }
 
 /* Dark mode specific adjustments */
@@ -520,290 +514,284 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
 /* ================= Responsive ================= */
 @media(max-width: 768px){
-    .topbar { display:flex; }
-    .sidebar { transform:translateX(-100%); }
-    .sidebar.active { transform:translateX(0); }
-    .main-content { 
-        margin-left: 0; 
-        padding: 20px 15px;
-        padding-top: 80px;
+    .university-header {
+        padding: 0.5rem 15px;
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
     }
+    
+    .header-left, .header-right {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .system-title {
+        font-size: 0.8rem;
+    }
+    
+    .header-right {
+        font-size: 0.75rem;
+    }
+    
+    .topbar { 
+        display:flex;
+        top: 60px; /* Adjusted for mobile with header */
+    }
+    
+    .sidebar { 
+        transform:translateX(-100%); 
+        top: 120px; /* 60px header + 60px topbar */
+        height: calc(100% - 120px) !important;
+    }
+    
+    .sidebar.active { 
+        transform:translateX(0); 
+    }
+    
+    .overlay {
+        top: 120px;
+        height: calc(100% - 120px);
+    }
+    
+    .main-content {
+        padding-top: 140px; /* Adjusted for headers on mobile */
+        margin-top: 120px; /* 60px header + 60px topbar */
+    }
+    
     .content-wrapper {
         padding: 20px;
         border-radius: 0;
     }
+    
     .header { 
         flex-direction: column; 
         gap: 15px; 
         align-items: flex-start; 
     }
+    
     .header h1 { font-size: 1.8rem; }
-    .stats-cards { flex-direction: column; }
-    .stat-card { min-width: auto; }
+    
     .management-cards .card { 
         flex: 1 1 100%; 
         max-width: 100%;
     }
-    .action-buttons {
-        flex-direction: column;
-    }
-    .action-btn {
-        width: 100%;
-        justify-content: center;
-    }
+}
+
+/* Improved sidebar icons */
+.sidebar a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.sidebar a i {
+    width: 20px;
+    text-align: center;
+    font-size: 1.1rem;
 }
 </style>
 </head>
 <body>
-
-<!-- Topbar with Hamburger -->
-<div class="topbar">
-    <button class="menu-btn" onclick="toggleSidebar()">☰</button>
-    <span>Admin Dashboard</span>
-</div>
-
-<!-- Overlay for mobile -->
-<div class="overlay" onclick="toggleSidebar()"></div>
-
-<!-- Sidebar -->
-<div class="sidebar" id="sidebar">
-    <!-- Scrollable content wrapper -->
-    <div class="sidebar-content">
-        <div class="sidebar-profile">
-            <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic"
-                 onerror="this.onerror=null; this.src='../assets/default_profile.png';">
-            <p><?= htmlspecialchars($current_user['username']) ?></p>
+    <!-- University Header -->
+    <div class="university-header">
+        <div class="header-left">
+            <img src="../assets/images/dku logo.jpg" alt="Debark University Logo" class="dku-logo-img">
+            <div class="system-title">Debark University Class Scheduling System</div>
         </div>
-        <h2>Admin Panel</h2>
-        
-        <!-- Navigation Links -->
-        <nav>
-            <a href="dashboard.php" class="<?= $current_page=='dashboard.php'?'active':'' ?>">
-                <i class="fas fa-home"></i> Dashboard
-            </a>
-            <a href="manage_users.php" class="<?= $current_page=='manage_users.php'?'active':'' ?>">
-                <i class="fas fa-users"></i> Manage Users
-            </a>
-            <a href="approve_users.php" class="<?= $current_page=='approve_users.php'?'active':'' ?>">
-                <i class="fas fa-user-check"></i> Approve Users
-                <?php if($pending_approvals > 0): ?>
-                    <span class="pending-badge"><?= $pending_approvals ?></span>
-                <?php endif; ?>
-            </a>
-            <a href="manage_departments.php" class="<?= $current_page=='manage_departments.php'?'active':'' ?>">
-                <i class="fas fa-building"></i> Manage Departments
-            </a>
-            <a href="manage_courses.php" class="<?= $current_page=='manage_courses.php'?'active':'' ?>">
-                <i class="fas fa-book"></i> Manage Courses
-            </a>
-            <a href="manage_rooms.php" class="<?= $current_page=='manage_rooms.php'?'active':'' ?>">
-                <i class="fas fa-door-closed"></i> Manage Rooms
-            </a>
-            <a href="manage_schedules.php" class="<?= $current_page=='manage_schedules.php'?'active':'' ?>">
-                <i class="fas fa-calendar-alt"></i> Manage Schedule
-            </a>
-            <a href="assign_instructors.php" class="<?= $current_page=='assign_instructors.php'?'active':'' ?>">
-                <i class="fas fa-user-graduate"></i> Assign Instructors
-            </a>
-            <a href="manage_exam_schedules.php" class="<?= $current_page=='manage_exam_schedules.php'?'active':'' ?>">
-                <i class="fas fa-clipboard-list"></i> Exam Scheduling
-            </a>
-            <a href="manage_announcements.php" class="<?= $current_page=='manage_announcements.php'?'active':'' ?>">
-                <i class="fas fa-bullhorn"></i> Manage Announcements
-            </a>
-            <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
-                <i class="fas fa-user-edit"></i> Edit Profile
-            </a>
-            <a href="../logout.php">
-                <i class="fas fa-sign-out-alt"></i> Logout
-            </a>
-        </nav>
+        <div class="header-right">
+            Admin Dashboard
+        </div>
     </div>
-</div>
-<!-- Main content -->
-<div class="main-content">
-    <div class="content-wrapper">
-        <!-- Header -->
-        <div class="header">
-            <div class="welcome-section">
-                <h1>Welcome, <?= htmlspecialchars($current_user['username']); ?> 👋</h1>
-                <p>This is your admin dashboard. Manage users, courses, rooms, and announcements here.</p>
-            </div>
-            <div class="user-info">
-                <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile" id="headerProfilePic"
+
+    <!-- Topbar for Mobile -->
+    <div class="topbar">
+        <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+        <h2>Admin Dashboard</h2>
+    </div>
+
+    <!-- Overlay for Mobile -->
+    <div class="overlay" onclick="toggleSidebar()"></div>
+
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-content">
+            <div class="sidebar-profile">
+                <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic"
                      onerror="this.onerror=null; this.src='../assets/default_profile.png';">
-                <div>
-                    <div><?= htmlspecialchars($current_user['username']) ?></div>
-                    <small>Administrator</small>
+                <p><?= htmlspecialchars($current_user['username']) ?></p>
+            </div>
+            <h2>Admin Panel</h2>
+            
+            <!-- Navigation Links -->
+            <nav>
+                <a href="dashboard.php" class="<?= $current_page=='dashboard.php'?'active':'' ?>">
+                    <i class="fas fa-home"></i> Dashboard
+                </a>
+                <a href="manage_users.php" class="<?= $current_page=='manage_users.php'?'active':'' ?>">
+                    <i class="fas fa-users"></i> Manage Users
+                </a>
+                <a href="approve_users.php" class="<?= $current_page=='approve_users.php'?'active':'' ?>">
+                    <i class="fas fa-user-check"></i> Approve Users
+                    <?php if($pending_approvals > 0): ?>
+                        <span class="pending-badge"><?= $pending_approvals ?></span>
+                    <?php endif; ?>
+                </a>
+                <a href="manage_departments.php" class="<?= $current_page=='manage_departments.php'?'active':'' ?>">
+                    <i class="fas fa-building"></i> Manage Departments
+                </a>
+                <a href="manage_courses.php" class="<?= $current_page=='manage_courses.php'?'active':'' ?>">
+                    <i class="fas fa-book"></i> Manage Courses
+                </a>
+                <a href="manage_rooms.php" class="<?= $current_page=='manage_rooms.php'?'active':'' ?>">
+                    <i class="fas fa-door-closed"></i> Manage Rooms
+                </a>
+                <a href="manage_schedules.php" class="<?= $current_page=='manage_schedules.php'?'active':'' ?>">
+                    <i class="fas fa-calendar-alt"></i> Manage Schedule
+                </a>
+                <a href="assign_instructors.php" class="<?= $current_page=='assign_instructors.php'?'active':'' ?>">
+                    <i class="fas fa-user-graduate"></i> Assign Instructors
+                </a>
+                <a href="manage_exam_schedules.php" class="<?= $current_page=='manage_exam_schedules.php'?'active':'' ?>">
+                    <i class="fas fa-clipboard-list"></i> Exam Scheduling
+                </a>
+                <a href="manage_announcements.php" class="<?= $current_page=='manage_announcements.php'?'active':'' ?>">
+                    <i class="fas fa-bullhorn"></i> Manage Announcements
+                </a>
+                <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
+                    <i class="fas fa-user-edit"></i> Edit Profile
+                </a>
+                <a href="../logout.php">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </nav>
+        </div>
+    </div>
+
+    <!-- Main content -->
+    <div class="main-content">
+        <div class="content-wrapper">
+            <!-- Header -->
+            <div class="header">
+                <div class="welcome-section">
+                    <h1>Welcome, <?= htmlspecialchars($current_user['username']); ?> 👋</h1>
+                    <p>This is your admin dashboard. Manage users, courses, rooms, and announcements here.</p>
+                </div>
+                <div class="user-info">
+                    <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile" id="headerProfilePic"
+                         onerror="this.onerror=null; this.src='../assets/default_profile.png';">
+                    <div>
+                        <div><?= htmlspecialchars($current_user['username']) ?></div>
+                        <small>Administrator</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Management Cards -->
+            <div class="management-cards">
+                <div class="card">
+                    <div class="card-icon">👨‍🎓</div>
+                    <h3>Users</h3>
+                    <p><?= $total_students + $total_faculty ?></p>
+                    <a href="manage_users.php">Manage Users</a>
+                </div>
+                <div class="card">
+                    <div class="card-icon">👩‍🏫</div>
+                    <h3>Approve Users</h3>
+                    <p><?= $pending_approvals ?> pending</p>
+                    <a href="approve_users.php">Approve Users</a>
+                </div>
+                <div class="card">
+                    <div class="card-icon">📚</div>
+                    <h3>Courses</h3>
+                    <p><?= $total_courses ?></p>
+                    <a href="manage_courses.php">Manage Courses</a>
+                </div>
+                <div class="card">
+                    <div class="card-icon">🏫</div>
+                    <h3>Rooms</h3>
+                    <p><?= $total_rooms ?></p>
+                    <a href="manage_rooms.php">Manage Rooms</a>
+                </div>
+                <div class="card">
+                    <div class="card-icon">📢</div>
+                    <h3>Announcements</h3>
+                    <p>View / Post</p>
+                    <a href="manage_announcements.php">Manage Announcements</a>
+                </div>
+                <div class="card">
+                    <div class="card-icon">📅</div>
+                    <h3>Schedule</h3>
+                    <p>Manage</p>
+                    <a href="manage_schedule.php">Manage Schedule</a>
                 </div>
             </div>
         </div>
-
-        <!-- Stats Cards -->
-        <div class="stats-cards">
-            <div class="stat-card">
-                <i class="fas fa-user-graduate icon"></i>
-                <h3>Total Students</h3>
-                <div class="number"><?= $total_students ?></div>
-            </div>
-            <div class="stat-card">
-                <i class="fas fa-chalkboard-teacher icon"></i>
-                <h3>Total Faculty</h3>
-                <div class="number"><?= $total_faculty ?></div>
-            </div>
-            <div class="stat-card">
-                <i class="fas fa-book icon"></i>
-                <h3>Total Courses</h3>
-                <div class="number"><?= $total_courses ?></div>
-            </div>
-            <div class="stat-card">
-                <i class="fas fa-door-closed icon"></i>
-                <h3>Total Rooms</h3>
-                <div class="number"><?= $total_rooms ?></div>
-            </div>
-            <div class="stat-card">
-                <i class="fas fa-user-clock icon"></i>
-                <h3>Pending Approvals</h3>
-                <div class="number"><?= $pending_approvals ?></div>
-            </div>
-        </div>
-
-        <!-- Management Cards -->
-        <div class="management-cards">
-            <div class="card">
-                <div class="card-icon">👨‍🎓</div>
-                <h3>Users</h3>
-                <p><?= $total_students + $total_faculty ?></p>
-                <a href="manage_users.php">Manage Users</a>
-            </div>
-            <div class="card">
-                <div class="card-icon">👩‍🏫</div>
-                <h3>Approve Users</h3>
-                <p><?= $pending_approvals ?> pending</p>
-                <a href="approve_users.php">Approve Users</a>
-            </div>
-            <div class="card">
-                <div class="card-icon">📚</div>
-                <h3>Courses</h3>
-                <p><?= $total_courses ?></p>
-                <a href="manage_courses.php">Manage Courses</a>
-            </div>
-            <div class="card">
-                <div class="card-icon">🏫</div>
-                <h3>Rooms</h3>
-                <p><?= $total_rooms ?></p>
-                <a href="manage_rooms.php">Manage Rooms</a>
-            </div>
-            <div class="card">
-                <div class="card-icon">📢</div>
-                <h3>Announcements</h3>
-                <p>View / Post</p>
-                <a href="manage_announcements.php">Manage Announcements</a>
-            </div>
-            <div class="card">
-                <div class="card-icon">📅</div>
-                <h3>Schedule</h3>
-                <p>Manage</p>
-                <a href="manage_schedule.php">Manage Schedule</a>
-            </div>
-        </div>
-
-        <!-- Quick Actions -->
-        <div class="quick-actions">
-            <h2>Quick Actions</h2>
-            <div class="action-buttons">
-                <a href="manage_users.php" class="action-btn">
-                    <i class="fas fa-user-plus"></i> Add New User
-                </a>
-                <a href="manage_courses.php" class="action-btn">
-                    <i class="fas fa-plus-circle"></i> Add New Course
-                </a>
-                <a href="manage_rooms.php" class="action-btn">
-                    <i class="fas fa-door-open"></i> Add New Room
-                </a>
-                <a href="manage_announcements.php" class="action-btn">
-                    <i class="fas fa-bullhorn"></i> Post Announcement
-                </a>
-            </div>
-        </div>
     </div>
-</div>
 
-<!-- Include darkmode.js -->
-<script src="../../assets/js/darkmode.js"></script>
-<script>
-function toggleSidebar(){
-    const sidebar = document.querySelector('.sidebar');
-    const overlay = document.querySelector('.overlay');
-    sidebar.classList.toggle('active');
-    overlay.classList.toggle('active');
-}
+    <!-- Include darkmode.js -->
+    <script src="../../assets/js/darkmode.js"></script>
+    <script>
+    function toggleSidebar(){
+        const sidebar = document.querySelector('.sidebar');
+        const overlay = document.querySelector('.overlay');
+        sidebar.classList.toggle('active');
+        overlay.classList.toggle('active');
+    }
 
-// Set active state for current page
-document.addEventListener('DOMContentLoaded', function() {
-    const currentPage = window.location.pathname.split('/').pop();
-    const navLinks = document.querySelectorAll('.sidebar a');
-    
-    navLinks.forEach(link => {
-        const linkPage = link.getAttribute('href');
-        if (linkPage === currentPage) {
-            link.classList.add('active');
+    // Set active state for current page
+    document.addEventListener('DOMContentLoaded', function() {
+        const currentPage = window.location.pathname.split('/').pop();
+        const navLinks = document.querySelectorAll('.sidebar a');
+        
+        navLinks.forEach(link => {
+            const linkPage = link.getAttribute('href');
+            if (linkPage === currentPage) {
+                link.classList.add('active');
+            }
+        });
+        
+        // Add animation to management cards
+        const mgmtCards = document.querySelectorAll('.management-cards .card');
+        mgmtCards.forEach((card, index) => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            setTimeout(() => {
+                card.style.transition = 'all 0.5s ease';
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, index * 100);
+        });
+        
+        // Debug: Log profile picture paths
+        console.log('Sidebar profile pic src:', document.getElementById('sidebarProfilePic').src);
+        console.log('Header profile pic src:', document.getElementById('headerProfilePic').src);
+    });
+
+    // Confirm logout
+    document.querySelector('a[href="../logout.php"]').addEventListener('click', function(e) {
+        if(!confirm('Are you sure you want to logout?')) {
+            e.preventDefault();
         }
     });
-    
-    // Add animation to stats cards
-    const statCards = document.querySelectorAll('.stat-card');
-    statCards.forEach((card, index) => {
-        card.style.opacity = '0';
-        card.style.transform = 'translateY(20px)';
-        setTimeout(() => {
-            card.style.transition = 'all 0.5s ease';
-            card.style.opacity = '1';
-            card.style.transform = 'translateY(0)';
-        }, index * 100);
-    });
-    
-    // Add animation to management cards
-    const mgmtCards = document.querySelectorAll('.management-cards .card');
-    mgmtCards.forEach((card, index) => {
-        card.style.opacity = '0';
-        card.style.transform = 'translateY(20px)';
-        setTimeout(() => {
-            card.style.transition = 'all 0.5s ease';
-            card.style.opacity = '1';
-            card.style.transform = 'translateY(0)';
-        }, (index * 100) + 200);
-    });
-    
-    // Debug: Log profile picture paths
-    console.log('Sidebar profile pic src:', document.getElementById('sidebarProfilePic').src);
-    console.log('Header profile pic src:', document.getElementById('headerProfilePic').src);
-});
 
-// Confirm logout
-document.querySelector('a[href="../logout.php"]').addEventListener('click', function(e) {
-    if(!confirm('Are you sure you want to logout?')) {
-        e.preventDefault();
+    // Fallback for broken profile pictures
+    function handleImageError(img) {
+        img.onerror = null;
+        img.src = '../assets/default_profile.png';
+        return true;
     }
-});
 
-// Fallback for broken profile pictures
-function handleImageError(img) {
-    img.onerror = null;
-    img.src = '../assets/default_profile.png';
-    return true;
-}
-
-// Set profile picture fallbacks
-document.addEventListener('DOMContentLoaded', function() {
-    const profileImages = document.querySelectorAll('img[src*="profile"], img[alt*="Profile"]');
-    profileImages.forEach(img => {
-        img.onerror = function() {
-            this.src = '../assets/default_profile.png';
-        };
+    // Set profile picture fallbacks
+    document.addEventListener('DOMContentLoaded', function() {
+        const profileImages = document.querySelectorAll('img[src*="profile"], img[alt*="Profile"]');
+        profileImages.forEach(img => {
+            img.onerror = function() {
+                this.src = '../assets/default_profile.png';
+            };
+        });
     });
-});
-</script>
+    </script>
 
 </body>
 </html>

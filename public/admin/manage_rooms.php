@@ -288,22 +288,110 @@ $current_page = basename($_SERVER['PHP_SELF']);
 * { margin:0; padding:0; box-sizing:border-box; font-family: "Segoe UI", Arial, sans-serif; }
 body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x:hidden; }
 
+/* ================= University Header ================= */
+.university-header {
+    background: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%);
+    color: white;
+    padding: 0.5rem 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1201;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.dku-logo-img {
+    width: 45px;
+    height: 45px;
+    object-fit: contain;
+    border-radius: 5px;
+    background: white;
+    padding: 4px;
+}
+
+.system-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    opacity: 0.95;
+}
+
+.header-right {
+    font-size: 0.8rem;
+    opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+    .university-header {
+        padding: 0.5rem 15px;
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+    }
+    
+    .header-left, .header-right {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .system-title {
+        font-size: 0.8rem;
+    }
+    
+    .header-right {
+        font-size: 0.75rem;
+    }
+}
+
+/* Adjust other elements for university header */
+.topbar {
+    top: 60px !important; /* Adjusted for university header */
+}
+
+.sidebar {
+    top: 60px !important; /* Adjusted for university header */
+    height: calc(100% - 60px) !important;
+}
+
+.overlay {
+    top: 60px; /* Adjusted for university header */
+    height: calc(100% - 60px);
+}
+
+.main-content {
+    margin-top: 60px; /* Added for university header */
+}
+
 /* ================= Topbar for Mobile ================= */
 .topbar {
     display: none;
-    position: fixed; top:0; left:0; width:100%;
-    background:var(--bg-sidebar); color:var(--text-sidebar);
-    padding:15px 20px;
+    position: fixed; 
+    top:60px; 
+    left:0; 
+    width:100%;
+    background:var(--bg-sidebar); 
+    color:var(--text-sidebar);
+    padding:12px 20px;
     z-index:1200;
-    justify-content:space-between; align-items:center;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    justify-content:space-between; 
+    align-items:center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 .menu-btn {
     font-size:26px;
     background:#1abc9c;
     border:none; color:var(--text-sidebar);
     cursor:pointer;
-    padding:10px 14px;
+    padding:8px 12px;
     border-radius:8px;
     font-weight:600;
     transition: background 0.3s, transform 0.2s;
@@ -313,79 +401,21 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
 /* ================= Sidebar ================= */
 .sidebar { 
     position: fixed; 
-    top:0; left:0; 
+    top:60px; 
+    left:0;
     width:250px; 
-    height:100%; 
+    height:calc(100% - 60px);
     background:var(--bg-sidebar); 
     color:var(--text-sidebar);
     z-index:1100;
     transition: transform 0.3s ease;
-    padding: 20px 0;
-}
-.sidebar.hidden { transform:translateX(-260px); }
-
-.sidebar-profile {
-    text-align: center;
-    margin-bottom: 25px;
-    padding: 0 20px 20px;
-    border-bottom: 1px solid rgba(255,255,255,0.2);
-}
-
-.sidebar-profile img {
-    width: 100px;
-    height: 100px;
-    border-radius: 50%;
-    object-fit: cover;
-    margin-bottom: 10px;
-    border: 2px solid #1abc9c;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-}
-
-.sidebar-profile p {
-    color: var(--text-sidebar);
-    font-weight: bold;
-    margin: 0;
-    font-size: 16px;
-}
-
-.sidebar h2 {
-    text-align: center;
-    color: var(--text-sidebar);
-    margin-bottom: 25px;
-    font-size: 22px;
-    padding: 0 20px;
-}
-
-.sidebar a { 
-    display:block; 
-    padding:12px 20px; 
-    color:var(--text-sidebar); 
-    text-decoration:none; 
-    transition: background 0.3s; 
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    position: relative;
-}
-.sidebar a:hover, .sidebar a.active { background:#1abc9c; color:white; }
-
-/* ================= Updated Sidebar ================= */
-.sidebar { 
-    position: fixed; 
-    top: 0; 
-    left: 0; 
-    width: 250px; 
-    height: 100%; 
-    background: var(--bg-sidebar); 
-    color: var(--text-sidebar);
-    z-index: 1100;
-    transition: transform 0.3s ease;
     display: flex;
     flex-direction: column;
-    overflow: hidden; /* Prevent main scrollbar */
+    overflow: hidden;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.2);
 }
 
+/* Sidebar Content (scrollable) */
 .sidebar-content {
     flex: 1;
     overflow-y: auto;
@@ -422,89 +452,121 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
     background: rgba(255, 255, 255, 0.3);
 }
 
-.sidebar.hidden { 
-    transform: translateX(-260px); 
-}
-
-/* Move sidebar-profile and h2 inside sidebar-content */
+/* Sidebar Profile */
 .sidebar-profile {
     text-align: center;
     margin-bottom: 25px;
     padding: 0 20px 20px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-    flex-shrink: 0; /* Prevent shrinking */
+    border-bottom: 1px solid rgba(255,255,255,0.2);
+    flex-shrink: 0;
 }
 
+.sidebar-profile img {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-bottom: 10px;
+    border: 2px solid #1abc9c;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+.sidebar-profile p {
+    color: var(--text-sidebar);
+    font-weight: bold;
+    margin: 0;
+    font-size: 16px;
+}
+
+/* Sidebar Title */
 .sidebar h2 {
     text-align: center;
     color: var(--text-sidebar);
     margin-bottom: 25px;
     font-size: 22px;
     padding: 0 20px;
-    flex-shrink: 0; /* Prevent shrinking */
 }
 
+/* Sidebar Navigation */
 .sidebar a { 
-    display: block; 
+    display: flex; 
+    align-items: center;
+    gap: 10px;
     padding: 12px 20px; 
     color: var(--text-sidebar); 
     text-decoration: none; 
-    transition: background 0.3s; 
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    display: flex;
-    align-items: center;
-    gap: 10px;
+    transition: all 0.3s; 
+    border-bottom: 1px solid rgba(255,255,255,0.1);
     position: relative;
-    flex-shrink: 0; /* Prevent shrinking */
+}
+.sidebar a:hover, .sidebar a.active { 
+    background: #1abc9c; 
+    color: white; 
+    padding-left: 25px;
 }
 
-/* Optional: Add fade effect at bottom when scrolling */
-.sidebar-content::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 30px;
-    background: linear-gradient(to bottom, transparent, var(--bg-sidebar));
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.3s;
+.sidebar a i {
+    width: 20px;
+    text-align: center;
+    font-size: 1.1rem;
 }
 
-.sidebar-content.scrolled::after {
-    opacity: 1;
-}
-
+/* Pending badge */
 .pending-badge {
+    position: absolute;
+    right: 15px;
     background: #ef4444;
     color: white;
-    border-radius: 50%;
-    width: 20px;
-    height: 20px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.75rem;
-    margin-left: auto;
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-weight: bold;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
 }
 
 /* ================= Overlay ================= */
 .overlay {
-    position: fixed; top:0; left:0; width:100%; height:100%;
-    background: rgba(0,0,0,0.4); z-index:1050;
-    display:none; opacity:0; transition: opacity 0.3s ease;
+    position: fixed; 
+    top:60px; 
+    left:0; 
+    width:100%; 
+    height:calc(100% - 60px);
+    background: rgba(0,0,0,0.4); 
+    z-index:1050;
+    display:none; 
+    opacity:0; 
+    transition: opacity 0.3s ease;
 }
-.overlay.active { display:block; opacity:1; }
+.overlay.active { 
+    display:block; 
+    opacity:1; 
+}
 
 /* ================= Main Content ================= */
-.main-content { 
-    margin-left:250px; 
-    padding:30px;
-    min-height:100vh;
-    background: var(--bg-primary);
-    transition: all 0.3s ease;
-    width: calc(100% - 250px);
+.main-content {
+  margin-left: 250px;
+  padding: 30px;
+  min-height: 100vh;
+  background: var(--bg-primary);
+  transition: all 0.3s ease;
+  margin-top: 60px;
+  width: calc(100% - 250px);
+}
+
+@media (max-width: 768px) {
+    .main-content {
+        margin-left: 0;
+        padding: 15px;
+        padding-top: 140px; /* Adjusted for headers on mobile */
+        margin-top: 120px; /* 60px header + 60px topbar */
+        width: 100%;
+    }
 }
 
 /* Content Wrapper */
@@ -945,20 +1007,58 @@ input.checking {
     .main-content{ padding:25px; }
     .content-wrapper { padding: 20px; }
 }
+
 @media(max-width: 768px){
-    .topbar{ display:flex; }
-    .sidebar{ transform:translateX(-100%); }
-    .sidebar.active{ transform:translateX(0); }
-    .main-content{ 
-        margin-left:0; 
-        padding: 15px;
-        padding-top: 80px;
-        width: 100%;
+    .university-header {
+        padding: 0.5rem 15px;
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
     }
+    
+    .header-left, .header-right {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .system-title {
+        font-size: 0.8rem;
+    }
+    
+    .header-right {
+        font-size: 0.75rem;
+    }
+    
+    .topbar { 
+        display:flex;
+        top: 60px; /* Adjusted for mobile with header */
+    }
+    
+    .sidebar { 
+        transform:translateX(-100%); 
+        top: 120px; /* 60px header + 60px topbar */
+        height: calc(100% - 120px) !important;
+    }
+    
+    .sidebar.active { 
+        transform:translateX(0); 
+    }
+    
+    .overlay {
+        top: 120px;
+        height: calc(100% - 120px);
+    }
+    
+    .main-content {
+        padding-top: 140px; /* Adjusted for headers on mobile */
+        margin-top: 120px; /* 60px header + 60px topbar */
+    }
+    
     .content-wrapper {
         padding: 15px;
         border-radius: 0;
     }
+    
     .header { 
         flex-direction: column; 
         gap: 15px; 
@@ -1058,220 +1158,230 @@ input.checking {
 </style>
 </head>
 <body>
-
-<!-- Mobile Topbar -->
-<div class="topbar">
-    <button class="menu-btn" onclick="toggleMenu()">☰</button>
-    <span>Manage Rooms</span>
-</div>
-
-<!-- Overlay for Mobile -->
-<div class="overlay" onclick="toggleMenu()"></div>
-
-<!-- Sidebar -->
-<div class="sidebar" id="sidebar">
-    <div class="sidebar-content" id="sidebarContent">
-        <div class="sidebar-profile">
-            <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic"
-                 onerror="this.onerror=null; this.src='../assets/default_profile.png';">
-            <p><?= htmlspecialchars($current_user['username']) ?></p>
+    <!-- University Header -->
+    <div class="university-header">
+        <div class="header-left">
+            <img src="../assets/images/dku logo.jpg" alt="Debark University Logo" class="dku-logo-img">
+            <div class="system-title">Debark University Class Scheduling System</div>
         </div>
-        <h2>Admin Panel</h2>
-        <a href="dashboard.php" class="<?= $current_page=='dashboard.php'?'active':'' ?>">
-            <i class="fas fa-home"></i> Dashboard
-        </a>
-        <a href="manage_users.php" class="<?= $current_page=='manage_users.php'?'active':'' ?>">
-            <i class="fas fa-users"></i> Manage Users
-        </a>
-        <a href="approve_users.php" class="<?= $current_page=='approve_users.php'?'active':'' ?>">
-            <i class="fas fa-user-check"></i> Approve Users
-            <?php if($pending_approvals > 0): ?>
-                <span class="pending-badge"><?= $pending_approvals ?></span>
-            <?php endif; ?>
-        </a>
-        <a href="manage_departments.php" class="<?= $current_page=='manage_departments.php'?'active':'' ?>">
-            <i class="fas fa-building"></i> Manage Departments
-        </a>
-        <a href="manage_courses.php" class="<?= $current_page=='manage_courses.php'?'active':'' ?>">
-            <i class="fas fa-book"></i> Manage Courses
-        </a>
-        <a href="manage_rooms.php" class="<?= $current_page=='manage_rooms.php'?'active':'' ?>">
-            <i class="fas fa-door-closed"></i> Manage Rooms
-        </a>
-        <a href="manage_schedules.php" class="<?= $current_page=='manage_schedules.php'?'active':'' ?>">
-            <i class="fas fa-calendar-alt"></i> Manage Schedule
-        </a>
-        <a href="assign_instructors.php" class="<?= $current_page=='assign_instructors.php'?'active':'' ?>">
-            <i class="fas fa-user-graduate"></i> Assign Instructors
-        </a>
-        <a href="admin_exam_schedules.php" class="<?= $current_page=='admin_exam_schedules.php'?'active':'' ?>">
-            <i class="fas fa-clipboard-list"></i> Exam Scheduling
-        </a>
-        <a href="manage_announcements.php" class="<?= $current_page=='manage_announcements.php'?'active':'' ?>">
-            <i class="fas fa-bullhorn"></i> Manage Announcements
-        </a>
-        <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
-            <i class="fas fa-user-edit"></i> Edit Profile
-        </a>
-        <a href="../logout.php">
-            <i class="fas fa-sign-out-alt"></i> Logout
-        </a>
+        <div class="header-right">
+            Manage Rooms
+        </div>
     </div>
-</div>
 
-<!-- Main Content -->
-<div class="main-content">
-    <div class="content-wrapper">
-        <!-- Header -->
-        <div class="header">
-            <div>
-                <h1>Manage Rooms</h1>
-                <p>Add, edit, or delete rooms for scheduling</p>
-            </div>
-            <div class="user-info">
-                <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile" id="headerProfilePic"
+    <!-- Mobile Topbar -->
+    <div class="topbar">
+        <button class="menu-btn" onclick="toggleMenu()">☰</button>
+        <span>Manage Rooms</span>
+    </div>
+
+    <!-- Overlay for Mobile -->
+    <div class="overlay" onclick="toggleMenu()"></div>
+
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-content" id="sidebarContent">
+            <div class="sidebar-profile">
+                <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic"
                      onerror="this.onerror=null; this.src='../assets/default_profile.png';">
+                <p><?= htmlspecialchars($current_user['username']) ?></p>
+            </div>
+            <h2>Admin Dashboard</h2>
+            <a href="dashboard.php" class="<?= $current_page=='dashboard.php'?'active':'' ?>">
+                <i class="fas fa-home"></i> Dashboard
+            </a>
+            <a href="manage_users.php" class="<?= $current_page=='manage_users.php'?'active':'' ?>">
+                <i class="fas fa-users"></i> Manage Users
+            </a>
+            <a href="approve_users.php" class="<?= $current_page=='approve_users.php'?'active':'' ?>">
+                <i class="fas fa-user-check"></i> Approve Users
+                <?php if($pending_approvals > 0): ?>
+                    <span class="pending-badge"><?= $pending_approvals ?></span>
+                <?php endif; ?>
+            </a>
+            <a href="manage_departments.php" class="<?= $current_page=='manage_departments.php'?'active':'' ?>">
+                <i class="fas fa-building"></i> Manage Departments
+            </a>
+            <a href="manage_courses.php" class="<?= $current_page=='manage_courses.php'?'active':'' ?>">
+                <i class="fas fa-book"></i> Manage Courses
+            </a>
+            <a href="manage_rooms.php" class="active">
+                <i class="fas fa-door-closed"></i> Manage Rooms
+            </a>
+            <a href="manage_schedules.php" class="<?= $current_page=='manage_schedules.php'?'active':'' ?>">
+                <i class="fas fa-calendar-alt"></i> Manage Schedule
+            </a>
+            <a href="assign_instructors.php" class="<?= $current_page=='assign_instructors.php'?'active':'' ?>">
+                <i class="fas fa-user-graduate"></i> Assign Instructors
+            </a>
+            <a href="admin_exam_schedules.php" class="<?= $current_page=='admin_exam_schedules.php'?'active':'' ?>">
+                <i class="fas fa-clipboard-list"></i> Exam Scheduling
+            </a>
+            <a href="manage_announcements.php" class="<?= $current_page=='manage_announcements.php'?'active':'' ?>">
+                <i class="fas fa-bullhorn"></i> Manage Announcements
+            </a>
+            <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
+                <i class="fas fa-user-edit"></i> Edit Profile
+            </a>
+            <a href="../logout.php">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="content-wrapper">
+            <!-- Header -->
+            <div class="header">
                 <div>
-                    <div><?= htmlspecialchars($current_user['username']) ?></div>
-                    <small>Administrator</small>
+                    <h1>Manage Rooms</h1>
+                    <p>Add, edit, or delete rooms for scheduling</p>
+                </div>
+                <div class="user-info">
+                    <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile" id="headerProfilePic"
+                         onerror="this.onerror=null; this.src='../assets/default_profile.png';">
+                    <div>
+                        <div><?= htmlspecialchars($current_user['username']) ?></div>
+                        <small>Administrator</small>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Display Error/Success Messages -->
-        <?php if($message): ?>
-            <div class="message <?= $message_type ?>">
-                <i class="fas fa-<?= $message_type === 'error' ? 'exclamation-circle' : ($message_type === 'warning' ? 'exclamation-triangle' : 'check-circle') ?>"></i>
-                <?= htmlspecialchars($message) ?>
-            </div>
-        <?php endif; ?>
+            <!-- Display Error/Success Messages -->
+            <?php if($message): ?>
+                <div class="message <?= $message_type ?>">
+                    <i class="fas fa-<?= $message_type === 'error' ? 'exclamation-circle' : ($message_type === 'warning' ? 'exclamation-triangle' : 'check-circle') ?>"></i>
+                    <?= htmlspecialchars($message) ?>
+                </div>
+            <?php endif; ?>
 
-        <!-- Form Section -->
-        <div class="form-section">
-            <div class="form-section-title">
-                <i class="fas fa-<?= isset($edit_room) ? 'edit' : 'plus-circle' ?>"></i>
-                <?= isset($edit_room) ? "Edit Room" : "Add New Room" ?>
-            </div>
+            <!-- Form Section -->
+            <div class="form-section">
+                <div class="form-section-title">
+                    <i class="fas fa-<?= isset($edit_room) ? 'edit' : 'plus-circle' ?>"></i>
+                    <?= isset($edit_room) ? "Edit Room" : "Add New Room" ?>
+                </div>
 
-            <div class="room-form-wrapper">
-                <form method="POST" class="room-form" id="roomForm">
-                    <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-                    <input type="hidden" name="room_id" value="<?= $edit_room['room_id'] ?? '' ?>">
-                    
-                    <div class="form-group">
-                        <label class="required">Room Name:</label>
-                        <input type="text" name="room_name" id="room-name" placeholder="e.g., Classroom 201, Lab A" required 
-                               value="<?= isset($edit_room['room_name']) ? htmlspecialchars($edit_room['room_name']) : '' ?>"
-                               oninput="checkRoomAvailability()">
-                        <div id="room-name-feedback"></div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="required">Capacity:</label>
-                        <input type="number" name="capacity" id="capacity" placeholder="Number of seats" min="1" max="500" required 
-                               value="<?= isset($edit_room['capacity']) ? htmlspecialchars($edit_room['capacity']) : '30' ?>">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="required">Building:</label>
-                        <input type="text" name="building" id="building" placeholder="e.g., Main Building, Science Block" required 
-                               value="<?= isset($edit_room['building']) ? htmlspecialchars($edit_room['building']) : '' ?>"
-                               oninput="checkRoomAvailability()">
-                    </div>
-                    
-                    <div class="form-actions">
-                        <button class="btn btn-primary" type="submit" name="<?= isset($edit_room) ? 'edit_room' : 'add_room' ?>" id="submit-btn" <?= isset($edit_room) ? '' : 'disabled' ?>>
-                            <i class="fas fa-<?= isset($edit_room) ? 'save' : 'plus' ?>"></i>
-                            <?= isset($edit_room) ? 'Update Room' : 'Add Room' ?>
-                        </button>
-                        <?php if(isset($edit_room)): ?>
-                            <a href="manage_rooms.php" class="cancel-btn">
-                                <i class="fas fa-times"></i> Cancel
-                            </a>
-                        <?php endif; ?>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        <!-- Rooms Table Section -->
-        <div class="table-section">
-            <div class="table-section-title">
-                <i class="fas fa-list"></i>
-                Existing Rooms (<?= count($rooms) ?>)
-            </div>
-
-            <div class="table-wrapper">
-                <div class="table-container">
-                    <table class="room-table" id="roomTable">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Room Name</th>
-                                <th>Capacity</th>
-                                <th>Building</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php if(empty($rooms)): ?>
-                                <tr>
-                                    <td colspan="5" style="text-align:center; padding:30px; color:var(--text-secondary);">
-                                        No rooms found. Add your first room above.
-                                    </td>
-                                </tr>
-                            <?php else: ?>
-                                <?php 
-                                $currentBuilding = '';
-                                foreach($rooms as $r): 
-                                    if($r['building'] !== $currentBuilding):
-                                        $currentBuilding = $r['building'];
-                                ?>
-                                <tr class="building-header">
-                                    <td colspan="5" style="text-align:left;">
-                                        <i class="fas fa-building"></i> <?= htmlspecialchars($currentBuilding) ?>
-                                    </td>
-                                </tr>
-                                <?php endif; ?>
-                                <tr data-label="Room">
-                                    <td data-label="ID"><?= $r['room_id'] ?></td>
-                                    <td data-label="Room Name">
-                                        <strong><?= htmlspecialchars($r['room_name']) ?></strong>
-                                    </td>
-                                    <td data-label="Capacity">
-                                        <span class="capacity-badge">
-                                            <i class="fas fa-users"></i> <?= htmlspecialchars($r['capacity']) ?> seats
-                                        </span>
-                                    </td>
-                                    <td data-label="Building">
-                                        <span class="building-badge">
-                                            <i class="fas fa-building"></i> <?= htmlspecialchars($r['building']) ?>
-                                        </span>
-                                    </td>
-                                    <td data-label="Actions">
-                                        <div class="action-buttons">
-                                            <a class="action-link" href="?edit=<?= $r['room_id'] ?>">
-                                                <i class="fas fa-edit"></i> Edit
-                                            </a>
-                                            <form method="POST" style="display:inline;" onsubmit="return confirmDelete(this, '<?= htmlspecialchars(addslashes($r['room_name'])) ?>')">
-                                                <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-                                                <input type="hidden" name="room_id" value="<?= $r['room_id'] ?>">
-                                                <button type="submit" name="delete_room" class="action-link delete">
-                                                    <i class="fas fa-trash"></i> Delete
-                                                </button>
-                                            </form>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
+                <div class="room-form-wrapper">
+                    <form method="POST" class="room-form" id="roomForm">
+                        <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+                        <input type="hidden" name="room_id" value="<?= $edit_room['room_id'] ?? '' ?>">
+                        
+                        <div class="form-group">
+                            <label class="required">Room Name:</label>
+                            <input type="text" name="room_name" id="room-name" placeholder="e.g., Classroom 201, Lab A" required 
+                                   value="<?= isset($edit_room['room_name']) ? htmlspecialchars($edit_room['room_name']) : '' ?>"
+                                   oninput="checkRoomAvailability()">
+                            <div id="room-name-feedback"></div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="required">Capacity:</label>
+                            <input type="number" name="capacity" id="capacity" placeholder="Number of seats" min="1" max="500" required 
+                                   value="<?= isset($edit_room['capacity']) ? htmlspecialchars($edit_room['capacity']) : '30' ?>">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="required">Building:</label>
+                            <input type="text" name="building" id="building" placeholder="e.g., Main Building, Science Block" required 
+                                   value="<?= isset($edit_room['building']) ? htmlspecialchars($edit_room['building']) : '' ?>"
+                                   oninput="checkRoomAvailability()">
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button class="btn btn-primary" type="submit" name="<?= isset($edit_room) ? 'edit_room' : 'add_room' ?>" id="submit-btn" <?= isset($edit_room) ? '' : 'disabled' ?>>
+                                <i class="fas fa-<?= isset($edit_room) ? 'save' : 'plus' ?>"></i>
+                                <?= isset($edit_room) ? 'Update Room' : 'Add Room' ?>
+                            </button>
+                            <?php if(isset($edit_room)): ?>
+                                <a href="manage_rooms.php" class="cancel-btn">
+                                    <i class="fas fa-times"></i> Cancel
+                                </a>
                             <?php endif; ?>
-                        </tbody>
-                    </table>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Rooms Table Section -->
+            <div class="table-section">
+                <div class="table-section-title">
+                    <i class="fas fa-list"></i>
+                    Existing Rooms (<?= count($rooms) ?>)
+                </div>
+
+                <div class="table-wrapper">
+                    <div class="table-container">
+                        <table class="room-table" id="roomTable">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Room Name</th>
+                                    <th>Capacity</th>
+                                    <th>Building</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php if(empty($rooms)): ?>
+                                    <tr>
+                                        <td colspan="5" style="text-align:center; padding:30px; color:var(--text-secondary);">
+                                            No rooms found. Add your first room above.
+                                        </td>
+                                    </tr>
+                                <?php else: ?>
+                                    <?php 
+                                    $currentBuilding = '';
+                                    foreach($rooms as $r): 
+                                        if($r['building'] !== $currentBuilding):
+                                            $currentBuilding = $r['building'];
+                                    ?>
+                                    <tr class="building-header">
+                                        <td colspan="5" style="text-align:left;">
+                                            <i class="fas fa-building"></i> <?= htmlspecialchars($currentBuilding) ?>
+                                        </td>
+                                    </tr>
+                                    <?php endif; ?>
+                                    <tr data-label="Room">
+                                        <td data-label="ID"><?= $r['room_id'] ?></td>
+                                        <td data-label="Room Name">
+                                            <strong><?= htmlspecialchars($r['room_name']) ?></strong>
+                                        </td>
+                                        <td data-label="Capacity">
+                                            <span class="capacity-badge">
+                                                <i class="fas fa-users"></i> <?= htmlspecialchars($r['capacity']) ?> seats
+                                            </span>
+                                        </td>
+                                        <td data-label="Building">
+                                            <span class="building-badge">
+                                                <i class="fas fa-building"></i> <?= htmlspecialchars($r['building']) ?>
+                                            </span>
+                                        </td>
+                                        <td data-label="Actions">
+                                            <div class="action-buttons">
+                                                <a class="action-link" href="?edit=<?= $r['room_id'] ?>">
+                                                    <i class="fas fa-edit"></i> Edit
+                                                </a>
+                                                <form method="POST" style="display:inline;" onsubmit="return confirmDelete(this, '<?= htmlspecialchars(addslashes($r['room_name'])) ?>')">
+                                                    <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+                                                    <input type="hidden" name="room_id" value="<?= $r['room_id'] ?>">
+                                                    <button type="submit" name="delete_room" class="action-link delete">
+                                                        <i class="fas fa-trash"></i> Delete
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
 
 <script>
 // Hamburger toggle

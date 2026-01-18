@@ -26,6 +26,10 @@ error_log("Student ID $student_id has year value: " . $student_year);
 $table_check = $pdo->query("SHOW TABLES LIKE 'enrollments'");
 $enrollments_table_exists = $table_check->fetch();
 
+// Initialize search variables
+$search = isset($_GET['search']) ? trim($_GET['search']) : '';
+$search_placeholder = "Search by course name or code...";
+
 if (!$enrollments_table_exists) {
     error_log("ERROR: enrollments table not found!");
     $debug_info = "ERROR: Enrollment table 'enrollments' not found in database.";
@@ -99,8 +103,8 @@ if (!$enrollments_table_exists) {
     error_log("Enrolled schedule IDs: " . $enrolled_schedule_ids);
     
     if ($enrollment_count > 0) {
-        // Main query for ALL students (using enrollments table)
-        $schedules = $pdo->prepare("
+        // Build base query with search condition
+        $base_query = "
             SELECT s.schedule_id, c.course_name, c.course_code, 
                    COALESCE(u.username, 'TBA') AS instructor_name, 
                    r.room_name, s.day, s.start_time, s.end_time, s.year as schedule_year
@@ -111,11 +115,28 @@ if (!$enrollments_table_exists) {
             JOIN enrollments e ON s.schedule_id = e.schedule_id
             WHERE e.student_id = ? 
             AND s.year IN ($placeholders)
-            ORDER BY FIELD(s.day, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'), s.start_time
-        ");
+        ";
         
-        // Prepare parameters: student_id + year equivalents
-        $params = array_merge([$student_id], $year_search_values);
+        // Add search condition if search term is provided
+        $search_query = "";
+        $search_params = [];
+        
+        if (!empty($search)) {
+            $search_query = " AND (c.course_name LIKE ? OR c.course_code LIKE ?)";
+            $search_param = "%{$search}%";
+            $search_params = [$search_param, $search_param];
+        }
+        
+        // Complete query with ordering
+        $complete_query = $base_query . $search_query . "
+            ORDER BY FIELD(s.day, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'), s.start_time
+        ";
+        
+        // Prepare and execute the query
+        $schedules = $pdo->prepare($complete_query);
+        
+        // Prepare parameters: student_id + year equivalents + search params
+        $params = array_merge([$student_id], $year_search_values, $search_params);
         error_log("Executing query with params: " . implode(', ', $params));
         
         $schedules->execute($params);
@@ -124,7 +145,7 @@ if (!$enrollments_table_exists) {
         error_log("Found " . count($my_schedule) . " schedules for student $student_id");
         
         // Debug info if no schedules found
-        if (empty($my_schedule)) {
+        if (empty($my_schedule) && empty($search)) {
             // Check available schedules for this year
             $schedule_check = $pdo->prepare("
                 SELECT COUNT(*) as count 
@@ -243,54 +264,347 @@ if(isset($_GET['export']) && $_GET['export'] == 'excel') {
 <!-- Include Dark Mode CSS -->
 <link rel="stylesheet" href="../../assets/css/darkmode.css">
 <style>
+/* Add search bar styles */
+.search-container {
+    margin-bottom: 30px;
+    position: relative;
+    max-width: 500px;
+}
+
+.search-form {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.search-box {
+    flex: 1;
+    padding: 14px 50px 14px 20px;
+    border: 2px solid var(--border-color);
+    border-radius: 12px;
+    background: var(--bg-card);
+    color: var(--text-primary);
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px var(--shadow-color);
+}
+
+.search-box:focus {
+    outline: none;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.search-btn {
+    padding: 14px 24px;
+    background: linear-gradient(135deg, #6366f1, #3b82f6);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px var(--shadow-color);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.search-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px var(--shadow-lg);
+    background: linear-gradient(135deg, #4f46e5, #2563eb);
+}
+
+.clear-btn {
+    padding: 14px 20px;
+    background: linear-gradient(135deg, #6b7280, #4b5563);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px var(--shadow-color);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+}
+
+.clear-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px var(--shadow-lg);
+    background: linear-gradient(135deg, #4b5563, #374151);
+}
+
+.search-icon {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+}
+
+.search-results-info {
+    margin-top: 10px;
+    padding: 10px 15px;
+    background: rgba(99, 102, 241, 0.1);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.search-results-info i {
+    color: #6366f1;
+}
+
+.no-results {
+    text-align: center;
+    padding: 40px 20px;
+    background: var(--bg-card);
+    border-radius: 12px;
+    margin-top: 20px;
+    border: 1px solid var(--border-color);
+}
+
+.no-results i {
+    font-size: 3rem;
+    color: var(--text-secondary);
+    margin-bottom: 15px;
+}
+
+.no-results h3 {
+    color: var(--text-primary);
+    margin-bottom: 10px;
+}
+
+.no-results p {
+    color: var(--text-secondary);
+    margin-bottom: 20px;
+}
+
+.try-again-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #6366f1, #3b82f6);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.try-again-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px var(--shadow-color);
+}
+
+/* Responsive adjustments for search */
+@media (max-width: 768px) {
+    .search-form {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .search-box, .search-btn, .clear-btn {
+        width: 100%;
+    }
+    
+    .search-container {
+        max-width: 100%;
+    }
+}
+
 * { box-sizing: border-box; margin:0; padding:0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+
+/* ================= University Header (ADDED) ================= */
+.university-header {
+    background: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%);
+    color: white;
+    padding: 0.5rem 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1201;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.dku-logo-img {
+    width: 45px;
+    height: 45px;
+    object-fit: contain;
+    border-radius: 5px;
+    background: white;
+    padding: 4px;
+}
+
+.system-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    opacity: 0.95;
+}
+
+.header-right {
+    font-size: 0.8rem;
+    opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+    .university-header {
+        padding: 0.5rem 15px;
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+    }
+    
+    .header-left, .header-right {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .system-title {
+        font-size: 0.8rem;
+    }
+    
+    .header-right {
+        font-size: 0.75rem;
+    }
+}
+
+/* Adjust other elements for university header */
+.topbar {
+    top: 60px !important; /* Adjusted for university header */
+}
+
+.sidebar {
+    top: 60px !important; /* Adjusted for university header */
+    height: calc(100% - 60px) !important;
+}
+
+.overlay {
+    top: 60px; /* Adjusted for university header */
+    height: calc(100% - 60px);
+}
+
+.main-content {
+    margin-top: 60px; /* Added for university header */
+}
 
 /* ================= Topbar for Hamburger ================= */
 .topbar {
     display: none;
-    position: fixed; top:0; left:0; width:100%;
-    background:var(--bg-sidebar); color:var(--text-sidebar);
-    padding:15px 20px;
+    position: fixed; 
+    top:60px; 
+    left:0; 
+    width:100%;
+    background:var(--bg-sidebar); 
+    color:var(--text-sidebar);
+    padding:12px 20px;
     z-index:1200;
-    justify-content:space-between; align-items:center;
+    justify-content:space-between; 
+    align-items:center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 .menu-btn {
     font-size:26px;
     background:#1abc9c;
-    border:none; color:var(--text-sidebar);
+    border:none; 
+    color:var(--text-sidebar);
     cursor:pointer;
-    padding:10px 14px;
+    padding:8px 12px;
     border-radius:8px;
     font-weight:600;
     transition: background 0.3s, transform 0.2s;
 }
-.menu-btn:hover { background:#159b81; transform:translateY(-2px); }
+.menu-btn:hover { 
+    background:#159b81; 
+    transform:translateY(-2px); 
+}
 
 /* ================= Sidebar ================= */
 .sidebar {
-    position: fixed; top:0; left:0;
-    width:250px; height:100%;
-    background:var(--bg-sidebar); color:var(--text-sidebar);
+    position: fixed; 
+    top:60px; 
+    left:0;
+    width:250px; 
+    height:calc(100% - 60px);
+    background:var(--bg-sidebar); 
+    color:var(--text-sidebar);
     z-index:1100;
     transition: transform 0.3s ease;
-    padding: 20px 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
-.sidebar.hidden { transform:translateX(-260px); }
-.sidebar a { 
-    display:block; 
-    padding:12px 20px; 
-    color:var(--text-sidebar); 
-    text-decoration:none; 
-    transition: background 0.3s; 
-    border-bottom: 1px solid rgba(255,255,255,0.1);
+.sidebar.hidden { 
+    transform:translateX(-260px); 
 }
-.sidebar a:hover, .sidebar a.active { background:#1abc9c; color:white; }
 
+/* Sidebar Content (scrollable) */
+.sidebar-content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 20px 0;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+/* Custom scrollbar for sidebar */
+.sidebar-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sidebar-content::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 3px;
+}
+
+.sidebar-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+}
+
+.sidebar-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
+}
+
+[data-theme="dark"] .sidebar-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+[data-theme="dark"] .sidebar-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* Sidebar Profile */
 .sidebar-profile {
     text-align: center;
-    margin-bottom: 20px;
+    margin-bottom: 25px;
     padding: 0 20px 20px;
     border-bottom: 1px solid rgba(255,255,255,0.2);
+    flex-shrink: 0;
 }
 
 .sidebar-profile img {
@@ -310,15 +624,6 @@ if(isset($_GET['export']) && $_GET['export'] == 'excel') {
     font-size: 16px;
 }
 
-/* Sidebar title */
-.sidebar h2 {
-    text-align: center;
-    color: var(--text-sidebar);
-    margin-bottom: 25px;
-    font-size: 22px;
-    padding: 0 20px;
-}
-
 /* Year badge in sidebar */
 .year-badge {
     display: inline-block;
@@ -331,13 +636,60 @@ if(isset($_GET['export']) && $_GET['export'] == 'excel') {
     margin-top: 5px;
 }
 
+/* Sidebar Title */
+.sidebar h2 {
+    text-align: center;
+    color: var(--text-sidebar);
+    margin-bottom: 25px;
+    font-size: 22px;
+    padding: 0 20px;
+}
+
+/* Sidebar Navigation */
+.sidebar nav {
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar a { 
+    display: flex; 
+    align-items: center;
+    gap: 10px;
+    padding: 12px 20px; 
+    color: var(--text-sidebar); 
+    text-decoration: none; 
+    transition: all 0.3s; 
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.sidebar a:hover, .sidebar a.active { 
+    background: #1abc9c; 
+    color: white; 
+    padding-left: 25px;
+}
+
+.sidebar a i {
+    width: 20px;
+    text-align: center;
+    font-size: 1.1rem;
+}
+
 /* ================= Overlay ================= */
 .overlay {
-    position: fixed; top:0; left:0; width:100%; height:100%;
-    background: rgba(0,0,0,0.4); z-index:1050;
-    display:none; opacity:0; transition: opacity 0.3s ease;
+    position: fixed; 
+    top:60px; 
+    left:0; 
+    width:100%; 
+    height:calc(100% - 60px);
+    background: rgba(0,0,0,0.4); 
+    z-index:1050;
+    display:none; 
+    opacity:0; 
+    transition: opacity 0.3s ease;
 }
-.overlay.active { display:block; opacity:1; }
+.overlay.active { 
+    display:block; 
+    opacity:1; 
+}
 
 /* ================= Main content ================= */
 .main-content {
@@ -346,6 +698,16 @@ if(isset($_GET['export']) && $_GET['export'] == 'excel') {
     min-height:100vh;
     background: var(--bg-primary);
     transition: all 0.3s ease;
+    margin-top: 60px;
+}
+
+@media (max-width: 768px) {
+    .main-content {
+        margin-left: 0;
+        padding: 15px;
+        padding-top: 140px; /* Adjusted for headers on mobile */
+        margin-top: 120px; /* 60px header + 60px topbar */
+    }
 }
 
 /* Content Wrapper */
@@ -693,11 +1055,12 @@ if(isset($_GET['export']) && $_GET['export'] == 'excel') {
 
 /* ================= Print Styles ================= */
 @media print {
-    .sidebar, .topbar, .overlay, .export-buttons, .user-info, .student-info-box, .debug-info, .info-box, .db-info-box, .warning-box { 
+    .university-header, .sidebar, .topbar, .overlay, .export-buttons, .user-info, .student-info-box, .debug-info, .info-box, .db-info-box, .warning-box, .search-container { 
         display: none !important; 
     }
     .main-content { 
         margin-left: 0 !important; 
+        margin-top: 0 !important;
         padding: 0 !important; 
         background: white !important;
     }
@@ -723,17 +1086,77 @@ if(isset($_GET['export']) && $_GET['export'] == 'excel') {
 
 /* ================= Responsive ================= */
 @media (max-width: 768px) {
-    .topbar { display: flex; }
-    .sidebar { transform: translateX(-100%); }
-    .sidebar.active { transform: translateX(0); }
-    .main-content { margin-left: 0; padding: 15px; }
-    .content-wrapper { padding: 20px; border-radius: 0; }
-    .header { flex-direction: column; gap: 15px; align-items: flex-start; }
-    .header h1 { font-size: 1.8rem; }
-    .export-buttons { flex-direction: column; }
-    .export-btn { width: 100%; justify-content: center; }
-    .table-container { overflow-x: auto; }
-    .schedule-table { min-width: 600px; }
+    .university-header {
+        padding: 0.5rem 15px;
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+    }
+    
+    .header-left, .header-right {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .system-title {
+        font-size: 0.8rem;
+    }
+    
+    .header-right {
+        font-size: 0.75rem;
+    }
+    
+    .topbar { 
+        display:flex;
+        top: 60px; /* Adjusted for mobile with header */
+    }
+    
+    .sidebar { 
+        transform:translateX(-100%); 
+        top: 120px; /* 60px header + 60px topbar */
+        height: calc(100% - 120px) !important;
+    }
+    
+    .sidebar.active { 
+        transform:translateX(0); 
+    }
+    
+    .overlay {
+        top: 120px;
+        height: calc(100% - 120px);
+    }
+    
+    .main-content {
+        padding-top: 140px; /* Adjusted for headers on mobile */
+        margin-top: 120px; /* 60px header + 60px topbar */
+    }
+    
+    .header { 
+        flex-direction: column; 
+        gap: 15px; 
+        align-items: flex-start; 
+    }
+    
+    .header h1 { 
+        font-size: 1.8rem; 
+    }
+    
+    .export-buttons { 
+        flex-direction: column; 
+    }
+    
+    .export-btn { 
+        width: 100%; 
+        justify-content: center; 
+    }
+    
+    .table-container { 
+        overflow-x: auto; 
+    }
+    
+    .schedule-table { 
+        min-width: 600px; 
+    }
 }
 
 /* Dark mode specific table adjustments */
@@ -748,207 +1171,20 @@ if(isset($_GET['export']) && $_GET['export'] == 'excel') {
 [data-theme="dark"] .schedule-table tr:hover {
     background: rgba(255, 255, 255, 0.05);
 }
-
-/* Improved sidebar icons */
-.sidebar a {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.sidebar a i {
-    width: 20px;
-    text-align: center;
-    font-size: 1.1rem;
-}
-/* ================= Updated Sidebar ================= */
-.sidebar {
-    position: fixed; 
-    top:0; 
-    left:0;
-    width:250px; 
-    height:100%;
-    background:var(--bg-sidebar); 
-    color:var(--text-sidebar);
-    z-index:1100;
-    transition: transform 0.3s ease;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
-
-.sidebar.hidden { 
-    transform:translateX(-260px); 
-}
-
-/* Sidebar Content (scrollable) */
-.sidebar-content {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: 20px 0;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
-}
-
-/* Custom scrollbar for sidebar */
-.sidebar-content::-webkit-scrollbar {
-    width: 6px;
-}
-
-.sidebar-content::-webkit-scrollbar-track {
-    background: transparent;
-    border-radius: 3px;
-}
-
-.sidebar-content::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.3);
-    border-radius: 3px;
-}
-
-.sidebar-content::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.5);
-}
-
-[data-theme="dark"] .sidebar-content::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
-}
-
-[data-theme="dark"] .sidebar-content::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.3);
-}
-
-/* Sidebar Profile */
-.sidebar-profile {
-    text-align: center;
-    margin-bottom: 25px;
-    padding: 0 20px 20px;
-    border-bottom: 1px solid rgba(255,255,255,0.2);
-    flex-shrink: 0; /* Prevent shrinking */
-}
-
-.sidebar-profile img {
-    width: 100px;
-    height: 100px;
-    border-radius: 50%;
-    object-fit: cover;
-    margin-bottom: 10px;
-    border: 2px solid #1abc9c;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-}
-
-.sidebar-profile p {
-    color: var(--text-sidebar);
-    font-weight: bold;
-    margin: 0;
-    font-size: 16px;
-}
-
-/* Year badge in sidebar */
-.year-badge {
-    display: inline-block;
-    padding: 3px 10px;
-    background: <?= (substr($student_year, 0, 1) === 'E') ? '#8b5cf6' : '#3b82f6' ?>;
-    color: white;
-    border-radius: 12px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    margin-top: 5px;
-}
-
-/* Sidebar Title */
-.sidebar h2 {
-    text-align: center;
-    color: var(--text-sidebar);
-    margin-bottom: 25px;
-    font-size: 22px;
-    padding: 0 20px;
-}
-
-/* Sidebar Navigation */
-.sidebar nav {
-    display: flex;
-    flex-direction: column;
-}
-
-.sidebar a { 
-    display: flex; 
-    align-items: center;
-    gap: 10px;
-    padding: 12px 20px; 
-    color: var(--text-sidebar); 
-    text-decoration: none; 
-    transition: all 0.3s; 
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-}
-.sidebar a:hover, .sidebar a.active { 
-    background: #1abc9c; 
-    color: white; 
-    padding-left: 25px;
-}
-
-.sidebar a i {
-    width: 20px;
-    text-align: center;
-    font-size: 1.1rem;
-}
-
-/* Optional: Add fade effect at bottom when scrolling */
-.sidebar-content::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 30px;
-    background: linear-gradient(to bottom, transparent, var(--bg-sidebar));
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.3s;
-}
-
-.sidebar-content.scrolled::after {
-    opacity: 1;
-}
-
-/* ================= Overlay ================= */
-.overlay {
-    position: fixed; 
-    top:0; 
-    left:0; 
-    width:100%; 
-    height:100%;
-    background: rgba(0,0,0,0.4); 
-    z-index:1050;
-    display:none; 
-    opacity:0; 
-    transition: opacity 0.3s ease;
-}
-
-.overlay.active { 
-    display:block; 
-    opacity:1; 
-}
-
-/* ================= Main content ================= */
-.main-content {
-    margin-left: 250px;
-    padding:20px;
-    min-height:100vh;
-    background: var(--bg-primary);
-    transition: all 0.3s ease;
-}
-
-@media (max-width: 768px) {
-    .main-content {
-        margin-left: 0;
-        padding: 15px;
-        padding-top: 80px;
-    }
-}
 </style>
 </head>
 <body>
+    <!-- =========== ADDED: University Header =========== -->
+    <div class="university-header">
+        <div class="header-left">
+            <img src="../assets/images/dku logo.jpg" alt="Debark University Logo" class="dku-logo-img">
+            <div class="system-title">Debark University Class Scheduling System</div>
+        </div>
+        <div class="header-right">
+            My Schedule
+        </div>
+    </div>
+
     <!-- Topbar for Mobile -->
     <div class="topbar">
         <button class="menu-btn" onclick="toggleSidebar()">☰</button>
@@ -958,54 +1194,51 @@ if(isset($_GET['export']) && $_GET['export'] == 'excel') {
     <!-- Overlay for Mobile -->
     <div class="overlay" onclick="toggleSidebar()"></div>
 
- <!-- Sidebar -->
-<div class="sidebar" id="sidebar">
-    <div class="sidebar-content" id="sidebarContent">
-        <div class="sidebar-profile">
-            <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture">
-            <p><?= htmlspecialchars($user['username'] ?? 'Student') ?></p>
-            <?php if($student_year): ?>
-                <span class="year-badge">
-                    <?php 
-                    if (strtoupper(substr($student_year, 0, 1)) === 'E') {
-                        echo 'Extension Year ' . substr($student_year, 1);
-                    } elseif (is_numeric($student_year)) {
-                        echo 'Year ' . $student_year;
-                    } else {
-                        echo ucfirst($student_year);
-                    }
-                    ?>
-                </span>
-            <?php endif; ?>
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-content" id="sidebarContent">
+            <div class="sidebar-profile">
+                <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture">
+                <p><?= htmlspecialchars($user['username'] ?? 'Student') ?></p>
+                <?php if($student_year): ?>
+                    <span class="year-badge">
+                        <?php 
+                        if (strtoupper(substr($student_year, 0, 1)) === 'E') {
+                            echo 'Extension Year ' . substr($student_year, 1);
+                        } elseif (is_numeric($student_year)) {
+                            echo 'Year ' . $student_year;
+                        } else {
+                            echo ucfirst($student_year);
+                        }
+                        ?>
+                    </span>
+                <?php endif; ?>
+            </div>
+            
+            <h2>Student Dashboard</h2>
+            
+            <nav>
+                <a href="student_dashboard.php" class="<?= $current_page=='student_dashboard.php'?'active':'' ?>">
+                    <i class="fas fa-home"></i> Dashboard
+                </a>
+                <a href="my_schedule.php" class="active">
+                    <i class="fas fa-calendar-alt"></i> My Schedule
+                </a>
+                <a href="view_exam_schedules.php" class="<?= $current_page=='view_exam_schedules.php'?'active':'' ?>">
+                    <i class="fas fa-clipboard-list"></i> Exam Schedule
+                </a>
+                <a href="view_announcements.php" class="<?= $current_page=='view_announcements.php'?'active':'' ?>">
+                    <i class="fas fa-bullhorn"></i> Announcements
+                </a>
+                <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
+                    <i class="fas fa-user-edit"></i> Edit Profile
+                </a>
+                <a href="../logout.php">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </nav>
         </div>
-        
-        <h2>Student Panel</h2>
-        
-        <nav>
-            <a href="student_dashboard.php" class="<?= $current_page=='student_dashboard.php'?'active':'' ?>">
-                <i class="fas fa-home"></i> Dashboard
-            </a>
-            <a href="my_schedule.php" class="active">
-                <i class="fas fa-calendar-alt"></i> My Schedule
-            </a>
-            <a href="view_exam_schedules.php" class="<?= $current_page=='view_exam_schedules.php'?'active':'' ?>">
-                <i class="fas fa-clipboard-list"></i> Exam Schedule
-            </a>
-            <a href="view_announcements.php" class="<?= $current_page=='view_announcements.php'?'active':'' ?>">
-                <i class="fas fa-bullhorn"></i> Announcements
-            </a>
-            <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
-                <i class="fas fa-user-edit"></i> Edit Profile
-            </a>
-            <a href="../logout.php">
-                <i class="fas fa-sign-out-alt"></i> Logout
-            </a>
-        </nav>
     </div>
-</div>
-
-<!-- Overlay for Mobile -->
-<div class="overlay" onclick="toggleSidebar()"></div>
 
     <!-- Main Content -->
     <div class="main-content">
@@ -1089,10 +1322,45 @@ if(isset($_GET['export']) && $_GET['export'] == 'excel') {
                 </div>
             <?php endif; ?>
 
-            <!-- Export Buttons -->
+            <!-- Search Bar -->
+            <div class="search-container">
+                <form method="GET" class="search-form">
+                    <div style="position: relative; flex: 1;">
+                        <i class="fas fa-search search-icon"></i>
+                        <input 
+                            type="text" 
+                            name="search" 
+                            class="search-box" 
+                            placeholder="<?= $search_placeholder ?>"
+                            value="<?= htmlspecialchars($search) ?>"
+                            autocomplete="off"
+                        >
+                    </div>
+                    <button type="submit" class="search-btn">
+                        <i class="fas fa-search"></i> Search
+                    </button>
+                    <?php if(!empty($search)): ?>
+                        <a href="my_schedule.php" class="clear-btn">
+                            <i class="fas fa-times"></i> Clear
+                        </a>
+                    <?php endif; ?>
+                </form>
+                
+                <?php if(!empty($search)): ?>
+                    <div class="search-results-info">
+                        <i class="fas fa-info-circle"></i>
+                        Showing results for "<?= htmlspecialchars($search) ?>"
+                        <?php if(!empty($my_schedule)): ?>
+                            - Found <?= count($my_schedule) ?> course(s)
+                        <?php endif; ?>
+                    </div>
+                <?php endif; ?>
+            </div>
+
+            <!-- Export Buttons (only show when there are results) -->
             <?php if(!empty($my_schedule)): ?>
             <div class="export-buttons">
-                <a href="?export=excel" class="export-btn excel">
+                <a href="?export=excel<?= !empty($search) ? '&search=' . urlencode($search) : '' ?>" class="export-btn excel">
                     <i class="fas fa-file-excel"></i> Export Excel/CSV
                 </a>
                 <button onclick="window.print()" class="export-btn print">
@@ -1104,78 +1372,90 @@ if(isset($_GET['export']) && $_GET['export'] == 'excel') {
             <!-- Schedule Table -->
             <div class="schedule-section">
                 <h2 style="margin-bottom: 20px; color: var(--text-primary);">Class Timetable</h2>
-                <div class="table-container">
-                    <table class="schedule-table">
-                        <thead>
-                            <tr>
-                                <th>Course</th>
-                                <th>Instructor</th>
-                                <th>Room</th>
-                                <th>Day</th>
-                                <th>Time</th>
-                                <th>Year</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                        <?php 
-                        $today = date('l');
-                        $hasTodayClass = false;
-                        foreach($my_schedule as $s): 
-                            $todayClass = ($s['day']==$today) ? 'today-row' : '';
-                            if($s['day']==$today) $hasTodayClass = true;
-                        ?>
-                            <tr class="<?= $todayClass ?>">
-                                <td>
-                                    <?= htmlspecialchars($s['course_name']) ?>
-                                    <?php if(!empty($s['course_code'])): ?>
-                                        <div class="course-code"><?= htmlspecialchars($s['course_code']) ?></div>
-                                    <?php endif; ?>
-                                </td>
-                                <td><?= htmlspecialchars($s['instructor_name']) ?></td>
-                                <td><?= htmlspecialchars($s['room_name']) ?></td>
-                                <td><?= htmlspecialchars($s['day']) ?></td>
-                                <td><?= date('g:i A', strtotime($s['start_time'])) . ' - ' . date('g:i A', strtotime($s['end_time'])) ?></td>
-                                <td><small><?= htmlspecialchars($s['schedule_year']) ?></small></td>
-                            </tr>
-                        <?php endforeach; ?>
-                        <?php if(empty($my_schedule)): ?>
-                            <tr>
-                                <td colspan="6">
-                                    <div class="empty-state">
-                                        <i class="fas fa-calendar-times"></i>
-                                        <h3>No Classes Scheduled</h3>
-                                        <p>You don't have any classes scheduled for 
-                                            <?php 
-                                            if($student_year) {
-                                                if (strtoupper(substr($student_year, 0, 1)) === 'E') {
-                                                    echo 'Extension Year ' . substr($student_year, 1);
-                                                } elseif (is_numeric($student_year)) {
-                                                    echo 'Year ' . $student_year;
-                                                } else {
-                                                    echo ucfirst($student_year);
-                                                }
-                                            } else {
-                                                echo 'your year';
-                                            }
-                                            ?>
-                                        </p>
-                                        <p style="margin-top: 10px; font-size: 0.9rem;">
-                                            Please check with your department head or administrator.
-                                        </p>
-                                    </div>
-                                </td>
-                            </tr>
-                        <?php endif; ?>
-                        </tbody>
-                    </table>
-                </div>
                 
-                <?php if($hasTodayClass): ?>
-                <div style="margin-top: 15px; padding: 10px; background: var(--info-bg); border-radius: 8px; border-left: 4px solid #f59e0b;">
-                    <small style="color: var(--info-text); font-weight: 600;">
-                        <i class="fas fa-info-circle"></i> Highlighted rows indicate today's classes
-                    </small>
-                </div>
+                <?php if(!empty($search) && empty($my_schedule)): ?>
+                    <div class="no-results">
+                        <i class="fas fa-search"></i>
+                        <h3>No courses found</h3>
+                        <p>No courses match your search for "<?= htmlspecialchars($search) ?>"</p>
+                        <a href="my_schedule.php" class="try-again-btn">
+                            <i class="fas fa-redo"></i> View All Courses
+                        </a>
+                    </div>
+                <?php else: ?>
+                    <div class="table-container">
+                        <table class="schedule-table">
+                            <thead>
+                                <tr>
+                                    <th>Course</th>
+                                    <th>Instructor</th>
+                                    <th>Room</th>
+                                    <th>Day</th>
+                                    <th>Time</th>
+                                    <th>Year</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            <?php 
+                            $today = date('l');
+                            $hasTodayClass = false;
+                            foreach($my_schedule as $s): 
+                                $todayClass = ($s['day']==$today) ? 'today-row' : '';
+                                if($s['day']==$today) $hasTodayClass = true;
+                            ?>
+                                <tr class="<?= $todayClass ?>">
+                                    <td>
+                                        <?= htmlspecialchars($s['course_name']) ?>
+                                        <?php if(!empty($s['course_code'])): ?>
+                                            <div class="course-code"><?= htmlspecialchars($s['course_code']) ?></div>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td><?= htmlspecialchars($s['instructor_name']) ?></td>
+                                    <td><?= htmlspecialchars($s['room_name']) ?></td>
+                                    <td><?= htmlspecialchars($s['day']) ?></td>
+                                    <td><?= date('g:i A', strtotime($s['start_time'])) . ' - ' . date('g:i A', strtotime($s['end_time'])) ?></td>
+                                    <td><small><?= htmlspecialchars($s['schedule_year']) ?></small></td>
+                                </tr>
+                            <?php endforeach; ?>
+                            <?php if(empty($my_schedule) && empty($search)): ?>
+                                <tr>
+                                    <td colspan="6">
+                                        <div class="empty-state">
+                                            <i class="fas fa-calendar-times"></i>
+                                            <h3>No Classes Scheduled</h3>
+                                            <p>You don't have any classes scheduled for 
+                                                <?php 
+                                                if($student_year) {
+                                                    if (strtoupper(substr($student_year, 0, 1)) === 'E') {
+                                                        echo 'Extension Year ' . substr($student_year, 1);
+                                                    } elseif (is_numeric($student_year)) {
+                                                        echo 'Year ' . $student_year;
+                                                    } else {
+                                                        echo ucfirst($student_year);
+                                                    }
+                                                } else {
+                                                    echo 'your year';
+                                                }
+                                                ?>
+                                            </p>
+                                            <p style="margin-top: 10px; font-size: 0.9rem;">
+                                                Please check with your department head or administrator.
+                                            </p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <?php if($hasTodayClass && !empty($my_schedule)): ?>
+                    <div style="margin-top: 15px; padding: 10px; background: var(--info-bg); border-radius: 8px; border-left: 4px solid #f59e0b;">
+                        <small style="color: var(--info-text); font-weight: 600;">
+                            <i class="fas fa-info-circle"></i> Highlighted rows indicate today's classes
+                        </small>
+                    </div>
+                    <?php endif; ?>
                 <?php endif; ?>
             </div>
         </div>
@@ -1202,6 +1482,17 @@ if(isset($_GET['export']) && $_GET['export'] == 'excel') {
                 link.classList.add('active');
             }
         });
+        
+        // Focus on search box if search parameter exists
+        const urlParams = new URLSearchParams(window.location.search);
+        const searchParam = urlParams.get('search');
+        if (searchParam) {
+            const searchBox = document.querySelector('.search-box');
+            if (searchBox) {
+                searchBox.focus();
+                searchBox.setSelectionRange(searchParam.length, searchParam.length);
+            }
+        }
     });
 
     // Confirm logout
@@ -1223,6 +1514,27 @@ if(isset($_GET['export']) && $_GET['export'] == 'excel') {
                 row.style.transform = 'translateX(0)';
             }, index * 50);
         });
+    });
+
+    // Enhance search functionality with keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        // Focus search box with Ctrl+F or Cmd+F
+        if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+            e.preventDefault();
+            const searchBox = document.querySelector('.search-box');
+            if (searchBox) {
+                searchBox.focus();
+                searchBox.select();
+            }
+        }
+        
+        // Clear search with Escape key
+        if (e.key === 'Escape') {
+            const searchBox = document.querySelector('.search-box');
+            if (searchBox && searchBox.value) {
+                window.location.href = 'my_schedule.php';
+            }
+        }
     });
     </script>
 </body>

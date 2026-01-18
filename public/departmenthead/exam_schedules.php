@@ -341,9 +341,8 @@ $student_type_distribution = $student_type_stmt->fetchAll();
 $default_year = date('Y') . '-' . (date('Y') + 1);
 $default_semester = date('n') <= 6 ? '2nd Semester' : '1st Semester';
 ?>
-
 <!DOCTYPE html>
-<html lang="en" data-theme="<?= $darkMode ? 'dark' : 'light' ?>">
+<html lang="en" data-theme="<?php echo $darkMode ? 'dark' : 'light'; ?>">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -368,11 +367,94 @@ body {
     line-height: 1.6;
 }
 
+/* ================= University Header ================= */
+.university-header {
+    background: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%);
+    color: white;
+    padding: 0.5rem 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1201;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.dku-logo-img {
+    width: 45px;
+    height: 45px;
+    object-fit: contain;
+    border-radius: 5px;
+    background: white;
+    padding: 4px;
+}
+
+.system-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    opacity: 0.95;
+}
+
+.header-right {
+    font-size: 0.8rem;
+    opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+    .university-header {
+        padding: 0.5rem 15px;
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+    }
+    
+    .header-left, .header-right {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .system-title {
+        font-size: 0.8rem;
+    }
+    
+    .header-right {
+        font-size: 0.75rem;
+    }
+}
+
+/* Adjust other elements for university header */
+.topbar {
+    top: 60px !important; /* Adjusted for university header */
+}
+
+.sidebar {
+    top: 60px !important; /* Adjusted for university header */
+    height: calc(100% - 60px) !important;
+}
+
+.overlay {
+    top: 60px; /* Adjusted for university header */
+    height: calc(100% - 60px);
+}
+
+.main-content {
+    margin-top: 60px; /* Added for university header */
+}
+
 /* ================= Topbar for Hamburger ================= */
 .topbar {
     display: none;
     position: fixed; 
-    top:0; 
+    top:60px; 
     left:0; 
     width:100%;
     background:var(--bg-sidebar); 
@@ -409,75 +491,18 @@ body {
 /* ================= Sidebar ================= */
 .sidebar {
     position: fixed; 
-    top:0; 
+    top:60px; 
     left:0;
     width:250px; 
-    height:100%;
+    height:calc(100% - 60px);
     background:var(--bg-sidebar); 
     color:var(--text-sidebar);
-    z-index:1100;
-    transition: transform 0.3s ease;
-    padding: 20px 0;
-}
-
-.sidebar.hidden { 
-    transform:translateX(-260px); 
-}
-
-.sidebar a { 
-    display:block; 
-    padding:12px 20px; 
-    color:var(--text-sidebar); 
-    text-decoration:none; 
-    transition: background 0.3s; 
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-}
-
-.sidebar a:hover, .sidebar a.active { 
-    background:#1abc9c; 
-    color:white; 
-}
-
-.sidebar-profile {
-    text-align: center;
-    margin-bottom: 20px;
-    padding: 0 20px 20px;
-    border-bottom: 1px solid rgba(255,255,255,0.2);
-}
-
-.sidebar-profile img {
-    width: 100px;
-    height: 100px;
-    border-radius: 50%;
-    object-fit: cover;
-    margin-bottom: 10px;
-    border: 2px solid #1abc9c;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-}
-
-.sidebar-profile p {
-    color: var(--text-sidebar);
-    font-weight: bold;
-    margin: 0;
-    font-size: 16px;
-}
-
-/* ================= Updated Sidebar ================= */
-.sidebar {
-    position: fixed; 
-    top:0; 
-    left:0;
-    width:250px; 
-    height:100%;
-    background: var(--bg-sidebar); 
-    color: var(--text-sidebar);
     z-index:1100;
     transition: transform 0.3s ease;
     display: flex;
     flex-direction: column;
     overflow: hidden;
 }
-
 .sidebar.hidden { 
     transform:translateX(-260px); 
 }
@@ -572,38 +597,19 @@ body {
     text-align: center;
 }
 
-/* Optional: Add fade effect at bottom when scrolling */
-.sidebar-content::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 30px;
-    background: linear-gradient(to bottom, transparent, var(--bg-sidebar));
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.3s;
-}
-
-.sidebar-content.scrolled::after {
-    opacity: 1;
-}
-
 /* ================= Overlay ================= */
 .overlay {
     position: fixed; 
-    top:0; 
+    top:60px; 
     left:0; 
     width:100%; 
-    height:100%;
+    height:calc(100% - 60px);
     background: rgba(0,0,0,0.4); 
     z-index:1050;
     display:none; 
     opacity:0; 
     transition: opacity 0.3s ease;
 }
-
 .overlay.active { 
     display:block; 
     opacity:1; 
@@ -617,49 +623,15 @@ body {
     background:var(--bg-primary);
     color:var(--text-primary);
     transition: all 0.3s ease;
+    margin-top: 60px; /* Added for university header */
 }
 
 @media (max-width: 768px) {
     .main-content {
         margin-left: 0;
-        padding-top: 80px;
         padding: 20px;
-    }
-}
-/* ================= Overlay ================= */
-.overlay {
-    position: fixed; 
-    top:0; 
-    left:0; 
-    width:100%; 
-    height:100%;
-    background: rgba(0,0,0,0.4); 
-    z-index:1050;
-    display:none; 
-    opacity:0; 
-    transition: opacity 0.3s ease;
-}
-
-.overlay.active { 
-    display:block; 
-    opacity:1; 
-}
-
-/* ================= Main content ================= */
-.main-content {
-    margin-left: 250px;
-    padding:30px 50px;
-    min-height:100vh;
-    background:var(--bg-primary);
-    color:var(--text-primary);
-    transition: all 0.3s ease;
-}
-
-@media (max-width: 768px) {
-    .main-content {
-        margin-left: 0;
-        padding-top: 80px;
-        padding: 20px;
+        padding-top: 140px; /* Adjusted for headers on mobile */
+        margin-top: 120px; /* 60px header + 60px topbar */
     }
 }
 
@@ -1428,17 +1400,40 @@ body {
 }
 
 /* ================= Responsive Design ================= */
-@media (max-width: 768px) {
-    .topbar {
+@media (max-width: 768px){
+    .university-header {
+        padding: 0.5rem 15px;
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+    }
+    
+    .header-left, .header-right {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .system-title {
+        font-size: 0.8rem;
+    }
+    
+    .header-right {
+        font-size: 0.75rem;
+    }
+    
+    .topbar { 
         display: flex;
+        top: 60px; /* Adjusted for mobile with header */
     }
     
-    .sidebar {
-        transform: translateX(-100%);
+    .sidebar { 
+        transform: translateX(-100%); 
+        top: 120px; /* 60px header + 60px topbar */
+        height: calc(100% - 120px) !important;
     }
     
-    .sidebar.active {
-        transform: translateX(0);
+    .sidebar.active { 
+        transform: translateX(0); 
     }
     
     .header {
@@ -1628,6 +1623,17 @@ body {
 </style>
 </head>
 <body>
+    <!-- University Header -->
+    <div class="university-header">
+        <div class="header-left">
+            <img src="../assets/images/dku logo.jpg" alt="Debark University Logo" class="dku-logo-img">
+            <div class="system-title">Debark University Class Scheduling System</div>
+        </div>
+        <div class="header-right">
+            Exam Schedules
+        </div>
+    </div>
+
     <!-- Topbar for Mobile -->
     <div class="topbar">
         <button class="menu-btn" onclick="toggleSidebar()">☰</button>
@@ -1638,46 +1644,43 @@ body {
     <div class="overlay" onclick="toggleSidebar()"></div>
 
     <!-- Sidebar -->
-<div class="sidebar" id="sidebar">
-    <div class="sidebar-content" id="sidebarContent">
-        <div class="sidebar-profile">
-            <img src="<?= htmlspecialchars($profile_src) ?>" alt="Profile Picture">
-            <p><?= htmlspecialchars($user['username'] ?? 'User') ?></p>
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-content" id="sidebarContent">
+            <div class="sidebar-profile">
+                <img src="<?php echo htmlspecialchars($profile_src); ?>" alt="Profile Picture">
+                <p><?php echo htmlspecialchars($user['username'] ?? 'User'); ?></p>
+            </div>
+            <nav>
+                <a href="departmenthead_dashboard.php" class="<?php echo $current_page=='departmenthead_dashboard.php'?'active':''; ?>">
+                    <i class="fas fa-home"></i> Dashboard
+                </a>
+                <a href="manage_enrollments.php" class="<?php echo $current_page=='manage_enrollments.php'?'active':''; ?>">
+                    <i class="fas fa-users"></i> Manage Enrollments
+                </a>
+                <a href="manage_schedules.php" class="<?php echo $current_page=='manage_schedules.php'?'active':''; ?>">
+                    <i class="fas fa-calendar-alt"></i> Manage Schedules
+                </a>
+                <a href="assign_courses.php" class="<?php echo $current_page=='assign_courses.php'?'active':''; ?>">
+                    <i class="fas fa-chalkboard-teacher"></i> Assign Courses
+                </a>
+                <a href="add_courses.php" class="<?php echo $current_page=='add_courses.php'?'active':''; ?>">
+                    <i class="fas fa-book"></i> Add Courses
+                </a>
+                <a href="exam_schedules.php" class="active">
+                    <i class="fas fa-clipboard-list"></i> Exam Schedules
+                </a>
+                <a href="edit_profile.php" class="<?php echo $current_page=='edit_profile.php'?'active':''; ?>">
+                    <i class="fas fa-user-edit"></i> Edit Profile
+                </a>
+                <a href="manage_announcements.php" class="<?php echo $current_page=='manage_announcements.php'?'active':''; ?>">
+                    <i class="fas fa-bullhorn"></i> Announcements
+                </a>
+                <a href="../logout.php">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </nav>
         </div>
-        <nav>
-            <a href="departmenthead_dashboard.php" class="<?= $current_page=='departmenthead_dashboard.php'?'active':'' ?>">
-                <i class="fas fa-home"></i> Dashboard
-            </a>
-            <a href="manage_enrollments.php" class="<?= $current_page=='manage_enrollments.php'?'active':'' ?>">
-                <i class="fas fa-users"></i> Manage Enrollments
-            </a>
-            <a href="manage_schedules.php" class="<?= $current_page=='manage_schedules.php'?'active':'' ?>">
-                <i class="fas fa-calendar-alt"></i> Manage Schedules
-            </a>
-            <a href="assign_courses.php" class="<?= $current_page=='assign_courses.php'?'active':'' ?>">
-                <i class="fas fa-chalkboard-teacher"></i> Assign Courses
-            </a>
-            <a href="add_courses.php" class="<?= $current_page=='add_courses.php'?'active':'' ?>">
-                <i class="fas fa-book"></i> Add Courses
-            </a>
-            <a href="exam_schedules.php" class="<?= $current_page=='exam_schedules.php'?'active':'' ?>">
-                <i class="fas fa-clipboard-list"></i> Exam Schedules
-            </a>
-            <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
-                <i class="fas fa-user-edit"></i> Edit Profile
-            </a>
-            <a href="manage_announcements.php" class="<?= $current_page=='manage_announcements.php'?'active':'' ?>">
-                <i class="fas fa-bullhorn"></i> Announcements
-            </a>
-            <a href="../logout.php">
-                <i class="fas fa-sign-out-alt"></i> Logout
-            </a>
-        </nav>
     </div>
-</div>
-
-<!-- Overlay for Mobile -->
-<div class="overlay" onclick="toggleSidebar()"></div>
 
     <!-- Main Content -->
     <div class="main-content">
@@ -1685,9 +1688,9 @@ body {
         <div class="header">
             <h1>Exam Schedule Management</h1>
             <div class="user-info">
-                <img src="<?= htmlspecialchars($profile_src) ?>" alt="Profile">
+                <img src="<?php echo htmlspecialchars($profile_src); ?>" alt="Profile">
                 <div>
-                    <div><?= htmlspecialchars($user['username'] ?? 'User') ?></div>
+                    <div><?php echo htmlspecialchars($user['username'] ?? 'User'); ?></div>
                     <small>Department Head</small>
                 </div>
             </div>
@@ -1695,15 +1698,15 @@ body {
 
         <!-- Welcome Section -->
         <div class="welcome-section">
-            <h1>Welcome, <?= htmlspecialchars($user['username'] ?? 'User'); ?> 👋</h1>
+            <h1>Welcome, <?php echo htmlspecialchars($user['username'] ?? 'User'); ?> 👋</h1>
             <p>Schedule and manage all department exams. Use the calendar to view and schedule exams.</p>
         </div>
 
         <!-- Messages -->
         <?php if($message): ?>
-            <div class="message <?= $message_type ?>">
-                <i class="fas fa-<?= $message_type === 'success' ? 'check-circle' : ($message_type === 'warning' ? 'exclamation-triangle' : ($message_type === 'error' ? 'exclamation-circle' : 'info-circle')) ?>"></i>
-                <?= $message ?>
+            <div class="message <?php echo $message_type; ?>">
+                <i class="fas fa-<?php echo $message_type === 'success' ? 'check-circle' : ($message_type === 'warning' ? 'exclamation-triangle' : ($message_type === 'error' ? 'exclamation-circle' : 'info-circle')); ?>"></i>
+                <?php echo $message; ?>
             </div>
         <?php endif; ?>
 
@@ -1714,7 +1717,7 @@ body {
                     <i class="fas fa-calendar-alt"></i>
                 </div>
                 <h3>Total Exams</h3>
-                <p><?= $stats['total_exams'] ?? 0 ?></p>
+                <p><?php echo $stats['total_exams'] ?? 0; ?></p>
             </div>
             
             <div class="card">
@@ -1722,7 +1725,7 @@ body {
                     <i class="fas fa-calendar-check"></i>
                 </div>
                 <h3>Upcoming Exams</h3>
-                <p><?= $stats['upcoming_exams'] ?? 0 ?></p>
+                <p><?php echo $stats['upcoming_exams'] ?? 0; ?></p>
             </div>
             
             <div class="card">
@@ -1730,7 +1733,7 @@ body {
                     <i class="fas fa-bullhorn"></i>
                 </div>
                 <h3>Published</h3>
-                <p><?= $stats['published_exams'] ?? 0 ?></p>
+                <p><?php echo $stats['published_exams'] ?? 0; ?></p>
             </div>
             
             <div class="card">
@@ -1738,7 +1741,7 @@ body {
                     <i class="fas fa-chart-pie"></i>
                 </div>
                 <h3>Exam Types</h3>
-                <p><?= $stats['exam_types_count'] ?? 0 ?></p>
+                <p><?php echo $stats['exam_types_count'] ?? 0; ?></p>
             </div>
             
             <div class="card">
@@ -1746,7 +1749,7 @@ body {
                     <i class="fas fa-user-graduate"></i>
                 </div>
                 <h3>Student Types</h3>
-                <p><?= $stats['student_types_count'] ?? 0 ?></p>
+                <p><?php echo $stats['student_types_count'] ?? 0; ?></p>
             </div>
         </div>
 
@@ -1757,9 +1760,9 @@ body {
                 <?php if(!empty($type_distribution)): ?>
                     <?php foreach($type_distribution as $type): ?>
                         <div class="type-badge">
-                            <i class="fas fa-<?= $type['exam_type'] == 'Midterm' ? 'file-alt' : ($type['exam_type'] == 'Final' ? 'graduation-cap' : ($type['exam_type'] == 'Quiz' ? 'question-circle' : 'tasks')) ?>"></i>
-                            <span><?= htmlspecialchars($type['exam_type']) ?></span>
-                            <span class="count"><?= $type['count'] ?></span>
+                            <i class="fas fa-<?php echo $type['exam_type'] == 'Midterm' ? 'file-alt' : ($type['exam_type'] == 'Final' ? 'graduation-cap' : ($type['exam_type'] == 'Quiz' ? 'question-circle' : 'tasks')); ?>"></i>
+                            <span><?php echo htmlspecialchars($type['exam_type']); ?></span>
+                            <span class="count"><?php echo $type['count']; ?></span>
                         </div>
                     <?php endforeach; ?>
                 <?php else: ?>
@@ -1771,10 +1774,10 @@ body {
             <div class="student-type-distribution">
                 <?php if(!empty($student_type_distribution)): ?>
                     <?php foreach($student_type_distribution as $dist): ?>
-                        <div class="student-type-badge <?= $dist['student_type'] ?>">
-                            <i class="fas fa-<?= $dist['student_type'] == 'regular' ? 'user' : 'user-tie' ?>"></i>
-                            <span><?= ucfirst($dist['student_type']) ?> - Year <?= $dist['year'] ?></span>
-                            <span class="count"><?= $dist['count'] ?></span>
+                        <div class="student-type-badge <?php echo $dist['student_type']; ?>">
+                            <i class="fas fa-<?php echo $dist['student_type'] == 'regular' ? 'user' : 'user-tie'; ?>"></i>
+                            <span><?php echo ucfirst($dist['student_type']); ?> - Year <?php echo htmlspecialchars($dist['year']); ?></span>
+                            <span class="count"><?php echo $dist['count']; ?></span>
                         </div>
                     <?php endforeach; ?>
                 <?php else: ?>
@@ -1824,41 +1827,41 @@ body {
                                 <tr>
                                     <td>
                                         <strong style="color: var(--text-primary); display: block; margin-bottom: 0.25rem;">
-                                            <?= htmlspecialchars($exam['course_code']) ?>
+                                            <?php echo htmlspecialchars($exam['course_code']); ?>
                                         </strong>
-                                        <small style="color: var(--text-secondary);"><?= htmlspecialchars($exam['course_name']) ?></small>
+                                        <small style="color: var(--text-secondary);"><?php echo htmlspecialchars($exam['course_name']); ?></small>
                                     </td>
                                     <td>
-                                        <span class="badge badge-primary"><?= htmlspecialchars($exam['exam_type']) ?></span>
+                                        <span class="badge badge-primary"><?php echo htmlspecialchars($exam['exam_type']); ?></span>
                                     </td>
                                     <td>
                                         <strong style="color: var(--text-primary); display: block; margin-bottom: 0.25rem;">
-                                            <?= date('M d, Y', strtotime($exam['exam_date'])) ?>
+                                            <?php echo date('M d, Y', strtotime($exam['exam_date'])); ?>
                                         </strong>
                                         <small style="color: var(--text-secondary);">
-                                            <?= date('h:i A', strtotime($exam['start_time'])) ?> - <?= date('h:i A', strtotime($exam['end_time'])) ?>
+                                            <?php echo date('h:i A', strtotime($exam['start_time'])); ?> - <?php echo date('h:i A', strtotime($exam['end_time'])); ?>
                                         </small>
                                     </td>
                                     <td>
                                         <strong style="color: var(--text-primary); display: block; margin-bottom: 0.25rem;">
-                                            <?= htmlspecialchars($exam['room_name']) ?>
+                                            <?php echo htmlspecialchars($exam['room_name']); ?>
                                         </strong>
-                                        <small style="color: var(--text-secondary);">Capacity: <?= $exam['capacity'] ?></small>
+                                        <small style="color: var(--text-secondary);">Capacity: <?php echo $exam['capacity']; ?></small>
                                     </td>
                                     <td>
                                         <div style="display: flex; align-items: center; gap: 5px;">
                                             <span style="font-weight: 500; color: var(--text-primary);">
-                                                <?= ucfirst($exam['student_type']) ?>
+                                                <?php echo ucfirst($exam['student_type']); ?>
                                             </span>
-                                            <span class="year-badge <?= $exam['student_type'] ?>-year-badge">
-                                                Year <?= $exam['year'] ?>
+                                            <span class="year-badge <?php echo $exam['student_type']; ?>-year-badge">
+                                                Year <?php echo $exam['year']; ?>
                                             </span>
                                         </div>
                                     </td>
                                     <td>
                                         <?php if($exam['supervisor_name']): ?>
                                             <div style="color: var(--text-primary); font-weight: 500;">
-                                                <?= htmlspecialchars($exam['supervisor_name']) ?>
+                                                <?php echo htmlspecialchars($exam['supervisor_name']); ?>
                                             </div>
                                         <?php else: ?>
                                             <span class="badge badge-warning">Not Assigned</span>
@@ -1866,7 +1869,7 @@ body {
                                     </td>
                                     <td>
                                         <div style="font-weight: 600; color: var(--text-primary);">
-                                            <?= $exam['max_students'] ?> max
+                                            <?php echo $exam['max_students']; ?> max
                                         </div>
                                         <div class="progress-container">
                                             <div class="progress-bar">
@@ -1897,25 +1900,25 @@ body {
                                     </td>
                                     <td>
                                         <div class="btn-group">
-                                            <a href="?edit=<?= $exam['exam_id'] ?>" class="btn btn-warning btn-sm">
+                                            <a href="?edit=<?php echo $exam['exam_id']; ?>" class="btn btn-warning btn-sm">
                                                 <i class="fas fa-edit"></i> Edit
                                             </a>
                                             
                                             <?php if($exam['is_published'] == 0): ?>
-                                                <a href="?publish=<?= $exam['exam_id'] ?>&action=publish" 
+                                                <a href="?publish=<?php echo $exam['exam_id']; ?>&action=publish" 
                                                    class="btn btn-success btn-sm"
                                                    onclick="return confirm('Publish this exam? Students will be able to see it.')">
                                                     <i class="fas fa-eye"></i> Publish
                                                 </a>
                                             <?php else: ?>
-                                                <a href="?publish=<?= $exam['exam_id'] ?>&action=unpublish" 
+                                                <a href="?publish=<?php echo $exam['exam_id']; ?>&action=unpublish" 
                                                    class="btn btn-secondary btn-sm"
                                                    onclick="return confirm('Unpublish this exam? Students will no longer see it.')">
                                                     <i class="fas fa-eye-slash"></i> Unpublish
                                                 </a>
                                             <?php endif; ?>
                                             
-                                            <a href="?delete=<?= $exam['exam_id'] ?>" 
+                                            <a href="?delete=<?php echo $exam['exam_id']; ?>" 
                                                class="btn btn-danger btn-sm"
                                                onclick="return confirm('Are you sure you want to delete this exam schedule?')">
                                                 <i class="fas fa-trash"></i> Delete
@@ -1945,14 +1948,14 @@ body {
     <div id="examModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3><i class="fas fa-calendar-plus"></i> <?= $edit_exam ? 'Edit Exam Schedule' : 'Create New Exam Schedule' ?></h3>
+                <h3><i class="fas fa-calendar-plus"></i> <?php echo $edit_exam ? 'Edit Exam Schedule' : 'Create New Exam Schedule'; ?></h3>
                 <button class="modal-close" onclick="closeExamModal()">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
             <div class="modal-body">
                 <form method="POST" action="" id="examForm">
-                    <input type="hidden" name="exam_id" value="<?= $edit_exam['exam_id'] ?? '' ?>">
+                    <input type="hidden" name="exam_id" value="<?php echo $edit_exam['exam_id'] ?? ''; ?>">
                     
                     <div class="form-row">
                         <div class="form-group">
@@ -1963,9 +1966,9 @@ body {
                                 // Reset courses pointer and loop
                                 $courses->execute([$dept_id]);
                                 while($course = $courses->fetch()): ?>
-                                    <option value="<?= $course['course_id'] ?>" 
-                                        <?= ($edit_exam['course_id'] ?? '') == $course['course_id'] ? 'selected' : '' ?>>
-                                        <?= htmlspecialchars($course['course_code']) ?> - <?= htmlspecialchars($course['course_name']) ?>
+                                    <option value="<?php echo $course['course_id']; ?>" 
+                                        <?php echo ($edit_exam['course_id'] ?? '') == $course['course_id'] ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($course['course_code']); ?> - <?php echo htmlspecialchars($course['course_name']); ?>
                                     </option>
                                 <?php endwhile; ?>
                             </select>
@@ -1975,11 +1978,11 @@ body {
                             <label for="exam_type">Exam Type <span>*</span></label>
                             <select class="form-control" id="exam_type" name="exam_type" required>
                                 <option value="">Select Type</option>
-                                <option value="Midterm" <?= ($edit_exam['exam_type'] ?? '') == 'Midterm' ? 'selected' : '' ?>>Midterm</option>
-                                <option value="Final" <?= ($edit_exam['exam_type'] ?? '') == 'Final' ? 'selected' : '' ?>>Final</option>
-                                <option value="Quiz" <?= ($edit_exam['exam_type'] ?? '') == 'Quiz' ? 'selected' : '' ?>>Quiz</option>
-                                <option value="Practical" <?= ($edit_exam['exam_type'] ?? '') == 'Practical' ? 'selected' : '' ?>>Practical</option>
-                                <option value="Project Defense" <?= ($edit_exam['exam_type'] ?? '') == 'Project Defense' ? 'selected' : '' ?>>Project Defense</option>
+                                <option value="Midterm" <?php echo ($edit_exam['exam_type'] ?? '') == 'Midterm' ? 'selected' : ''; ?>>Midterm</option>
+                                <option value="Final" <?php echo ($edit_exam['exam_type'] ?? '') == 'Final' ? 'selected' : ''; ?>>Final</option>
+                                <option value="Quiz" <?php echo ($edit_exam['exam_type'] ?? '') == 'Quiz' ? 'selected' : ''; ?>>Quiz</option>
+                                <option value="Practical" <?php echo ($edit_exam['exam_type'] ?? '') == 'Practical' ? 'selected' : ''; ?>>Practical</option>
+                                <option value="Project Defense" <?php echo ($edit_exam['exam_type'] ?? '') == 'Project Defense' ? 'selected' : ''; ?>>Project Defense</option>
                             </select>
                         </div>
                     </div>
@@ -1988,19 +1991,19 @@ body {
                         <div class="form-group">
                             <label for="exam_date">Exam Date <span>*</span></label>
                             <input type="date" class="form-control" id="exam_date" name="exam_date" 
-                                   value="<?= $edit_exam['exam_date'] ?? date('Y-m-d') ?>" min="<?= date('Y-m-d') ?>" required>
+                                   value="<?php echo $edit_exam['exam_date'] ?? date('Y-m-d'); ?>" min="<?php echo date('Y-m-d'); ?>" required>
                         </div>
                         
                         <div class="form-group">
                             <label for="start_time">Start Time <span>*</span></label>
                             <input type="time" class="form-control" id="start_time" name="start_time" 
-                                   value="<?= $edit_exam['start_time'] ?? '09:00' ?>" required>
+                                   value="<?php echo $edit_exam['start_time'] ?? '09:00'; ?>" required>
                         </div>
                         
                         <div class="form-group">
                             <label for="end_time">End Time <span>*</span></label>
                             <input type="time" class="form-control" id="end_time" name="end_time" 
-                                   value="<?= $edit_exam['end_time'] ?? '10:30' ?>" required>
+                                   value="<?php echo $edit_exam['end_time'] ?? '10:30'; ?>" required>
                         </div>
                     </div>
                     
@@ -2013,10 +2016,10 @@ body {
                                 // Reset rooms pointer and loop
                                 $rooms->execute();
                                 while($room = $rooms->fetch()): ?>
-                                    <option value="<?= $room['room_id'] ?>" 
-                                        <?= ($edit_exam['room_id'] ?? '') == $room['room_id'] ? 'selected' : '' ?>
-                                        data-capacity="<?= $room['capacity'] ?>">
-                                        <?= htmlspecialchars($room['room_name']) ?> (Capacity: <?= $room['capacity'] ?>)
+                                    <option value="<?php echo $room['room_id']; ?>" 
+                                        <?php echo ($edit_exam['room_id'] ?? '') == $room['room_id'] ? 'selected' : ''; ?>
+                                        data-capacity="<?php echo $room['capacity']; ?>">
+                                        <?php echo htmlspecialchars($room['room_name']); ?> (Capacity: <?php echo $room['capacity']; ?>)
                                     </option>
                                 <?php endwhile; ?>
                             </select>
@@ -2036,10 +2039,10 @@ body {
                                 <option value="">No Supervisor</option>
                                 <?php if($instructor_count > 0): ?>
                                     <?php foreach($instructors_list as $instructor): ?>
-                                        <option value="<?= $instructor['user_id'] ?>" 
-                                            <?= ($edit_exam['supervisor_id'] ?? '') == $instructor['user_id'] ? 'selected' : '' ?>>
-                                            <?= htmlspecialchars($instructor['full_name'] ?? $instructor['username']) ?>
-                                            ( <?= $instructor['username'] ?>)
+                                        <option value="<?php echo $instructor['user_id']; ?>" 
+                                            <?php echo ($edit_exam['supervisor_id'] ?? '') == $instructor['user_id'] ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($instructor['full_name'] ?? $instructor['username']); ?>
+                                            ( <?php echo $instructor['username']; ?>)
                                         </option>
                                     <?php endforeach; ?>
                                 <?php else: ?>
@@ -2049,7 +2052,7 @@ body {
                             
                             <?php if($instructor_count > 0): ?>
                                 <small style="display: block; margin-top: 5px; color: var(--text-secondary); font-size: 0.85em;">
-                                    <i class="fas fa-info-circle"></i> Found <?= $instructor_count ?> instructor(s) in system
+                                    <i class="fas fa-info-circle"></i> Found <?php echo $instructor_count; ?> instructor(s) in system
                                 </small>
                             <?php else: ?>
                                 <small style="display: block; margin-top: 5px; color: #ef4444; font-size: 0.85em;">
@@ -2063,15 +2066,15 @@ body {
                         <div class="form-group">
                             <label for="academic_year">Academic Year <span>*</span></label>
                             <input type="text" class="form-control" id="academic_year" name="academic_year" 
-                                   value="<?= $edit_exam['academic_year'] ?? $default_year ?>" 
+                                   value="<?php echo $edit_exam['academic_year'] ?? $default_year; ?>" 
                                    placeholder="e.g., 2023-2024" required>
                         </div>
                         
                         <div class="form-group">
                             <label for="semester">Semester <span>*</span></label>
                             <select class="form-control" id="semester" name="semester" required>
-                                <option value="1st Semester" <?= ($edit_exam['semester'] ?? $default_semester) == '1st Semester' ? 'selected' : '' ?>>1st Semester</option>
-                                <option value="2nd Semester" <?= ($edit_exam['semester'] ?? $default_semester) == '2nd Semester' ? 'selected' : '' ?>>2nd Semester</option>
+                                <option value="1st Semester" <?php echo ($edit_exam['semester'] ?? $default_semester) == '1st Semester' ? 'selected' : ''; ?>>1st Semester</option>
+                                <option value="2nd Semester" <?php echo ($edit_exam['semester'] ?? $default_semester) == '2nd Semester' ? 'selected' : ''; ?>>2nd Semester</option>
                             </select>
                         </div>
                     </div>
@@ -2080,8 +2083,8 @@ body {
                         <div class="form-group">
                             <label for="student_type">Student Type <span>*</span></label>
                             <select class="form-control" id="student_type" name="student_type" required onchange="updateYearOptions()">
-                                <option value="regular" <?= ($edit_exam['student_type'] ?? 'regular') == 'regular' ? 'selected' : '' ?>>Regular</option>
-                                <option value="extension" <?= ($edit_exam['student_type'] ?? '') == 'extension' ? 'selected' : '' ?>>Extension</option>
+                                <option value="regular" <?php echo ($edit_exam['student_type'] ?? 'regular') == 'regular' ? 'selected' : ''; ?>>Regular</option>
+                                <option value="extension" <?php echo ($edit_exam['student_type'] ?? '') == 'extension' ? 'selected' : ''; ?>>Extension</option>
                             </select>
                             <small style="color: var(--text-secondary); font-size: 0.875rem;">
                                 <i class="fas fa-info-circle"></i> Regular: Year 1-5, Extension: Year E1-E5
@@ -2098,7 +2101,7 @@ body {
                         <div class="form-group">
                             <label for="max_students">Maximum Students <span>*</span></label>
                             <input type="number" class="form-control" id="max_students" name="max_students" 
-                                   value="<?= $edit_exam['max_students'] ?? 50 ?>" min="1" max="500" required>
+                                   value="<?php echo $edit_exam['max_students'] ?? 50; ?>" min="1" max="500" required>
                         </div>
                     </div>
                     
@@ -2106,7 +2109,7 @@ body {
                     <div class="form-group">
                         <div class="checkbox-group">
                             <input type="checkbox" id="is_published" name="is_published" value="1" 
-                                   <?= isset($edit_exam['is_published']) && $edit_exam['is_published'] == 1 ? 'checked' : '' ?>>
+                                   <?php echo isset($edit_exam['is_published']) && $edit_exam['is_published'] == 1 ? 'checked' : ''; ?>>
                             <label for="is_published">
                                 Publish this exam (make visible to students)
                             </label>
@@ -2118,7 +2121,7 @@ body {
                     
                     <div class="form-actions">
                         <button type="submit" name="save_exam" class="btn btn-primary">
-                            <i class="fas fa-save"></i> <?= $edit_exam ? 'Update Exam' : 'Create Exam Schedule' ?>
+                            <i class="fas fa-save"></i> <?php echo $edit_exam ? 'Update Exam' : 'Create Exam Schedule'; ?>
                         </button>
                         <button type="button" class="btn btn-secondary" onclick="closeExamModal()">
                             <i class="fas fa-times"></i> Cancel
@@ -2175,7 +2178,7 @@ body {
             
             // If editing, select the saved year
             <?php if(isset($edit_exam)): ?>
-                if(year === '<?= $edit_exam['year'] ?? '' ?>') {
+                if(year === '<?php echo $edit_exam['year'] ?? ''; ?>') {
                     option.selected = true;
                 }
             <?php endif; ?>
@@ -2185,10 +2188,10 @@ body {
         
         // If editing and year not in options (shouldn't happen), add it
         <?php if(isset($edit_exam)): ?>
-            if(!years.includes('<?= $edit_exam['year'] ?? '' ?>') && '<?= $edit_exam['year'] ?? '' ?>' !== '') {
+            if(!years.includes('<?php echo $edit_exam['year'] ?? ''; ?>') && '<?php echo $edit_exam['year'] ?? ''; ?>' !== '') {
                 const option = document.createElement('option');
-                option.value = '<?= $edit_exam['year'] ?>';
-                option.textContent = `Year <?= $edit_exam['year'] ?>`;
+                option.value = '<?php echo $edit_exam['year']; ?>';
+                option.textContent = `Year <?php echo $edit_exam['year']; ?>`;
                 option.selected = true;
                 yearSelect.appendChild(option);
             }
@@ -2220,7 +2223,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const calendarEl = document.getElementById('examCalendar');
     
     // Prepare events from PHP data
-    const calendarEvents = <?= json_encode(array_map(function($exam) {
+    const calendarEvents = <?php echo json_encode(array_map(function($exam) {
         $colorMap = [
             'Midterm' => '#6366f1',
             'Final' => '#ef4444',
@@ -2246,7 +2249,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 'year' => $exam['year']
             ]
         ];
-    }, $exams)) ?>;
+    }, $exams)); ?>;
     
     const calendar = new FullCalendar.Calendar(calendarEl, {
         initialView: 'dayGridMonth',

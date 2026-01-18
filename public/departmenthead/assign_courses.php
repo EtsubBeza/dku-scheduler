@@ -306,7 +306,6 @@ foreach($all_assignments as $assignment) {
 sort($years);
 rsort($years); // Show most recent first
 ?>
-
 <!DOCTYPE html>
 <html lang="en" data-theme="<?= $darkMode ? 'dark' : 'light' ?>">
 <head>
@@ -320,10 +319,89 @@ rsort($years); // Show most recent first
 <style>
 * { box-sizing: border-box; margin:0; padding:0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
 
+/* ================= University Header ================= */
+.university-header {
+    background: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%);
+    color: white;
+    padding: 0.5rem 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1201;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.dku-logo-img {
+    width: 45px;
+    height: 45px;
+    object-fit: contain;
+    border-radius: 5px;
+    background: white;
+    padding: 4px;
+}
+
+.system-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    opacity: 0.95;
+}
+
+.header-right {
+    font-size: 0.8rem;
+    opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+    .university-header {
+        padding: 0.5rem 15px;
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+    }
+    
+    .header-left, .header-right {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .system-title {
+        font-size: 0.8rem;
+    }
+    
+    .header-right {
+        font-size: 0.75rem;
+    }
+}
+
+/* Adjust other elements for university header */
+.topbar {
+    top: 60px !important; /* Adjusted for university header */
+}
+
+.sidebar {
+    top: 60px !important; /* Adjusted for university header */
+    height: calc(100% - 60px) !important;
+}
+
+.overlay {
+    top: 60px; /* Adjusted for university header */
+    height: calc(100% - 60px);
+}
+
 /* ================= Topbar for Hamburger ================= */
 .topbar {
     display: none;
-    position: fixed; top:0; left:0; width:100%;
+    position: fixed; top:60px; left:0; width:100%;
     background:var(--bg-sidebar); color:var(--text-sidebar);
     padding:15px 20px;
     z-index:1200;
@@ -343,66 +421,16 @@ rsort($years); // Show most recent first
 
 /* ================= Sidebar ================= */
 .sidebar {
-    position: fixed; top:0; left:0;
-    width:250px; height:100%;
+    position: fixed; top:60px; left:0;
+    width:250px; height:calc(100% - 60px);
     background:var(--bg-sidebar); color:var(--text-sidebar);
     z-index:1100;
-    transition: transform 0.3s ease;
-    padding: 20px 0;
-}
-.sidebar.hidden { transform:translateX(-260px); }
-.sidebar a { 
-    display:block; 
-    padding:12px 20px; 
-    color:var(--text-sidebar); 
-    text-decoration:none; 
-    transition: background 0.3s; 
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-}
-.sidebar a:hover, .sidebar a.active { background:#1abc9c; color:white; }
-
-.sidebar-profile {
-    text-align: center;
-    margin-bottom: 20px;
-    padding: 0 20px 20px;
-    border-bottom: 1px solid rgba(255,255,255,0.2);
-}
-
-.sidebar-profile img {
-    width: 100px;
-    height: 100px;
-    border-radius: 50%;
-    object-fit: cover;
-    margin-bottom: 10px;
-    border: 2px solid #1abc9c;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-}
-
-.sidebar-profile p {
-    color: var(--text-sidebar);
-    font-weight: bold;
-    margin: 0;
-    font-size: 16px;
-}
-/* ================= Updated Sidebar ================= */
-.sidebar {
-    position: fixed; 
-    top: 0; 
-    left: 0;
-    width: 250px; 
-    height: 100%;
-    background: var(--bg-sidebar); 
-    color: var(--text-sidebar);
-    z-index: 1100;
     transition: transform 0.3s ease;
     display: flex;
     flex-direction: column;
     overflow: hidden;
 }
-
-.sidebar.hidden { 
-    transform: translateX(-260px); 
-}
+.sidebar.hidden { transform:translateX(-260px); }
 
 /* Sidebar Content (scrollable) */
 .sidebar-content {
@@ -441,13 +469,12 @@ rsort($years); // Show most recent first
     background: rgba(255, 255, 255, 0.3);
 }
 
-/* Sidebar Profile */
 .sidebar-profile {
     text-align: center;
     margin-bottom: 25px;
     padding: 0 20px 20px;
     border-bottom: 1px solid rgba(255,255,255,0.2);
-    flex-shrink: 0; /* Prevent shrinking */
+    flex-shrink: 0;
 }
 
 .sidebar-profile img {
@@ -485,33 +512,16 @@ rsort($years); // Show most recent first
     align-items: center;
     gap: 10px;
     position: relative;
-    flex-shrink: 0; /* Prevent shrinking */
+    flex-shrink: 0;
 }
 .sidebar a:hover, .sidebar a.active { 
     background: #1abc9c; 
     color: white; 
 }
 
-/* Optional: Add fade effect at bottom when scrolling */
-.sidebar-content::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 30px;
-    background: linear-gradient(to bottom, transparent, var(--bg-sidebar));
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.3s;
-}
-
-.sidebar-content.scrolled::after {
-    opacity: 1;
-}
 /* ================= Overlay ================= */
 .overlay {
-    position: fixed; top:0; left:0; width:100%; height:100%;
+    position: fixed; top:60px; left:0; width:100%; height:calc(100% - 60px);
     background: rgba(0,0,0,0.4); z-index:1050;
     display:none; opacity:0; transition: opacity 0.3s ease;
 }
@@ -525,6 +535,7 @@ rsort($years); // Show most recent first
     background:var(--bg-primary);
     color:var(--text-primary);
     transition: all 0.3s ease;
+    margin-top: 60px; /* Added for university header */
 }
 
 /* Header Styles */
@@ -1011,10 +1022,44 @@ rsort($years); // Show most recent first
 
 /* ================= Responsive ================= */
 @media(max-width: 768px){
-    .topbar { display:flex; }
-    .sidebar { transform:translateX(-100%); }
-    .sidebar.active { transform:translateX(0); }
-    .main-content { margin-left:0; padding: 20px; padding-top: 80px; }
+    .university-header {
+        padding: 0.5rem 15px;
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+    }
+    
+    .header-left, .header-right {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .system-title {
+        font-size: 0.8rem;
+    }
+    
+    .header-right {
+        font-size: 0.75rem;
+    }
+    
+    .topbar { 
+        display:flex; 
+        top: 60px; /* Adjusted for mobile with header */
+    }
+    .sidebar { 
+        transform:translateX(-100%); 
+        top: 120px; /* 60px header + 60px topbar */
+        height: calc(100% - 120px) !important;
+    }
+    .sidebar.active { 
+        transform:translateX(0); 
+    }
+    .main-content { 
+        margin-left:0; 
+        padding: 20px; 
+        padding-top: 140px; /* Adjusted for headers */
+        margin-top: 120px; /* 60px header + 60px topbar */
+    }
     .header { flex-direction: column; gap: 15px; align-items: flex-start; }
     .header h1 { font-size: 1.8rem; }
     .form-row { flex-direction: column; }
@@ -1042,6 +1087,17 @@ rsort($years); // Show most recent first
 </style>
 </head>
 <body>
+    <!-- University Header -->
+    <div class="university-header">
+        <div class="header-left">
+            <img src="../assets/images/dku logo.jpg" alt="Debark University Logo" class="dku-logo-img">
+            <div class="system-title">Debark University Class Scheduling System</div>
+        </div>
+        <div class="header-right">
+            Assign Courses
+        </div>
+    </div>
+
     <!-- Topbar for Mobile -->
     <div class="topbar">
         <button class="menu-btn" onclick="toggleSidebar()">☰</button>
@@ -1052,43 +1108,44 @@ rsort($years); // Show most recent first
     <div class="overlay" onclick="toggleSidebar()"></div>
 
     <!-- Sidebar -->
-<div class="sidebar" id="sidebar">
-    <div class="sidebar-content" id="sidebarContent">
-        <div class="sidebar-profile">
-            <img src="<?= htmlspecialchars($profile_src) ?>" alt="Profile Picture">
-            <p><?= htmlspecialchars($user['username'] ?? 'User') ?></p>
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-content" id="sidebarContent">
+            <div class="sidebar-profile">
+                <img src="<?= htmlspecialchars($profile_src) ?>" alt="Profile Picture">
+                <p><?= htmlspecialchars($user['username'] ?? 'User') ?></p>
+            </div>
+            <nav>
+                <a href="departmenthead_dashboard.php" class="<?= $current_page=='departmenthead_dashboard.php'?'active':'' ?>">
+                    <i class="fas fa-home"></i> Dashboard
+                </a>
+                <a href="manage_enrollments.php" class="<?= $current_page=='manage_enrollments.php'?'active':'' ?>">
+                    <i class="fas fa-users"></i> Manage Enrollments
+                </a>
+                <a href="manage_schedules.php" class="<?= $current_page=='manage_schedules.php'?'active':'' ?>">
+                    <i class="fas fa-calendar-alt"></i> Manage Schedules
+                </a>
+                <a href="assign_courses.php" class="active">
+                    <i class="fas fa-chalkboard-teacher"></i> Assign Courses
+                </a>
+                <a href="add_courses.php" class="<?= $current_page=='add_courses.php'?'active':'' ?>">
+                    <i class="fas fa-book"></i> Add Courses
+                </a>
+                <a href="exam_schedules.php" class="<?= $current_page=='exam_schedules.php'?'active':'' ?>">
+                    <i class="fas fa-clipboard-list"></i> Exam Schedules
+                </a>
+                <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
+                    <i class="fas fa-user-edit"></i> Edit Profile
+                </a>
+                <a href="manage_announcements.php" class="<?= $current_page=='manage_announcements.php'?'active':'' ?>">
+                    <i class="fas fa-bullhorn"></i> Announcements
+                </a>
+                <a href="../logout.php">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </nav>
         </div>
-        <nav>
-            <a href="departmenthead_dashboard.php" class="<?= $current_page=='departmenthead_dashboard.php'?'active':'' ?>">
-                <i class="fas fa-home"></i> Dashboard
-            </a>
-            <a href="manage_enrollments.php" class="<?= $current_page=='manage_enrollments.php'?'active':'' ?>">
-                <i class="fas fa-users"></i> Manage Enrollments
-            </a>
-            <a href="manage_schedules.php" class="<?= $current_page=='manage_schedules.php'?'active':'' ?>">
-                <i class="fas fa-calendar-alt"></i> Manage Schedules
-            </a>
-            <a href="assign_courses.php" class="active">
-                <i class="fas fa-chalkboard-teacher"></i> Assign Courses
-            </a>
-            <a href="add_courses.php" class="<?= $current_page=='add_courses.php'?'active':'' ?>">
-                <i class="fas fa-book"></i> Add Courses
-            </a>
-            <a href="exam_schedules.php" class="<?= $current_page=='exam_schedules.php'?'active':'' ?>">
-                <i class="fas fa-clipboard-list"></i> Exam Schedules
-            </a>
-            <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
-                <i class="fas fa-user-edit"></i> Edit Profile
-            </a>
-            <a href="manage_announcements.php" class="<?= $current_page=='manage_announcements.php'?'active':'' ?>">
-                <i class="fas fa-bullhorn"></i> Announcements
-            </a>
-            <a href="../logout.php">
-                <i class="fas fa-sign-out-alt"></i> Logout
-            </a>
-        </nav>
     </div>
-</div>
+
     <!-- Main Content -->
     <div class="main-content">
         <div class="header">
@@ -1307,7 +1364,7 @@ rsort($years); // Show most recent first
                                         <?= $course_info ?>
                                     </option>
                                 <?php endforeach; ?>
-                            </select>
+                                </select>
                         </div>
 
                         <div class="form-group">

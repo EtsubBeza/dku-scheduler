@@ -305,143 +305,183 @@ $current_page = basename($_SERVER['PHP_SELF']);
 <!-- FullCalendar CSS -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css">
 <style>
-/* ================= CSS VARIABLES ================= */
-:root {
-    --bg-primary: #f9fafb;
-    --bg-secondary: #f3f4f6;
-    --bg-card: #ffffff;
-    --bg-sidebar: #1f2937;
-    --bg-input: #ffffff;
-    --text-primary: #111827;
-    --text-light: #6b7280;
-    --text-sidebar: #e5e7eb;
-    --border-color: #d1d5db;
-    --shadow-color: rgba(0, 0, 0, 0.1);
-    --hover-color: rgba(99, 102, 241, 0.05);
-    --table-header: #f9fafb;
-    --today-bg: #fffbeb;
-    --success-bg: #d1fae5;
-    --success-text: #065f46;
-    --error-bg: #fee2e2;
-    --error-text: #991b1b;
-    --warning-bg: #fef3c7;
-    --warning-text: #92400e;
-    --badge-primary-bg: #dbeafe;
-    --badge-primary-text: #1e40af;
-    --badge-success-bg: #d1fae5;
-    --badge-success-text: #065f46;
-    --badge-warning-bg: #fef3c7;
-    --badge-warning-text: #92400e;
-    --badge-danger-bg: #fee2e2;
-    --badge-danger-text: #991b1b;
-    --badge-secondary-bg: #f3f4f6;
-    --badge-secondary-text: #4b5563;
+* { box-sizing: border-box; margin:0; padding:0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+
+/* ================= University Header ================= */
+.university-header {
+    background: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%);
+    color: white;
+    padding: 0.5rem 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1201;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
-/* Dark mode overrides */
-.dark-mode {
-    --bg-primary: #111827;
-    --bg-secondary: #1f2937;
-    --bg-card: #1f2937;
-    --bg-sidebar: #111827;
-    --bg-input: #374151;
-    --text-primary: #f9fafb;
-    --text-light: #d1d5db;
-    --text-sidebar: #f3f4f6;
-    --border-color: #4b5563;
-    --shadow-color: rgba(0, 0, 0, 0.3);
-    --hover-color: rgba(99, 102, 241, 0.1);
-    --table-header: #374151;
-    --today-bg: rgba(245, 158, 11, 0.1);
-    --success-bg: rgba(16, 185, 129, 0.1);
-    --success-text: #10b981;
-    --error-bg: rgba(239, 68, 68, 0.1);
-    --error-text: #ef4444;
-    --warning-bg: rgba(245, 158, 11, 0.1);
-    --warning-text: #f59e0b;
-    --badge-primary-bg: rgba(59, 130, 246, 0.1);
-    --badge-primary-text: #93c5fd;
-    --badge-success-bg: rgba(16, 185, 129, 0.1);
-    --badge-success-text: #10b981;
-    --badge-warning-bg: rgba(245, 158, 11, 0.1);
-    --badge-warning-text: #f59e0b;
-    --badge-danger-bg: rgba(239, 68, 68, 0.1);
-    --badge-danger-text: #ef4444;
-    --badge-secondary-bg: rgba(156, 163, 175, 0.1);
-    --badge-secondary-text: #9ca3af;
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
 }
 
-/* ================= RESET & BASE STYLES ================= */
-* { 
-    box-sizing: border-box; 
-    margin:0; 
-    padding:0; 
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+.dku-logo-img {
+    width: 45px;
+    height: 45px;
+    object-fit: contain;
+    border-radius: 5px;
+    background: white;
+    padding: 4px;
 }
 
-body {
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    transition: background 0.3s ease, color 0.3s ease;
-    overflow-x: hidden;
+.system-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    opacity: 0.95;
 }
 
-/* ================= TOPBAR FOR MOBILE ================= */
+.header-right {
+    font-size: 0.8rem;
+    opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+    .university-header {
+        padding: 0.5rem 15px;
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+    }
+    
+    .header-left, .header-right {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .system-title {
+        font-size: 0.8rem;
+    }
+    
+    .header-right {
+        font-size: 0.75rem;
+    }
+}
+
+/* Adjust other elements for university header */
+.topbar {
+    top: 60px !important; /* Adjusted for university header */
+}
+
+.sidebar {
+    top: 60px !important; /* Adjusted for university header */
+    height: calc(100% - 60px) !important;
+}
+
+.overlay {
+    top: 60px; /* Adjusted for university header */
+    height: calc(100% - 60px);
+}
+
+.main-content {
+    margin-top: 60px; /* Added for university header */
+}
+
+/* ================= Topbar for Hamburger ================= */
 .topbar {
     display: none;
-    position: fixed;
-    top:0;
-    left:0;
+    position: fixed; 
+    top:60px; 
+    left:0; 
     width:100%;
-    background:var(--bg-sidebar);
+    background:var(--bg-sidebar); 
     color:var(--text-sidebar);
-    padding:15px 20px;
+    padding:12px 20px;
     z-index:1200;
-    justify-content:space-between;
+    justify-content:space-between; 
     align-items:center;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
-
 .menu-btn {
     font-size:26px;
     background:#1abc9c;
-    border:none;
+    border:none; 
     color:var(--text-sidebar);
     cursor:pointer;
-    padding:10px 14px;
+    padding:8px 12px;
     border-radius:8px;
     font-weight:600;
     transition: background 0.3s, transform 0.2s;
 }
-
-.menu-btn:hover {
-    background:#159b81;
-    transform:translateY(-2px);
+.menu-btn:hover { 
+    background:#159b81; 
+    transform:translateY(-2px); 
 }
 
-/* ================= SIDEBAR ================= */
+/* ================= Sidebar ================= */
 .sidebar {
-    position: fixed;
-    top:0;
+    position: fixed; 
+    top:60px; 
     left:0;
-    width:250px;
-    height:100%;
-    background:var(--bg-sidebar);
+    width:250px; 
+    height:calc(100% - 60px);
+    background:var(--bg-sidebar); 
     color:var(--text-sidebar);
     z-index:1100;
     transition: transform 0.3s ease;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
 }
-
 .sidebar.hidden { 
     transform:translateX(-260px); 
+}
+
+/* Sidebar Content (scrollable) */
+.sidebar-content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 20px 0;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+/* Custom scrollbar for sidebar */
+.sidebar-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sidebar-content::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 3px;
+}
+
+.sidebar-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+}
+
+.sidebar-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
+}
+
+[data-theme="dark"] .sidebar-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+[data-theme="dark"] .sidebar-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
 }
 
 /* Sidebar Profile */
 .sidebar-profile {
     text-align: center;
-    padding: 20px;
+    margin-bottom: 25px;
+    padding: 0 20px 20px;
     border-bottom: 1px solid rgba(255,255,255,0.2);
     flex-shrink: 0;
 }
@@ -463,145 +503,90 @@ body {
     font-size: 16px;
 }
 
-/* Student badge in sidebar */
-.student-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 12px;
-    border-radius: 20px;
+/* Year badge in sidebar */
+.year-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    background: <?= (substr($student_year_trimmed, 0, 1) === 'E') ? '#8b5cf6' : '#3b82f6' ?>;
+    color: white;
+    border-radius: 12px;
     font-size: 0.8rem;
     font-weight: 600;
     margin-top: 5px;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.student-badge.regular {
-    background: rgba(59, 130, 246, 0.2);
-    color: #93c5fd;
-    border-color: rgba(59, 130, 246, 0.3);
-}
-
-.student-badge.extension {
-    background: rgba(139, 92, 246, 0.2);
-    color: #c4b5fd;
-    border-color: rgba(139, 92, 246, 0.3);
-}
-
-.student-badge.freshman {
-    background: rgba(6, 182, 212, 0.2);
-    color: #67e8f9;
-    border-color: rgba(6, 182, 212, 0.3);
-}
-
-.year-badge {
-    display: inline-block;
-    padding: 2px 8px;
-    margin-left: 5px;
-    border-radius: 10px;
-    font-size: 0.7rem;
-    font-weight: 600;
-}
-
-.year-badge.regular {
-    background: #3b82f6;
-    color: white;
-}
-
-.year-badge.extension {
-    background: #8b5cf6;
-    color: white;
-}
-
-.year-badge.freshman {
-    background: #06b6d4;
-    color: white;
 }
 
 /* Sidebar Title */
 .sidebar h2 {
     text-align: center;
     color: var(--text-sidebar);
-    padding: 15px 20px;
+    margin-bottom: 25px;
     font-size: 22px;
-    border-bottom: 1px solid rgba(255,255,255,0.2);
-    flex-shrink: 0;
-    margin: 0;
+    padding: 0 20px;
 }
 
-/* Scrollable Navigation Links */
-.sidebar-nav {
-    flex: 1;
-    overflow-y: auto;
-    padding-bottom: 20px;
+/* Sidebar Navigation */
+.sidebar nav {
+    display: flex;
+    flex-direction: column;
 }
 
-/* Style the scrollbar */
-.sidebar-nav::-webkit-scrollbar {
-    width: 6px;
-}
-
-.sidebar-nav::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.1);
-    border-radius: 3px;
-}
-
-.sidebar-nav::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 3px;
-}
-
-.sidebar-nav::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.3);
-}
-
-/* Navigation Links */
 .sidebar a { 
-    display: block; 
+    display: flex; 
+    align-items: center;
+    gap: 10px;
     padding: 12px 20px; 
     color: var(--text-sidebar); 
     text-decoration: none; 
-    transition: background 0.3s; 
+    transition: all 0.3s; 
     border-bottom: 1px solid rgba(255,255,255,0.1);
 }
-
 .sidebar a:hover, .sidebar a.active { 
     background: #1abc9c; 
     color: white; 
+    padding-left: 25px;
 }
 
 .sidebar a i {
-    width: 25px;
+    width: 20px;
     text-align: center;
-    margin-right: 10px;
+    font-size: 1.1rem;
 }
 
-/* ================= OVERLAY ================= */
+/* ================= Overlay ================= */
 .overlay {
-    position: fixed;
-    top:0;
-    left:0;
-    width:100%;
-    height:100%;
-    background: rgba(0,0,0,0.4);
+    position: fixed; 
+    top:60px; 
+    left:0; 
+    width:100%; 
+    height:calc(100% - 60px);
+    background: rgba(0,0,0,0.4); 
     z-index:1050;
-    display:none;
-    opacity:0;
+    display:none; 
+    opacity:0; 
     transition: opacity 0.3s ease;
 }
-
-.overlay.active {
-    display:block;
-    opacity:1;
+.overlay.active { 
+    display:block; 
+    opacity:1; 
 }
 
-/* ================= MAIN CONTENT ================= */
+/* ================= Main content ================= */
 .main-content {
     margin-left: 250px;
     padding:20px;
     min-height:100vh;
+    background: var(--bg-primary);
     transition: all 0.3s ease;
+    margin-top: 60px;
+}
+
+@media (max-width: 768px) {
+    .main-content {
+        margin-left: 0;
+        padding: 15px;
+        padding-top: 140px; /* Adjusted for headers on mobile */
+        margin-top: 120px; /* 60px header + 60px topbar */
+    }
 }
 
 /* Content Wrapper */
@@ -613,7 +598,7 @@ body {
     min-height: calc(100vh - 40px);
 }
 
-/* ================= HEADER STYLES ================= */
+/* Header Styles */
 .header {
     display: flex;
     justify-content: space-between;
@@ -629,71 +614,6 @@ body {
     font-weight: 700;
 }
 
-/* Welcome Section */
-.welcome-section h1 {
-    font-size: 2.2rem;
-    font-weight: 700;
-    background: linear-gradient(135deg, #6366f1, #3b82f6);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    margin-bottom: 0.5rem;
-}
-
-.welcome-section p {
-    color: var(--text-secondary);
-    font-size: 1.1rem;
-    margin-top: 10px;
-}
-
-/* Student Type Display in Welcome */
-.student-type-display {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 15px;
-    border-radius: 20px;
-    font-size: 0.9rem;
-    font-weight: 600;
-    margin-top: 10px;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-}
-
-.student-type-display.regular {
-    background: rgba(59, 130, 246, 0.1);
-    color: #3b82f6;
-    border-color: rgba(59, 130, 246, 0.2);
-}
-
-.student-type-display.extension {
-    background: rgba(139, 92, 246, 0.1);
-    color: #8b5cf6;
-    border-color: rgba(139, 92, 246, 0.2);
-}
-
-.student-type-display.freshman {
-    background: rgba(6, 182, 212, 0.1);
-    color: #06b6d4;
-    border-color: rgba(6, 182, 212, 0.2);
-}
-
-/* Freshman Note */
-.freshman-note {
-    background: rgba(6, 182, 212, 0.1);
-    border: 1px solid rgba(6, 182, 212, 0.2);
-    border-radius: 8px;
-    padding: 12px 15px;
-    margin-top: 10px;
-    font-size: 0.85rem;
-    color: #06b6d4;
-}
-
-.freshman-note i {
-    color: #06b6d4;
-    margin-right: 8px;
-}
-
-/* User Info */
 .user-info {
     display: flex;
     align-items: center;
@@ -721,7 +641,56 @@ body {
     font-size: 0.875rem;
 }
 
-/* ================= STATS CARDS ================= */
+/* Welcome Section */
+.welcome-section {
+    margin-bottom: 30px;
+}
+
+.welcome-section h1 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #6366f1, #3b82f6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0.5rem;
+}
+
+.welcome-section p {
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    margin-top: 10px;
+}
+
+/* Student info box */
+.student-info-box {
+    background: rgba(99, 102, 241, 0.1);
+    padding: 15px 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    border-left: 4px solid #6366f1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-primary);
+}
+
+.student-info-box i {
+    color: #6366f1;
+    font-size: 1.2rem;
+}
+
+.student-year-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    background: <?= (substr($student_year_trimmed, 0, 1) === 'E') ? '#8b5cf6' : '#3b82f6' ?>;
+    color: white;
+    border-radius: 15px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-left: 10px;
+}
+
+/* ================= Stats Cards ================= */
 .stats-cards {
     display: flex;
     gap: 20px;
@@ -743,7 +712,7 @@ body {
 
 .stat-card:hover {
     transform: translateY(-5px);
-    box-shadow: 0 8px 15px var(--shadow-color);
+    box-shadow: 0 8px 15px var(--shadow-lg);
 }
 
 .stat-card h3 {
@@ -771,7 +740,7 @@ body {
 .stat-card .fa-clock.icon { color: #10b981; }
 .stat-card .fa-file-alt.icon { color: #f59e0b; }
 
-/* ================= CALENDAR CARD ================= */
+/* ================= Calendar Card ================= */
 .calendar-card {
     background: var(--bg-card);
     border-radius: 12px;
@@ -804,12 +773,12 @@ body {
 
 /* FullCalendar Custom Styling */
 .fc {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
 }
 
 .fc-toolbar-title {
     font-size: 1.5rem !important;
-    font-weight: 600;
+    font-weight: 600 !important;
     color: var(--text-primary) !important;
 }
 
@@ -879,7 +848,7 @@ body {
     border-color: var(--border-color) !important;
 }
 
-/* ================= EXAM TABLE ================= */
+/* ================= Exam Table ================= */
 .exam-section {
     margin-top: 30px;
 }
@@ -936,7 +905,7 @@ body {
     border-left: 4px solid #94a3b8;
 }
 
-/* ================= BADGE STYLES ================= */
+/* ================= Badge Styles ================= */
 .badge {
     display: inline-block;
     padding: 4px 10px;
@@ -1030,7 +999,7 @@ body {
     color: white;
 }
 
-/* ================= MESSAGE STYLING ================= */
+/* ================= Message Styling ================= */
 .message {
     padding: 15px;
     border-radius: 8px;
@@ -1059,7 +1028,7 @@ body {
     border-color: #f59e0b;
 }
 
-/* ================= EMPTY STATE ================= */
+/* ================= Empty State ================= */
 .empty-state {
     text-align: center;
     padding: 40px 20px;
@@ -1084,32 +1053,94 @@ body {
     margin: 0 auto;
 }
 
-/* ================= RESPONSIVE ================= */
+/* ================= Responsive ================= */
 @media (max-width: 768px) {
-    .topbar { display: flex; }
-    .sidebar { transform: translateX(-100%); }
-    .sidebar.active { transform: translateX(0); }
-    .main-content { margin-left: 0; padding: 15px; }
-    .content-wrapper { padding: 20px; border-radius: 0; }
-    .header { flex-direction: column; gap: 15px; align-items: flex-start; }
-    .header h1 { font-size: 1.8rem; }
-    .stats-cards { flex-direction: column; }
-    .stat-card { min-width: auto; }
-    .table-container { overflow-x: auto; }
-    .exam-table { min-width: 800px; }
+    .university-header {
+        padding: 0.5rem 15px;
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+    }
+    
+    .header-left, .header-right {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .system-title {
+        font-size: 0.8rem;
+    }
+    
+    .header-right {
+        font-size: 0.75rem;
+    }
+    
+    .topbar { 
+        display:flex;
+        top: 60px; /* Adjusted for mobile with header */
+    }
+    
+    .sidebar { 
+        transform:translateX(-100%); 
+        top: 120px; /* 60px header + 60px topbar */
+        height: calc(100% - 120px) !important;
+    }
+    
+    .sidebar.active { 
+        transform:translateX(0); 
+    }
+    
+    .overlay {
+        top: 120px;
+        height: calc(100% - 120px);
+    }
+    
+    .main-content {
+        padding-top: 140px; /* Adjusted for headers on mobile */
+        margin-top: 120px; /* 60px header + 60px topbar */
+    }
+    
+    .header { 
+        flex-direction: column; 
+        gap: 15px; 
+        align-items: flex-start; 
+    }
+    
+    .header h1 { 
+        font-size: 1.8rem; 
+    }
+    
+    .stats-cards { 
+        flex-direction: column; 
+    }
+    
+    .stat-card { 
+        min-width: auto; 
+    }
+    
+    .table-container { 
+        overflow-x: auto; 
+    }
+    
+    .exam-table { 
+        min-width: 800px; 
+    }
+    
     .fc-toolbar {
         flex-direction: column !important;
         gap: 10px !important;
     }
+    
     .fc-toolbar-title {
         font-size: 1.2rem !important;
     }
+    
     #examCalendar {
         padding: 10px;
     }
 }
 
-/* ================= CUSTOM SCROLLBAR ================= */
+/* ================= Custom Scrollbar ================= */
 ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -1127,9 +1158,33 @@ body {
 ::-webkit-scrollbar-thumb:hover {
     background: #4f46e5;
 }
+
+/* Improved sidebar icons */
+.sidebar a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.sidebar a i {
+    width: 20px;
+    text-align: center;
+    font-size: 1.1rem;
+}
 </style>
 </head>
 <body>
+    <!-- University Header -->
+    <div class="university-header">
+        <div class="header-left">
+            <img src="../assets/images/dku logo.jpg" alt="Debark University Logo" class="dku-logo-img">
+            <div class="system-title">Debark University Class Scheduling System</div>
+        </div>
+        <div class="header-right">
+            Exam Schedule
+        </div>
+    </div>
+
     <!-- Topbar for Mobile -->
     <div class="topbar">
         <button class="menu-btn" onclick="toggleSidebar()">☰</button>
@@ -1140,40 +1195,48 @@ body {
     <div class="overlay" onclick="toggleSidebar()"></div>
 
     <!-- Sidebar -->
-    <div class="sidebar">
-        <div class="sidebar-profile">
-            <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic">
-            <p><?= htmlspecialchars($user['username'] ?? 'Student') ?></p>
-            <div class="student-badge <?= $student_type ?>">
-                <i class="fas fa-<?= $student_type == 'regular' ? 'user-graduate' : ($student_type == 'extension' ? 'user-tie' : 'user') ?>"></i>
-                <?= ucfirst($student_type) ?> Student
-                <span class="year-badge <?= $student_type ?>">
-                    Year <?= htmlspecialchars($display_year) ?>
-                </span>
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-content">
+            <div class="sidebar-profile">
+                <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic">
+                <p><?= htmlspecialchars($user['username'] ?? 'Student') ?></p>
+                <?php if($student_year_trimmed): ?>
+                    <span class="year-badge">
+                        <?php 
+                        if (strtoupper(substr($student_year_trimmed, 0, 1)) === 'E') {
+                            echo 'Ext. Year ' . substr($student_year_trimmed, 1);
+                        } elseif (strtolower($student_year_trimmed) === 'freshman') {
+                            echo 'Freshman';
+                        } else {
+                            echo 'Year ' . $student_year_trimmed;
+                        }
+                        ?>
+                    </span>
+                <?php endif; ?>
             </div>
-        </div>
-        
-        <h2>Student Dashboard</h2>
-        
-        <div class="sidebar-nav">
-            <a href="student_dashboard.php" class="<?= $current_page=='student_dashboard.php'?'active':'' ?>">
-                <i class="fas fa-home"></i> Dashboard
-            </a>
-            <a href="my_schedule.php" class="<?= $current_page=='my_schedule.php'?'active':'' ?>">
-                <i class="fas fa-calendar-alt"></i> My Schedule
-            </a>
-            <a href="view_exam_schedules.php" class="<?= $current_page=='view_exam_schedules.php'?'active':'' ?>">
-                <i class="fas fa-clipboard-list"></i> Exam Schedule
-            </a>
-            <a href="view_announcements.php" class="<?= $current_page=='view_announcements.php'?'active':'' ?>">
-                <i class="fas fa-bullhorn"></i> Announcements
-            </a>
-            <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
-                <i class="fas fa-user-edit"></i> Edit Profile
-            </a>
-            <a href="../logout.php">
-                <i class="fas fa-sign-out-alt"></i> Logout
-            </a>
+            
+            <h2>Student Dashboard</h2>
+            
+            <nav>
+                <a href="student_dashboard.php" class="<?= $current_page=='student_dashboard.php'?'active':'' ?>">
+                    <i class="fas fa-home"></i> Dashboard
+                </a>
+                <a href="my_schedule.php" class="<?= $current_page=='my_schedule.php'?'active':'' ?>">
+                    <i class="fas fa-calendar-alt"></i> My Schedule
+                </a>
+                <a href="view_exam_schedules.php" class="active">
+                    <i class="fas fa-clipboard-list"></i> Exam Schedule
+                </a>
+                <a href="view_announcements.php" class="<?= $current_page=='view_announcements.php'?'active':'' ?>">
+                    <i class="fas fa-bullhorn"></i> Announcements
+                </a>
+                <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
+                    <i class="fas fa-user-edit"></i> Edit Profile
+                </a>
+                <a href="../logout.php">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </nav>
         </div>
     </div>
 
@@ -1184,26 +1247,37 @@ body {
                 <div class="welcome-section">
                     <h1>Exam Schedules</h1>
                     <p>View all your upcoming and past exam schedules</p>
-                    <div class="student-type-display <?= $student_type ?>">
-                        <i class="fas fa-<?= $student_type == 'regular' ? 'user-graduate' : ($student_type == 'extension' ? 'user-tie' : 'user') ?>"></i>
-                        <?= ucfirst($student_type) ?> Student - Year <?= htmlspecialchars($display_year) ?>
-                    </div>
-                    <?php if($student_year_trimmed === 'freshman'): ?>
-                    <div class="freshman-note">
-                        <i class="fas fa-info-circle"></i>
-                        Note: Showing exams for Freshman students
-                    </div>
-                    <?php endif; ?>
                 </div>
                 <div class="user-info">
                     <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile" id="headerProfilePic">
                     <div>
                         <div><?= htmlspecialchars($user['username'] ?? 'Student') ?></div>
                         <small>Student</small>
-                        <div class="student-badge <?= $student_type ?>" style="margin-top: 5px; font-size: 0.75rem;">
-                            <?= ucfirst($student_type) ?> - Year <?= htmlspecialchars($display_year) ?>
-                        </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Student Info -->
+            <div class="student-info-box">
+                <i class="fas fa-user-graduate"></i>
+                <div>
+                    <strong>Student Information:</strong> 
+                    <?= htmlspecialchars($user['username'] ?? 'Student') ?>
+                    <span class="student-year-badge">
+                        <?php 
+                        if($student_year_trimmed) {
+                            if (strtoupper(substr($student_year_trimmed, 0, 1)) === 'E') {
+                                echo 'Extension Year ' . substr($student_year_trimmed, 1);
+                            } elseif (strtolower($student_year_trimmed) === 'freshman') {
+                                echo 'Freshman';
+                            } else {
+                                echo 'Year ' . $student_year_trimmed;
+                            }
+                        } else {
+                            echo 'Year not set';
+                        }
+                        ?>
+                    </span>
                 </div>
             </div>
 
@@ -1461,6 +1535,30 @@ body {
             if (linkPage === currentPage) {
                 link.classList.add('active');
             }
+        });
+        
+        // Add animation to stats cards
+        const statCards = document.querySelectorAll('.stat-card');
+        statCards.forEach((card, index) => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            setTimeout(() => {
+                card.style.transition = 'all 0.5s ease';
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, index * 200);
+        });
+        
+        // Add animation to table rows
+        const tableRows = document.querySelectorAll('.exam-table tbody tr');
+        tableRows.forEach((row, index) => {
+            row.style.opacity = '0';
+            row.style.transform = 'translateX(-20px)';
+            setTimeout(() => {
+                row.style.transition = 'all 0.5s ease';
+                row.style.opacity = '1';
+                row.style.transform = 'translateX(0)';
+            }, index * 50);
         });
     });
     

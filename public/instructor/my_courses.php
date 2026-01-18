@@ -83,45 +83,141 @@ $current_page = basename($_SERVER['PHP_SELF']);
 <style>
 * { margin:0; padding:0; box-sizing:border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
 
+/* ================= University Header ================= */
+.university-header {
+    background: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%);
+    color: white;
+    padding: 0.5rem 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1201;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.dku-logo-img {
+    width: 45px;
+    height: 45px;
+    object-fit: contain;
+    border-radius: 5px;
+    background: white;
+    padding: 4px;
+}
+
+.system-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    opacity: 0.95;
+}
+
+.header-right {
+    font-size: 0.8rem;
+    opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+    .university-header {
+        padding: 0.5rem 15px;
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+    }
+    
+    .header-left, .header-right {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .system-title {
+        font-size: 0.8rem;
+    }
+    
+    .header-right {
+        font-size: 0.75rem;
+    }
+}
+
+/* Adjust other elements for university header */
+.topbar {
+    top: 60px !important; /* Adjusted for university header */
+}
+
+.sidebar {
+    top: 60px !important; /* Adjusted for university header */
+    height: calc(100vh - 60px) !important;
+}
+
+.overlay {
+    top: 60px; /* Adjusted for university header */
+    height: calc(100vh - 60px);
+}
+
+.main-content {
+    margin-top: 60px; /* Added for university header */
+}
+
 /* ================= Topbar for Hamburger ================= */
 .topbar {
     display: none;
-    position: fixed; top:0; left:0; width:100%;
-    background:var(--bg-sidebar); color:var(--text-sidebar);
-    padding:15px 20px;
-    z-index:1200;
-    justify-content:space-between; align-items:center;
+    position: fixed; 
+    top: 60px; /* Adjusted for university header */
+    left: 0; 
+    width: 100%;
+    background: var(--bg-sidebar); 
+    color: var(--text-sidebar);
+    padding: 15px 20px;
+    z-index: 1200;
+    justify-content: space-between; 
+    align-items: center;
     box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 .menu-btn {
-    font-size:26px;
-    background:#1abc9c;
-    border:none; color:var(--text-sidebar);
-    cursor:pointer;
-    padding:10px 14px;
-    border-radius:8px;
-    font-weight:600;
+    font-size: 26px;
+    background: #1abc9c;
+    border: none; 
+    color: var(--text-sidebar);
+    cursor: pointer;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-weight: 600;
     transition: background 0.3s, transform 0.2s;
 }
-.menu-btn:hover { background:#159b81; transform:translateY(-2px); }
+.menu-btn:hover { 
+    background: #159b81; 
+    transform: translateY(-2px); 
+}
 
 /* ================= Sidebar ================= */
 .sidebar {
     position: fixed;
-    top:0; left:0;
-    height:100vh;
-    width:240px;
+    top: 60px; /* Adjusted for university header */
+    left: 0;
+    height: calc(100vh - 60px); /* Adjusted for university header */
+    width: 240px;
     background: var(--bg-sidebar);
     padding: 30px 0 20px;
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    box-shadow:2px 0 10px rgba(0,0,0,0.2);
-    z-index:1000;
-    overflow-y:auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.2);
+    z-index: 1000;
+    overflow-y: auto;
     transition: transform 0.3s ease;
 }
-.sidebar.hidden { transform:translateX(-100%); }
+.sidebar.hidden { 
+    transform: translateX(-100%); 
+}
 
 .sidebar-profile {
     text-align: center;
@@ -150,49 +246,56 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
 .sidebar h2 {
     color: var(--text-sidebar);
-    text-align:center;
-    width:100%;
-    margin-bottom:25px;
-    font-size:22px;
+    text-align: center;
+    width: 100%;
+    margin-bottom: 25px;
+    font-size: 22px;
     padding: 0 20px;
 }
 .sidebar a {
-    padding:12px 20px;
-    text-decoration:none;
-    font-size:16px;
-    color:var(--text-sidebar);
-    width:100%;
+    padding: 12px 20px;
+    text-decoration: none;
+    font-size: 16px;
+    color: var(--text-sidebar);
+    width: 100%;
     transition: background 0.3s, color 0.3s;
-    border-radius:6px;
-    margin:3px 0;
+    border-radius: 6px;
+    margin: 3px 0;
     display: flex;
     align-items: center;
     gap: 10px;
 }
 .sidebar a.active, .sidebar a:hover {
-    background:#1abc9c;
-    color:#fff;
-    font-weight:bold;
+    background: #1abc9c;
+    color: #fff;
+    font-weight: bold;
 }
 
 /* ================= Overlay ================= */
 .overlay {
-    position: fixed; top:0; left:0; width:100%; height:100%;
-    background: rgba(0,0,0,0.4); z-index:1050;
-    display:none; opacity:0; transition: opacity 0.3s ease;
+    position: fixed; 
+    top: 60px; /* Adjusted for university header */
+    left: 0; 
+    width: 100%; 
+    height: calc(100vh - 60px); /* Adjusted for university header */
+    background: rgba(0,0,0,0.4); 
+    z-index: 1050;
+    display: none; 
+    opacity: 0; 
+    transition: opacity 0.3s ease;
 }
-.overlay.active { display:block; opacity:1; }
+.overlay.active { 
+    display: block; 
+    opacity: 1; 
+}
 
 /* ================= Main content ================= */
 .main-content {
-    margin-left:240px;
-    padding:30px;
-    flex-grow:1;
-    min-height:100vh;
+    margin-left: 240px;
+    margin-top: 60px; /* Added for university header */
+    padding: 30px;
+    min-height: calc(100vh - 60px);
     background: var(--bg-primary);
-    border-radius:12px;
-    margin-top:20px;
-    margin-bottom:20px;
     width: calc(100% - 240px);
     transition: all 0.3s ease;
 }
@@ -203,7 +306,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
     border-radius: 15px;
     padding: 30px;
     box-shadow: 0 4px 6px var(--shadow-color);
-    min-height: calc(100vh - 40px);
+    min-height: calc(100vh - 100px); /* Adjusted for header */
 }
 
 /* Header Styles */
@@ -321,6 +424,38 @@ $current_page = basename($_SERVER['PHP_SELF']);
     display: inline-flex;
     align-items: center;
     gap: 5px;
+}
+
+/* ================= Year Badge Styles ================= */
+.year-badge {
+    color: white;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    display: inline-block;
+    text-transform: capitalize;
+}
+
+.year-1 {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+}
+
+.year-2 {
+    background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.year-3 {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+}
+
+.year-4 {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+
+.year-badge.unknown {
+    background: var(--text-secondary);
+    opacity: 0.7;
 }
 
 /* View Students Button */
@@ -517,31 +652,96 @@ $current_page = basename($_SERVER['PHP_SELF']);
 }
 
 /* ================= Responsive ================= */
-@media screen and (max-width: 768px){
-    .topbar { display: flex; }
-    .sidebar { transform: translateX(-100%); width: 250px; }
-    .sidebar.active { transform: translateX(0); }
-    .main-content { margin-left: 0; padding: 15px; width: 100%; }
-    .content-wrapper { padding: 20px; border-radius: 0; }
-    .header { flex-direction: column; gap: 15px; align-items: flex-start; }
-    .header h1 { font-size: 1.8rem; }
-    .table-container { overflow-x: auto; }
-    .courses-table { min-width: 600px; }
+@media screen and (max-width: 768px) {
+    .topbar { 
+        display: flex; 
+    }
+    
+    .sidebar { 
+        transform: translateX(-100%); 
+        width: 250px;
+        top: 120px; /* 60px header + 60px topbar */
+        height: calc(100vh - 120px) !important;
+    }
+    
+    .sidebar.active { 
+        transform: translateX(0); 
+    }
+    
+    .overlay {
+        top: 120px;
+        height: calc(100vh - 120px);
+    }
+    
+    .main-content { 
+        margin-left: 0; 
+        padding: 15px; 
+        width: 100%;
+        padding-top: 140px; /* Adjusted for headers on mobile */
+        margin-top: 120px; /* 60px header + 60px topbar */
+    }
+    
+    .content-wrapper { 
+        padding: 20px; 
+        border-radius: 0; 
+    }
+    
+    .header { 
+        flex-direction: column; 
+        gap: 15px; 
+        align-items: flex-start; 
+    }
+    
+    .header h1 { 
+        font-size: 1.8rem; 
+    }
+    
+    .table-container { 
+        overflow-x: auto; 
+    }
+    
+    .courses-table { 
+        min-width: 600px; 
+    }
+    
     .modal-content { 
         margin: 10% auto; 
         padding: 20px;
         width: 95%;
     }
-    .modal-table { min-width: 500px; }
+    
+    .modal-table { 
+        min-width: 500px; 
+    }
 }
-@media screen and (max-width: 480px){
-    .modal-content { padding: 15px; }
-    .courses-table th, .courses-table td { padding: 12px 10px; }
-    .modal-table th, .modal-table td { padding: 12px 10px; }
+
+@media screen and (max-width: 480px) {
+    .modal-content { 
+        padding: 15px; 
+    }
+    
+    .courses-table th, .courses-table td { 
+        padding: 12px 10px; 
+    }
+    
+    .modal-table th, .modal-table td { 
+        padding: 12px 10px; 
+    }
 }
 </style>
 </head>
 <body>
+    <!-- University Header -->
+    <div class="university-header">
+        <div class="header-left">
+            <img src="../assets/images/dku logo.jpg" alt="Debark University Logo" class="dku-logo-img">
+            <div class="system-title">Debark University Class Scheduling System</div>
+        </div>
+        <div class="header-right">
+            My Courses
+        </div>
+    </div>
+
     <!-- Topbar for Mobile -->
     <div class="topbar">
         <button class="menu-btn" onclick="toggleSidebar()">☰</button>
@@ -551,33 +751,34 @@ $current_page = basename($_SERVER['PHP_SELF']);
     <!-- Overlay for Mobile -->
     <div class="overlay" onclick="toggleSidebar()"></div>
 
- <!-- Sidebar -->
-<div class="sidebar">
-    <div class="sidebar-profile">
-        <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic"
-             onerror="this.onerror=null; this.src='../assets/default_profile.png';">
-        <p><?= htmlspecialchars($user['username'] ?? 'Instructor') ?></p>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-profile">
+            <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic"
+                 onerror="this.onerror=null; this.src='../assets/default_profile.png';">
+            <p><?= htmlspecialchars($user['username'] ?? 'Instructor') ?></p>
+        </div>
+        <h2>Instructor Dashboard</h2>
+        <a href="instructor_dashboard.php" class="<?= $current_page=='instructor_dashboard.php'?'active':'' ?>">
+            <i class="fas fa-home"></i> Dashboard
+        </a>
+        <a href="announcements.php" class="<?= $current_page=='announcements.php'?'active':'' ?>">
+            <i class="fas fa-bullhorn"></i> Announcements
+        </a>
+        <a href="exam_assignments.php" class="<?= $current_page=='exam_assignments.php'?'active':'' ?>">
+            <i class="fas fa-clipboard-list"></i> Exam Assignments
+        </a>
+        <a href="my_courses.php" class="active">
+            <i class="fas fa-book"></i> My Courses
+        </a>
+        <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
+            <i class="fas fa-user-edit"></i> Edit Profile
+        </a>
+        <a href="../logout.php">
+            <i class="fas fa-sign-out-alt"></i> Logout
+        </a>
     </div>
-    <h2>Instructor Dashboard</h2>
-    <a href="instructor_dashboard.php" class="<?= $current_page=='instructor_dashboard.php'?'active':'' ?>">
-        <i class="fas fa-home"></i> Dashboard
-    </a>
-    <a href="announcements.php" class="<?= $current_page=='announcements.php'?'active':'' ?>">
-        <i class="fas fa-bullhorn"></i> Announcements
-    </a>
-    <a href="exam_assignments.php" class="<?= $current_page=='exam_assignments.php'?'active':'' ?>">
-        <i class="fas fa-clipboard-list"></i> Exam Assignments
-    </a>
-    <a href="my_courses.php" class="<?= $current_page=='my_courses.php'?'active':'' ?>">
-        <i class="fas fa-book"></i> My Courses
-    </a>
-    <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
-        <i class="fas fa-user-edit"></i> Edit Profile
-    </a>
-    <a href="../logout.php">
-        <i class="fas fa-sign-out-alt"></i> Logout
-    </a>
-</div>
+
     <!-- Main Content -->
     <div class="main-content">
         <div class="content-wrapper">

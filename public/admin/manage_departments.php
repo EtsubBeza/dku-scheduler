@@ -342,11 +342,13 @@ $current_page = basename($_SERVER['PHP_SELF']);
 <html lang="en" data-theme="<?= $darkMode ? 'dark' : 'light' ?>">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Manage Departments - DKU Scheduler</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <link rel="stylesheet" href="../../assets/css/darkmode.css">
 <style>
+* { box-sizing: border-box; margin:0; padding:0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+
 /* ================= CSS Variables ================= */
 :root {
     --bg-primary: #f8f9fa;
@@ -398,156 +400,187 @@ $current_page = basename($_SERVER['PHP_SELF']);
     --badge-social: #7c3aed;
 }
 
-/* ================= Reset ================= */
-* { margin:0; padding:0; box-sizing:border-box; font-family: "Segoe UI", Arial, sans-serif;}
-body { display:flex; min-height:100vh; background: var(--bg-primary); position:relative; }
+/* ================= University Header ================= */
+.university-header {
+    background: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%);
+    color: white;
+    padding: 0.5rem 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1201;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.dku-logo-img {
+    width: 45px;
+    height: 45px;
+    object-fit: contain;
+    border-radius: 5px;
+    background: white;
+    padding: 4px;
+}
+
+.system-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    opacity: 0.95;
+}
+
+.header-right {
+    font-size: 0.8rem;
+    opacity: 0.9;
+}
+
+/* Adjust elements for university header */
+.topbar {
+    top: 60px !important;
+}
+
+.sidebar {
+    top: 60px !important;
+    height: calc(100% - 60px) !important;
+}
+
+.overlay {
+    top: 60px;
+    height: calc(100% - 60px);
+}
+
+.main-content {
+    margin-top: 60px;
+}
+
+@media (max-width: 768px) {
+    .university-header {
+        padding: 0.5rem 15px;
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+    }
+    
+    .header-left, .header-right {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .system-title {
+        font-size: 0.8rem;
+    }
+    
+    .header-right {
+        font-size: 0.75rem;
+    }
+}
 
 /* ================= Topbar for Mobile ================= */
 .topbar {
     display: none;
-    position: fixed; top:0; left:0; width:100%;
-    background:var(--bg-sidebar); color:var(--text-sidebar);
-    padding:15px 20px;
-    z-index:1200;
-    justify-content:space-between; align-items:center;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    position: fixed; 
+    top: 60px; 
+    left: 0; 
+    width: 100%;
+    background: var(--bg-sidebar); 
+    color: var(--text-sidebar);
+    padding: 12px 20px;
+    z-index: 1200;
+    justify-content: space-between; 
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
+
 .menu-btn {
-    font-size:26px;
-    background:#1abc9c;
-    border:none; color:var(--text-sidebar);
-    cursor:pointer;
-    padding:10px 14px;
-    border-radius:8px;
-    font-weight:600;
+    font-size: 26px;
+    background: #1abc9c;
+    border: none; 
+    color: var(--text-sidebar);
+    cursor: pointer;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-weight: 600;
     transition: background 0.3s, transform 0.2s;
 }
-.menu-btn:hover { background:#159b81; transform:translateY(-2px); }
+
+.menu-btn:hover { 
+    background: #159b81; 
+    transform: translateY(-2px); 
+}
 
 /* ================= Sidebar ================= */
 .sidebar { 
     position: fixed; 
-    top:0; left:0; 
-    width:250px; 
-    height:100vh; 
-    background:var(--bg-sidebar); 
-    color:var(--text-sidebar);
-    z-index:1100;
-    transition: transform 0.3s ease;
-    padding: 20px 0;
-    box-shadow: 2px 0 10px rgba(0,0,0,0.2);
-}
-
-.sidebar-profile {
-    text-align: center;
-    margin-bottom: 25px;
-    padding: 0 20px 20px;
-    border-bottom: 1px solid rgba(255,255,255,0.2);
-}
-
-.sidebar-profile img {
-    width: 100px;
-    height: 100px;
-    border-radius: 50%;
-    object-fit: cover;
-    margin-bottom: 10px;
-    border: 2px solid #1abc9c;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-}
-
-.sidebar-profile p {
+    top: 60px; 
+    left: 0; 
+    width: 250px; 
+    height: calc(100% - 60px);
+    background: var(--bg-sidebar); 
     color: var(--text-sidebar);
-    font-weight: bold;
-    margin: 0;
-    font-size: 16px;
-}
-
-.sidebar h2 {
-    text-align: center;
-    color: var(--text-sidebar);
-    margin-bottom: 25px;
-    font-size: 22px;
-    padding: 0 20px;
-}
-
-.sidebar a { 
-    display:block; 
-    padding:12px 20px; 
-    color:var(--text-sidebar); 
-    text-decoration:none; 
-    transition: background 0.3s; 
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    position: relative;
-}
-.sidebar a:hover, .sidebar a.active { background:#1abc9c; color:white; }
-
-/* ================= Sidebar with Scrollability ================= */
-.sidebar { 
-    position: fixed; 
-    top:0; left:0; 
-    width:250px; 
-    height:100vh; 
-    background:var(--bg-sidebar); 
-    color:var(--text-sidebar);
-    z-index:1100;
+    z-index: 1100;
     transition: transform 0.3s ease;
-    padding: 20px 0;
-    box-shadow: 2px 0 10px rgba(0,0,0,0.2);
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.2);
 }
 
-/* Scrollable sidebar content */
-.sidebar-scrollable {
+.sidebar.hidden { 
+    transform: translateX(-260px); 
+}
+
+/* Sidebar Content (scrollable) */
+.sidebar-content {
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
-    display: flex;
-    flex-direction: column;
+    padding: 20px 0;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
 }
 
-/* Custom scrollbar styling for sidebar */
-.sidebar-scrollable::-webkit-scrollbar {
+/* Custom scrollbar for sidebar */
+.sidebar-content::-webkit-scrollbar {
     width: 6px;
 }
 
-.sidebar-scrollable::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.1);
+.sidebar-content::-webkit-scrollbar-track {
+    background: transparent;
     border-radius: 3px;
 }
 
-.sidebar-scrollable::-webkit-scrollbar-thumb {
+.sidebar-content::-webkit-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.3);
     border-radius: 3px;
 }
 
-.sidebar-scrollable::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.4);
+.sidebar-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
 }
 
-/* For Firefox */
-.sidebar-scrollable {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.3) rgba(255, 255, 255, 0.1);
+[data-theme="dark"] .sidebar-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
 }
 
-.sidebar.hidden { transform:translateX(-260px); }
+[data-theme="dark"] .sidebar-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
 
+/* Sidebar Profile */
 .sidebar-profile {
     text-align: center;
     margin-bottom: 25px;
     padding: 0 20px 20px;
     border-bottom: 1px solid rgba(255,255,255,0.2);
-    position: sticky;
-    top: 0;
-    background: var(--bg-sidebar);
-    z-index: 10;
-    padding-top: 10px;
-    margin-top: -10px;
+    flex-shrink: 0;
 }
 
 .sidebar-profile img {
@@ -567,81 +600,38 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); position:r
     font-size: 16px;
 }
 
+/* Sidebar Title */
 .sidebar h2 {
     text-align: center;
     color: var(--text-sidebar);
     margin-bottom: 25px;
     font-size: 22px;
     padding: 0 20px;
-    position: sticky;
-    top: 181px;
-    background: var(--bg-sidebar);
-    z-index: 10;
+    flex-shrink: 0;
 }
 
-/* Navigation container */
-.sidebar nav {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
-
+/* Sidebar Links */
 .sidebar a { 
-    display:block; 
-    padding:12px 20px; 
-    color:var(--text-sidebar); 
-    text-decoration:none; 
-    transition: background 0.3s; 
+    display: block; 
+    padding: 12px 20px; 
+    color: var(--text-sidebar); 
+    text-decoration: none; 
+    transition: all 0.3s; 
     border-bottom: 1px solid rgba(255,255,255,0.1);
     display: flex;
     align-items: center;
     gap: 10px;
     position: relative;
-}
-.sidebar a:hover, .sidebar a.active { background:#1abc9c; color:white; }
-
-.pending-badge {
-    position: absolute;
-    right: 15px;
-    background: #ef4444;
-    color: white;
-    border-radius: 50%;
-    width: 20px;
-    height: 20px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.75rem;
-    margin-left: auto;
+    flex-shrink: 0;
 }
 
-/* Logout button - pushes to bottom */
-.sidebar a[href="../logout.php"] {
-    margin-top: auto;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+.sidebar a:hover, .sidebar a.active { 
+    background: #1abc9c; 
+    color: white; 
+    padding-left: 25px;
 }
 
-/* Adjust for mobile */
-@media(max-width: 768px){
-    .topbar{ display:flex; }
-    .sidebar { 
-        transform:translateX(-100%); 
-        width: 250px;
-    }
-    .sidebar.active { transform:translateX(0); }
-    
-    .sidebar-profile, .sidebar h2 {
-        position: relative;
-        top: 0;
-        margin-top: 0;
-        padding-top: 0;
-    }
-    
-    .sidebar a[href="../logout.php"] {
-        margin-top: 0;
-    }
-}
-
+/* Pending Badge */
 .pending-badge {
     background: #ef4444;
     color: white;
@@ -653,24 +643,48 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); position:r
     justify-content: center;
     font-size: 0.75rem;
     margin-left: auto;
+}
+
+[data-theme="dark"] .pending-badge {
+    background: #dc2626;
 }
 
 /* ================= Overlay ================= */
 .overlay {
-    position: fixed; top:0; left:0; width:100%; height:100%;
-    background: rgba(0,0,0,0.4); z-index:1050;
-    display:none; opacity:0; transition: opacity 0.3s ease;
+    position: fixed; 
+    top: 60px; 
+    left: 0; 
+    width: 100%; 
+    height: calc(100% - 60px);
+    background: rgba(0,0,0,0.4); 
+    z-index: 1050;
+    display: none; 
+    opacity: 0; 
+    transition: opacity 0.3s ease;
 }
-.overlay.active { display:block; opacity:1; }
+
+.overlay.active { 
+    display: block; 
+    opacity: 1; 
+}
 
 /* ================= Main Content ================= */
 .main-content { 
-    margin-left:250px; 
-    padding:30px;
-    min-height:100vh;
+    margin-left: 250px; 
+    padding: 30px;
+    min-height: 100vh;
     background: var(--bg-primary);
     transition: all 0.3s ease;
     width: calc(100% - 250px);
+}
+
+/* Content Wrapper */
+.content-wrapper {
+    background: var(--bg-card);
+    border-radius: 15px;
+    padding: 30px;
+    box-shadow: 0 4px 6px var(--shadow-color);
+    min-height: calc(100vh - 60px);
 }
 
 /* Header Styles */
@@ -679,7 +693,8 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); position:r
     justify-content: space-between;
     align-items: center;
     margin-bottom: 30px;
-    padding: 20px 0;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border-color);
 }
 
 .header h1 {
@@ -692,10 +707,10 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); position:r
     display: flex;
     align-items: center;
     gap: 12px;
-    background: var(--bg-card);
+    background: var(--bg-secondary);
     padding: 12px 18px;
     border-radius: 12px;
-    box-shadow: 0 4px 12px var(--shadow-color);
+    border: 1px solid var(--border-color);
 }
 
 .user-info img {
@@ -705,6 +720,27 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); position:r
     object-fit: cover;
 }
 
+.user-info div div {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.user-info small {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+/* Page Title */
+.page-title {
+    font-size: 1.8rem;
+    color: var(--text-primary);
+    margin-bottom: 25px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
 /* Card Styles */
 .card {
     background: var(--bg-card);
@@ -712,6 +748,7 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); position:r
     box-shadow: 0 6px 18px var(--shadow-color);
     margin-bottom: 25px;
     overflow: hidden;
+    border: 1px solid var(--border-color);
 }
 
 .card-header {
@@ -744,6 +781,7 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); position:r
     font-weight: 500;
     animation: slideIn 0.3s ease;
     box-shadow: 0 4px 6px var(--shadow-color);
+    border-left: 4px solid;
 }
 
 @keyframes slideIn {
@@ -760,19 +798,23 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); position:r
 .message.success {
     background: var(--success-bg);
     color: var(--success-text);
-    border: 1px solid var(--success-border);
+    border-color: var(--success-border);
 }
 
 .message.error {
     background: var(--error-bg);
     color: var(--error-text);
-    border: 1px solid var(--error-border);
+    border-color: var(--error-border);
 }
 
 .message.warning {
     background: var(--warning-bg);
     color: var(--warning-text);
-    border: 1px solid var(--warning-border);
+    border-color: var(--warning-border);
+}
+
+.message i {
+    font-size: 1.2rem;
 }
 
 /* Form Styles */
@@ -785,6 +827,7 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); position:r
     margin-bottom: 8px;
     font-weight: 600;
     color: var(--text-primary);
+    font-size: 0.95rem;
 }
 
 .form-control {
@@ -794,8 +837,9 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); position:r
     border-radius: 10px;
     font-size: 1rem;
     transition: all 0.3s ease;
-    background: var(--bg-input);
+    background: var(--bg-secondary);
     color: var(--text-primary);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .form-control:focus {
@@ -819,6 +863,7 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); position:r
     font-size: 0.85rem;
     color: var(--text-secondary);
     margin-top: 4px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 /* Button Styles */
@@ -833,6 +878,7 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); position:r
     display: inline-flex;
     align-items: center;
     gap: 8px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .btn-primary {
@@ -843,6 +889,7 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); position:r
 .btn-primary:hover {
     background: #4f46e5;
     transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(79, 70, 229, 0.3);
 }
 
 .btn-secondary {
@@ -902,6 +949,7 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); position:r
     display: inline-flex;
     align-items: center;
     gap: 8px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .cancel-btn:hover {
@@ -912,8 +960,8 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); position:r
 /* Table Styles */
 .table-container {
     overflow-x: auto;
-    border-radius: 15px;
-    box-shadow: 0 4px 12px var(--shadow-color);
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
     margin-top: 20px;
 }
 
@@ -921,6 +969,7 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); position:r
     width: 100%;
     border-collapse: collapse;
     background: var(--bg-card);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .departments-table th,
@@ -933,8 +982,11 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); position:r
 
 .departments-table th {
     background: var(--table-header);
-    color: var(--text-primary);
+    color: var(--text-sidebar);
     font-weight: 600;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .departments-table tr:last-child td {
@@ -952,7 +1004,7 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); position:r
     border-radius: 20px;
     font-size: 0.8rem;
     font-weight: 600;
-    margin-left: 8px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .badge-natural {
@@ -973,11 +1025,13 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); position:r
     border-radius: 12px;
     font-size: 0.75rem;
     margin-left: 8px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .no-head {
     color: var(--text-secondary);
     font-style: italic;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 /* Action Buttons */
@@ -999,6 +1053,7 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); position:r
     border: none;
     cursor: pointer;
     font-size: 14px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .action-link:hover {
@@ -1035,6 +1090,7 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); position:r
     text-align: center;
     padding: 50px;
     color: var(--text-secondary);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .empty-state i {
@@ -1047,6 +1103,11 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); position:r
     font-size: 1.5rem;
     margin-bottom: 10px;
     color: var(--text-primary);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.empty-state p {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 /* Modal Styles */
@@ -1070,6 +1131,7 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); position:r
     width: 90%;
     max-width: 500px;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--border-color);
 }
 
 .modal-header {
@@ -1084,6 +1146,7 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); position:r
 .modal-header h3 {
     color: var(--text-primary);
     font-size: 1.4rem;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .close-modal {
@@ -1111,39 +1174,88 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); position:r
 
 /* ================= Responsive ================= */
 @media(max-width: 1200px){ 
-    .main-content{ padding:25px; }
+    .main-content{ padding: 25px; }
+    .content-wrapper { padding: 20px; }
 }
 
 @media(max-width: 768px){
-    .topbar{ display:flex; }
-    .sidebar{ transform:translateX(-100%); }
-    .sidebar.active{ transform:translateX(0); }
+    .university-header {
+        padding: 0.5rem 15px;
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+    }
+    
+    .header-left, .header-right {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .system-title {
+        font-size: 0.8rem;
+    }
+    
+    .header-right {
+        font-size: 0.75rem;
+    }
+    
+    .topbar{ 
+        display: flex; 
+        top: 60px;
+    }
+    
+    .sidebar{ 
+        transform: translateX(-100%); 
+        top: 120px;
+        height: calc(100% - 120px) !important;
+    }
+    
+    .sidebar.active{ 
+        transform: translateX(0); 
+    }
+    
+    .overlay {
+        top: 120px;
+        height: calc(100% - 120px);
+    }
+    
     .main-content{ 
-        margin-left:0; 
-        padding: 20px;
-        padding-top: 80px;
+        margin-left: 0; 
+        padding: 15px;
+        padding-top: 140px;
         width: 100%;
     }
+    
+    .content-wrapper {
+        padding: 15px;
+        border-radius: 0;
+    }
+    
     .header { 
         flex-direction: column; 
         gap: 15px; 
         align-items: flex-start; 
     }
+    
     .header h1 { font-size: 1.8rem; }
+    
     .form-row { flex-direction: column; }
     .form-row .form-group { min-width: auto; }
-    .action-buttons { flex-direction: column; }
     
     /* Mobile table card view */
+    .table-container {
+        border: none;
+    }
+    
     .departments-table, .departments-table thead, .departments-table tbody, .departments-table th, .departments-table td, .departments-table tr { 
         display: block; 
         width: 100%; 
     }
+    
     .departments-table thead tr { 
-        position: absolute;
-        top: -9999px;
-        left: -9999px;
+        display: none;
     }
+    
     .departments-table tr { 
         margin-bottom: 15px; 
         background: var(--bg-card); 
@@ -1152,13 +1264,17 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); position:r
         padding: 15px; 
         border: 1px solid var(--border-color);
     }
+    
     .departments-table td { 
         text-align: right; 
         padding-left: 50%; 
         position: relative; 
         border: none; 
         margin-bottom: 10px;
+        padding: 10px 15px;
+        padding-left: 50%;
     }
+    
     .departments-table td::before { 
         content: attr(data-label); 
         position: absolute; 
@@ -1167,14 +1283,23 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); position:r
         text-align: left; 
         font-weight: bold; 
         color: var(--text-secondary);
+        top: 50%;
+        transform: translateY(-50%);
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
     
     .departments-table td:last-child {
         text-align: center;
         padding-left: 15px;
     }
+    
     .departments-table td:last-child::before {
         display: none;
+    }
+    
+    .action-buttons {
+        flex-direction: column;
+        align-items: stretch;
     }
     
     .modal-content {
@@ -1191,406 +1316,451 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); position:r
 [data-theme="dark"] .action-link:hover {
     color: #3b82f6;
 }
+
+[data-theme="dark"] .btn-primary {
+    background: #4f46e5;
+}
+
+[data-theme="dark"] .btn-primary:hover {
+    background: #4338ca;
+}
+
+[data-theme="dark"] .card-header {
+    background: linear-gradient(135deg, #3730a3, #1d4ed8);
+}
 </style>
 </head>
 <body>
-
-<!-- Mobile Topbar -->
-<div class="topbar">
-    <button class="menu-btn" onclick="toggleMenu()">☰</button>
-    <span>Manage Departments</span>
-</div>
-
-<!-- Overlay for Mobile -->
-<div class="overlay" onclick="toggleMenu()"></div>
-
-<!-- Sidebar -->
-<div class="sidebar" id="sidebar">
-    <!-- Scrollable content wrapper -->
-    <div class="sidebar-scrollable">
-        <div class="sidebar-profile">
-            <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic"
-                 onerror="this.onerror=null; this.src='../assets/default_profile.png';">
-            <p><?= htmlspecialchars($current_user['username']) ?></p>
+    <!-- University Header -->
+    <div class="university-header">
+        <div class="header-left">
+            <img src="../assets/images/dku logo.jpg" alt="Debark University Logo" class="dku-logo-img">
+            <div class="system-title">Debark University Class Scheduling System</div>
         </div>
-        <h2>Admin Panel</h2>
-        
-        <!-- Navigation Container -->
-        <nav>
-            <a href="dashboard.php" class="<?= $current_page=='dashboard.php'?'active':'' ?>">
-                <i class="fas fa-home"></i> Dashboard
-            </a>
-            <a href="manage_users.php" class="<?= $current_page=='manage_users.php'?'active':'' ?>">
-                <i class="fas fa-users"></i> Manage Users
-            </a>
-            <a href="approve_users.php" class="<?= $current_page=='approve_users.php'?'active':'' ?>">
-                <i class="fas fa-user-check"></i> Approve Users
-                <?php if($pending_approvals > 0): ?>
-                    <span class="pending-badge"><?= $pending_approvals ?></span>
-                <?php endif; ?>
-            </a>
-            <a href="manage_departments.php" class="active">
-                <i class="fas fa-building"></i> Manage Departments
-            </a>
-            <a href="manage_courses.php" class="<?= $current_page=='manage_courses.php'?'active':'' ?>">
-                <i class="fas fa-book"></i> Manage Courses
-            </a>
-            <a href="manage_rooms.php" class="<?= $current_page=='manage_rooms.php'?'active':'' ?>">
-                <i class="fas fa-door-closed"></i> Manage Rooms
-            </a>
-            <a href="manage_schedules.php" class="<?= $current_page=='manage_schedules.php'?'active':'' ?>">
-                <i class="fas fa-calendar-alt"></i> Manage Schedule
-            </a>
-            <a href="assign_instructors.php" class="<?= $current_page=='assign_instructors.php'?'active':'' ?>">
-                <i class="fas fa-user-graduate"></i> Assign Instructors
-            </a>
-            <a href="admin_exam_schedules.php" class="<?= $current_page=='admin_exam_schedules.php'?'active':'' ?>">
-                <i class="fas fa-clipboard-list"></i> Exam Scheduling
-            </a>
-            <a href="manage_announcements.php" class="<?= $current_page=='manage_announcements.php'?'active':'' ?>">
-                <i class="fas fa-bullhorn"></i> Manage Announcements
-            </a>
-            <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
-                <i class="fas fa-user-edit"></i> Edit Profile
-            </a>
-            <a href="../logout.php">
-                <i class="fas fa-sign-out-alt"></i> Logout
-            </a>
-        </nav>
+        <div class="header-right">
+            Manage Departments
+        </div>
     </div>
-</div>
-<!-- Main Content -->
-<div class="main-content">
-    <div class="header">
-        <h1>Manage Departments</h1>
-        <div class="user-info">
-            <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile" id="headerProfilePic"
-                 onerror="this.onerror=null; this.src='../assets/default_profile.png';">
-            <div>
-                <div><?= htmlspecialchars($current_user['username']) ?></div>
-                <small>Administrator</small>
+
+    <!-- Topbar for Mobile -->
+    <div class="topbar">
+        <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+        <h2>Manage Departments</h2>
+    </div>
+
+    <!-- Overlay for Mobile -->
+    <div class="overlay" onclick="toggleSidebar()"></div>
+
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-content">
+            <div class="sidebar-profile">
+                <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic"
+                     onerror="this.onerror=null; this.src='../assets/default_profile.png';">
+                <p><?= htmlspecialchars($current_user['username']) ?></p>
+            </div>
+            <h2>Admin Dashboard</h2>
+            
+            <!-- Navigation Links -->
+            <nav>
+                <a href="dashboard.php" class="<?= $current_page=='dashboard.php'?'active':'' ?>">
+                    <i class="fas fa-home"></i> Dashboard
+                </a>
+                <a href="manage_users.php" class="<?= $current_page=='manage_users.php'?'active':'' ?>">
+                    <i class="fas fa-users"></i> Manage Users
+                </a>
+                <a href="approve_users.php" class="<?= $current_page=='approve_users.php'?'active':'' ?>">
+                    <i class="fas fa-user-check"></i> Approve Users
+                    <?php if($pending_approvals > 0): ?>
+                        <span class="pending-badge"><?= $pending_approvals ?></span>
+                    <?php endif; ?>
+                </a>
+                <a href="manage_departments.php" class="active">
+                    <i class="fas fa-building"></i> Manage Departments
+                </a>
+                <a href="manage_courses.php" class="<?= $current_page=='manage_courses.php'?'active':'' ?>">
+                    <i class="fas fa-book"></i> Manage Courses
+                </a>
+                <a href="manage_rooms.php" class="<?= $current_page=='manage_rooms.php'?'active':'' ?>">
+                    <i class="fas fa-door-closed"></i> Manage Rooms
+                </a>
+                <a href="manage_schedules.php" class="<?= $current_page=='manage_schedules.php'?'active':'' ?>">
+                    <i class="fas fa-calendar-alt"></i> Manage Schedule
+                </a>
+                <a href="assign_instructors.php" class="<?= $current_page=='assign_instructors.php'?'active':'' ?>">
+                    <i class="fas fa-user-graduate"></i> Assign Instructors
+                </a>
+                <a href="admin_exam_schedules.php" class="<?= $current_page=='admin_exam_schedules.php'?'active':'' ?>">
+                    <i class="fas fa-clipboard-list"></i> Exam Scheduling
+                </a>
+                <a href="manage_announcements.php" class="<?= $current_page=='manage_announcements.php'?'active':'' ?>">
+                    <i class="fas fa-bullhorn"></i> Manage Announcements
+                </a>
+                <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
+                    <i class="fas fa-user-edit"></i> Edit Profile
+                </a>
+                <a href="../logout.php">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </nav>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="content-wrapper">
+            <!-- Header -->
+            <div class="header">
+                <div>
+                    <h1>Manage Departments</h1>
+                    <p>Create, edit, and manage academic departments</p>
+                </div>
+                <div class="user-info">
+                    <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile" id="headerProfilePic"
+                         onerror="this.onerror=null; this.src='../assets/default_profile.png';">
+                    <div>
+                        <div><?= htmlspecialchars($current_user['username']) ?></div>
+                        <small>Administrator</small>
+                    </div>
+                </div>
+            </div>
+
+            <?php if($message): ?>
+                <div class="message <?= $message_type ?>">
+                    <i class="fas fa-<?= $message_type === 'error' ? 'exclamation-circle' : ($message_type === 'warning' ? 'exclamation-triangle' : 'check-circle') ?>"></i>
+                    <?= htmlspecialchars($message) ?>
+                </div>
+            <?php endif; ?>
+
+            <!-- Add/Edit Department Form Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-<?= isset($edit_department) ? 'edit' : 'plus-circle' ?>"></i> <?= isset($edit_department) ? 'Edit Department' : 'Add New Department' ?></h3>
+                </div>
+                <div class="card-body">
+                    <form method="POST" id="departmentForm">
+                        <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+                        <input type="hidden" name="department_id" value="<?= $edit_department['department_id'] ?? '' ?>">
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="department_name" class="required">Department Name</label>
+                                <input type="text" name="department_name" id="department_name" class="form-control" 
+                                       placeholder="e.g., Computer Science" required
+                                       value="<?= htmlspecialchars($edit_department['department_name'] ?? '') ?>">
+                            </div>
+                            <div class="form-group">
+                                <label for="department_code" class="required">Department Code</label>
+                                <input type="text" name="department_code" id="department_code" class="form-control" 
+                                       placeholder="e.g., CS" required
+                                       value="<?= htmlspecialchars($edit_department['department_code'] ?? '') ?>">
+                                <small class="form-info">Unique code for the department (2-6 characters)</small>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="category" class="required">Category</label>
+                                <select name="category" id="category" class="form-control" required>
+                                    <option value="">Select Category</option>
+                                    <option value="Natural" <?= (isset($edit_department) && $edit_department['category']=='Natural')?'selected':'' ?>>Natural Sciences</option>
+                                    <option value="Social" <?= (isset($edit_department) && $edit_department['category']=='Social')?'selected':'' ?>>Social Sciences</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="description">Department Description</label>
+                            <textarea name="description" id="description" class="form-control" rows="3" 
+                                      placeholder="Brief department description..."><?= htmlspecialchars($edit_department['description'] ?? '') ?></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <button type="submit" name="<?= isset($edit_department) ? 'edit_department' : 'add_department' ?>" 
+                                    class="btn btn-primary">
+                                <i class="fas fa-<?= isset($edit_department) ? 'save' : 'plus-circle' ?>"></i>
+                                <?= isset($edit_department) ? 'Update Department' : 'Add Department' ?>
+                            </button>
+                            <?php if(isset($edit_department)): ?>
+                                <a class="cancel-btn" href="manage_departments.php">
+                                    <i class="fas fa-times"></i> Cancel
+                                </a>
+                            <?php endif; ?>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Departments List Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-building"></i> All Departments (<?= count($departments) ?>)</h3>
+                </div>
+                <div class="card-body">
+                    <?php if($departments): ?>
+                        <div class="table-container">
+                            <table class="departments-table">
+                                <thead>
+                                    <tr>
+                                        <th>Code</th>
+                                        <th>Department Name</th>
+                                        <th>Category</th>
+                                        <th>Department Head</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach($departments as $dept): ?>
+                                    <tr>
+                                        <td data-label="Code"><strong><?= htmlspecialchars($dept['department_code']) ?></strong></td>
+                                        <td data-label="Department Name">
+                                            <?= htmlspecialchars($dept['department_name']) ?>
+                                            <?php if(!empty($dept['description'])): ?>
+                                                <br><small class="form-info"><?= htmlspecialchars(substr($dept['description'], 0, 50)) ?>...</small>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td data-label="Category">
+                                            <span class="department-badge badge-<?= strtolower($dept['category']) ?>">
+                                                <?= $dept['category'] ?>
+                                            </span>
+                                        </td>
+                                        <td data-label="Department Head">
+                                            <?php if($dept['head_id']): ?>
+                                                <div>
+                                                    <strong><?= htmlspecialchars($dept['head_name']) ?></strong>
+                                                    <span class="head-badge">Head</span>
+                                                    <br>
+                                                    <small><?= htmlspecialchars($dept['head_email']) ?></small>
+                                                </div>
+                                            <?php else: ?>
+                                                <span class="no-head">No department head assigned</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td data-label="Actions">
+                                            <div class="action-buttons">
+                                                <a class="action-link" href="manage_departments.php?edit=<?= $dept['department_id'] ?>">
+                                                    <i class="fas fa-edit"></i> Edit
+                                                </a>
+                                                
+                                                <?php if($dept['head_id']): ?>
+                                                    <button class="action-link success" onclick="openAssignModal(<?= $dept['department_id'] ?>, '<?= htmlspecialchars(addslashes($dept['department_name'])) ?>')">
+                                                        <i class="fas fa-user-edit"></i> Change Head
+                                                    </button>
+                                                    <form method="POST" style="display:inline;" onsubmit="return confirm('Remove <?= htmlspecialchars(addslashes($dept['head_name'])) ?> as department head?')">
+                                                        <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+                                                        <input type="hidden" name="user_id" value="<?= $dept['head_id'] ?>">
+                                                        <button type="submit" name="remove_head" class="action-link warning">
+                                                            <i class="fas fa-user-minus"></i> Remove Head
+                                                        </button>
+                                                    </form>
+                                                <?php else: ?>
+                                                    <button class="action-link success" onclick="openAssignModal(<?= $dept['department_id'] ?>, '<?= htmlspecialchars(addslashes($dept['department_name'])) ?>')">
+                                                        <i class="fas fa-user-plus"></i> Assign Head
+                                                    </button>
+                                                <?php endif; ?>
+                                                
+                                                <form method="POST" style="display:inline;" onsubmit="return confirmDelete(this, '<?= htmlspecialchars(addslashes($dept['department_name'])) ?>')">
+                                                    <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+                                                    <input type="hidden" name="department_id" value="<?= $dept['department_id'] ?>">
+                                                    <button type="submit" name="delete_department" class="action-link danger">
+                                                        <i class="fas fa-trash"></i> Delete
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php else: ?>
+                        <div class="empty-state">
+                            <i class="fas fa-building"></i>
+                            <h3>No Departments Found</h3>
+                            <p>No departments found in the system yet. Add your first department using the form above.</p>
+                        </div>
+                    <?php endif; ?>
+                </div>
             </div>
         </div>
     </div>
 
-    <?php if($message): ?>
-        <div class="message <?= $message_type ?>">
-            <i class="fas fa-<?= $message_type === 'error' ? 'exclamation-circle' : ($message_type === 'warning' ? 'exclamation-triangle' : 'check-circle') ?>"></i>
-            <?= htmlspecialchars($message) ?>
-        </div>
-    <?php endif; ?>
-
-    <!-- Add/Edit Department Form Card -->
-    <div class="card">
-        <div class="card-header">
-            <h3><i class="fas fa-<?= isset($edit_department) ? 'edit' : 'plus-circle' ?>"></i> <?= isset($edit_department) ? 'Edit Department' : 'Add New Department' ?></h3>
-        </div>
-        <div class="card-body">
-            <form method="POST" id="departmentForm">
-                <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-                <input type="hidden" name="department_id" value="<?= $edit_department['department_id'] ?? '' ?>">
-                
-                <div class="form-row">
+    <!-- Assign Department Head Modal -->
+    <div class="modal" id="assignModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Assign Department Head</h3>
+                <button class="close-modal" onclick="closeAssignModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form method="POST" id="assignForm">
+                    <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+                    <input type="hidden" name="department_id" id="modal_department_id">
+                    
                     <div class="form-group">
-                        <label for="department_name" class="required">Department Name</label>
-                        <input type="text" name="department_name" id="department_name" class="form-control" 
-                               placeholder="e.g., Computer Science" required
-                               value="<?= htmlspecialchars($edit_department['department_name'] ?? '') ?>">
+                        <label for="department_name_display">Department</label>
+                        <input type="text" id="department_name_display" class="form-control" readonly>
                     </div>
+                    
                     <div class="form-group">
-                        <label for="department_code" class="required">Department Code</label>
-                        <input type="text" name="department_code" id="department_code" class="form-control" 
-                               placeholder="e.g., CS" required
-                               value="<?= htmlspecialchars($edit_department['department_code'] ?? '') ?>">
-                        <small class="form-info">Unique code for the department (2-6 characters)</small>
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="category" class="required">Category</label>
-                        <select name="category" id="category" class="form-control" required>
-                            <option value="">Select Category</option>
-                            <option value="Natural" <?= (isset($edit_department) && $edit_department['category']=='Natural')?'selected':'' ?>>Natural Sciences</option>
-                            <option value="Social" <?= (isset($edit_department) && $edit_department['category']=='Social')?'selected':'' ?>>Social Sciences</option>
+                        <label for="user_id" class="required">Select Instructor</label>
+                        <select name="user_id" id="user_id" class="form-control" required>
+                            <option value="">Select an instructor...</option>
+                            <?php foreach($instructors as $instructor): ?>
+                                <option value="<?= $instructor['user_id'] ?>">
+                                    <?= htmlspecialchars($instructor['username']) ?> 
+                                    (<?= htmlspecialchars($instructor['email']) ?>)
+                                    - <?= $instructor['role'] ?>
+                                </option>
+                            <?php endforeach; ?>
                         </select>
                     </div>
-                </div>
-
-                <div class="form-group">
-                    <label for="description">Department Description</label>
-                    <textarea name="description" id="description" class="form-control" rows="3" 
-                              placeholder="Brief department description..."><?= htmlspecialchars($edit_department['description'] ?? '') ?></textarea>
-                </div>
-
-                <div class="form-group">
-                    <button type="submit" name="<?= isset($edit_department) ? 'edit_department' : 'add_department' ?>" 
-                            class="btn btn-primary">
-                        <i class="fas fa-<?= isset($edit_department) ? 'save' : 'plus-circle' ?>"></i>
-                        <?= isset($edit_department) ? 'Update Department' : 'Add Department' ?>
-                    </button>
-                    <?php if(isset($edit_department)): ?>
-                        <a class="cancel-btn" href="manage_departments.php">
+                    
+                    <div class="form-group">
+                        <button type="submit" name="assign_head" class="btn btn-success">
+                            <i class="fas fa-user-check"></i> Assign as Department Head
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="closeAssignModal()">
                             <i class="fas fa-times"></i> Cancel
-                        </a>
-                    <?php endif; ?>
-                </div>
-            </form>
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
-    <!-- Departments List Card -->
-    <div class="card">
-        <div class="card-header">
-            <h3><i class="fas fa-building"></i> All Departments (<?= count($departments) ?>)</h3>
-        </div>
-        <div class="card-body">
-            <?php if($departments): ?>
-                <div class="table-container">
-                    <table class="departments-table">
-                        <thead>
-                            <tr>
-                                <th>Code</th>
-                                <th>Department Name</th>
-                                <th>Category</th>
-                                <th>Department Head</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach($departments as $dept): ?>
-                            <tr>
-                                <td data-label="Code"><strong><?= htmlspecialchars($dept['department_code']) ?></strong></td>
-                                <td data-label="Department Name">
-                                    <?= htmlspecialchars($dept['department_name']) ?>
-                                    <?php if(!empty($dept['description'])): ?>
-                                        <br><small class="form-info"><?= htmlspecialchars(substr($dept['description'], 0, 50)) ?>...</small>
-                                    <?php endif; ?>
-                                </td>
-                                <td data-label="Category">
-                                    <span class="department-badge badge-<?= strtolower($dept['category']) ?>">
-                                        <?= $dept['category'] ?>
-                                    </span>
-                                </td>
-                                <td data-label="Department Head">
-                                    <?php if($dept['head_id']): ?>
-                                        <div>
-                                            <strong><?= htmlspecialchars($dept['head_name']) ?></strong>
-                                            <span class="head-badge">Head</span>
-                                            <br>
-                                            <small><?= htmlspecialchars($dept['head_email']) ?></small>
-                                        </div>
-                                    <?php else: ?>
-                                        <span class="no-head">No department head assigned</span>
-                                    <?php endif; ?>
-                                </td>
-                                <td data-label="Actions">
-                                    <div class="action-buttons">
-                                        <a class="action-link" href="manage_departments.php?edit=<?= $dept['department_id'] ?>">
-                                            <i class="fas fa-edit"></i> Edit
-                                        </a>
-                                        
-                                        <?php if($dept['head_id']): ?>
-                                            <button class="action-link success" onclick="openAssignModal(<?= $dept['department_id'] ?>, '<?= htmlspecialchars(addslashes($dept['department_name'])) ?>')">
-                                                <i class="fas fa-user-edit"></i> Change Head
-                                            </button>
-                                            <form method="POST" style="display:inline;" onsubmit="return confirm('Remove <?= htmlspecialchars(addslashes($dept['head_name'])) ?> as department head?')">
-                                                <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-                                                <input type="hidden" name="user_id" value="<?= $dept['head_id'] ?>">
-                                                <button type="submit" name="remove_head" class="action-link warning">
-                                                    <i class="fas fa-user-minus"></i> Remove Head
-                                                </button>
-                                            </form>
-                                        <?php else: ?>
-                                            <button class="action-link success" onclick="openAssignModal(<?= $dept['department_id'] ?>, '<?= htmlspecialchars(addslashes($dept['department_name'])) ?>')">
-                                                <i class="fas fa-user-plus"></i> Assign Head
-                                            </button>
-                                        <?php endif; ?>
-                                        
-                                        <form method="POST" style="display:inline;" onsubmit="return confirmDelete(this, '<?= htmlspecialchars(addslashes($dept['department_name'])) ?>')">
-                                            <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-                                            <input type="hidden" name="department_id" value="<?= $dept['department_id'] ?>">
-                                            <button type="submit" name="delete_department" class="action-link danger">
-                                                <i class="fas fa-trash"></i> Delete
-                                            </button>
-                                        </form>
-                                    </div>
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-            <?php else: ?>
-                <div class="empty-state">
-                    <i class="fas fa-building"></i>
-                    <h3>No Departments Found</h3>
-                    <p>No departments found in the system yet. Add your first department using the form above.</p>
-                </div>
-            <?php endif; ?>
-        </div>
-    </div>
-</div>
-
-<!-- Assign Department Head Modal -->
-<div class="modal" id="assignModal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3>Assign Department Head</h3>
-            <button class="close-modal" onclick="closeAssignModal()">&times;</button>
-        </div>
-        <div class="modal-body">
-            <form method="POST" id="assignForm">
-                <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-                <input type="hidden" name="department_id" id="modal_department_id">
-                
-                <div class="form-group">
-                    <label for="department_name_display">Department</label>
-                    <input type="text" id="department_name_display" class="form-control" readonly>
-                </div>
-                
-                <div class="form-group">
-                    <label for="user_id" class="required">Select Instructor</label>
-                    <select name="user_id" id="user_id" class="form-control" required>
-                        <option value="">Select an instructor...</option>
-                        <?php foreach($instructors as $instructor): ?>
-                            <option value="<?= $instructor['user_id'] ?>">
-                                <?= htmlspecialchars($instructor['username']) ?> 
-                                (<?= htmlspecialchars($instructor['email']) ?>)
-                                - <?= $instructor['role'] ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <button type="submit" name="assign_head" class="btn btn-success">
-                        <i class="fas fa-user-check"></i> Assign as Department Head
-                    </button>
-                    <button type="button" class="btn btn-secondary" onclick="closeAssignModal()">
-                        <i class="fas fa-times"></i> Cancel
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<script>
-// Toggle sidebar for mobile
-function toggleMenu() {
-    const sidebar = document.getElementById('sidebar');
-    const overlay = document.querySelector('.overlay');
-    sidebar.classList.toggle('active');
-    overlay.classList.toggle('active');
-}
-
-// Modal functions
-let currentDepartmentId = null;
-let currentDepartmentName = null;
-
-function openAssignModal(departmentId, departmentName) {
-    currentDepartmentId = departmentId;
-    currentDepartmentName = departmentName;
-    
-    document.getElementById('modal_department_id').value = departmentId;
-    document.getElementById('department_name_display').value = departmentName;
-    document.getElementById('assignModal').style.display = 'flex';
-}
-
-function closeAssignModal() {
-    document.getElementById('assignModal').style.display = 'none';
-    document.getElementById('modal_department_id').value = '';
-    document.getElementById('department_name_display').value = '';
-    document.getElementById('user_id').value = '';
-    currentDepartmentId = null;
-    currentDepartmentName = null;
-}
-
-// Close modal when clicking outside
-window.onclick = function(event) {
-    const modal = document.getElementById('assignModal');
-    if (event.target === modal) {
-        closeAssignModal();
+    <script>
+    // Toggle sidebar
+    function toggleSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.querySelector('.overlay');
+        sidebar.classList.toggle('active');
+        overlay.classList.toggle('active');
     }
-}
 
-// Confirm delete with department name
-function confirmDelete(form, departmentName) {
-    return confirm(`Are you sure you want to delete the department "${departmentName}"? This action cannot be undone.`);
-}
+    // Modal functions
+    let currentDepartmentId = null;
+    let currentDepartmentName = null;
 
-// Form validation
-document.getElementById('departmentForm').addEventListener('submit', function(e) {
-    const departmentCode = document.getElementById('department_code').value.trim();
-    const departmentCodeRegex = /^[A-Za-z]{2,6}$/;
-    
-    if (!departmentCodeRegex.test(departmentCode)) {
-        e.preventDefault();
-        alert('Department code must be 2-6 letters only (e.g., CS, MATH)');
-        document.getElementById('department_code').focus();
-        return false;
+    function openAssignModal(departmentId, departmentName) {
+        currentDepartmentId = departmentId;
+        currentDepartmentName = departmentName;
+        
+        document.getElementById('modal_department_id').value = departmentId;
+        document.getElementById('department_name_display').value = departmentName;
+        document.getElementById('assignModal').style.display = 'flex';
     }
-    
-    return true;
-});
 
-// Initialize
-document.addEventListener('DOMContentLoaded', function() {
-    // Set active nav
-    const currentPage = window.location.pathname.split('/').pop();
-    document.querySelectorAll('.sidebar a').forEach(link => {
-        const linkPage = link.getAttribute('href');
-        if (linkPage === currentPage) {
-            link.classList.add('active');
+    function closeAssignModal() {
+        document.getElementById('assignModal').style.display = 'none';
+        document.getElementById('modal_department_id').value = '';
+        document.getElementById('department_name_display').value = '';
+        document.getElementById('user_id').value = '';
+        currentDepartmentId = null;
+        currentDepartmentName = null;
+    }
+
+    // Close modal when clicking outside
+    window.onclick = function(event) {
+        const modal = document.getElementById('assignModal');
+        if (event.target === modal) {
+            closeAssignModal();
         }
-    });
-    
-    // Add data-labels for mobile table view
-    const tableHeaders = document.querySelectorAll('.departments-table thead th');
-    const tableRows = document.querySelectorAll('.departments-table tbody tr');
-    
-    tableRows.forEach(row => {
-        const cells = row.querySelectorAll('td');
-        cells.forEach((cell, index) => {
-            if(tableHeaders[index]) {
-                cell.setAttribute('data-label', tableHeaders[index].textContent);
-            }
-        });
-    });
-    
-    // Profile picture fallback
-    document.querySelectorAll('img').forEach(img => {
-        img.addEventListener('error', function() {
-            if (!this.src.includes('default_profile.png')) {
-                this.src = '../assets/default_profile.png';
-            }
-        });
-    });
-    
-    // Confirm logout
-    document.querySelector('a[href="../logout.php"]')?.addEventListener('click', function(e) {
-        if(!confirm('Are you sure you want to logout?')) {
+    }
+
+    // Confirm delete with department name
+    function confirmDelete(form, departmentName) {
+        return confirm(`Are you sure you want to delete the department "${departmentName}"? This action cannot be undone.`);
+    }
+
+    // Form validation
+    document.getElementById('departmentForm').addEventListener('submit', function(e) {
+        const departmentCode = document.getElementById('department_code').value.trim();
+        const departmentCodeRegex = /^[A-Za-z]{2,6}$/;
+        
+        if (!departmentCodeRegex.test(departmentCode)) {
             e.preventDefault();
+            alert('Department code must be 2-6 letters only (e.g., CS, MATH)');
+            document.getElementById('department_code').focus();
+            return false;
         }
+        
+        return true;
     });
-    
-    // Auto-capitalize department code
-    const deptCodeInput = document.getElementById('department_code');
-    if(deptCodeInput) {
-        deptCodeInput.addEventListener('input', function() {
-            this.value = this.value.toUpperCase();
-        });
-    }
-});
 
-// Fallback for broken profile pictures
-function handleImageError(img) {
-    img.onerror = null;
-    img.src = '../assets/default_profile.png';
-    return true;
-}
-</script>
+    // Initialize
+    document.addEventListener('DOMContentLoaded', function() {
+        // Set active nav
+        const currentPage = window.location.pathname.split('/').pop();
+        document.querySelectorAll('.sidebar a').forEach(link => {
+            const linkPage = link.getAttribute('href');
+            if (linkPage === currentPage) {
+                link.classList.add('active');
+            }
+        });
+        
+        // Add data-labels for mobile table view
+        const tableHeaders = document.querySelectorAll('.departments-table thead th');
+        const tableRows = document.querySelectorAll('.departments-table tbody tr');
+        
+        tableRows.forEach(row => {
+            const cells = row.querySelectorAll('td');
+            cells.forEach((cell, index) => {
+                if(tableHeaders[index]) {
+                    cell.setAttribute('data-label', tableHeaders[index].textContent);
+                }
+            });
+        });
+        
+        // Profile picture fallback
+        document.querySelectorAll('img').forEach(img => {
+            img.addEventListener('error', function() {
+                if (!this.src.includes('default_profile.png')) {
+                    this.src = '../assets/default_profile.png';
+                }
+            });
+        });
+        
+        // Confirm logout
+        document.querySelector('a[href="../logout.php"]')?.addEventListener('click', function(e) {
+            if(!confirm('Are you sure you want to logout?')) {
+                e.preventDefault();
+            }
+        });
+        
+        // Auto-capitalize department code
+        const deptCodeInput = document.getElementById('department_code');
+        if(deptCodeInput) {
+            deptCodeInput.addEventListener('input', function() {
+                this.value = this.value.toUpperCase();
+            });
+        }
+        
+        // Initialize overlay and sidebar for mobile
+        if (window.innerWidth <= 768) {
+            document.querySelector('.sidebar').classList.add('hidden');
+        }
+        
+        // Animate table rows
+        const tableRowsAnimate = document.querySelectorAll('.departments-table tbody tr');
+        tableRowsAnimate.forEach((row, index) => {
+            row.style.opacity = '0';
+            row.style.transform = 'translateY(10px)';
+            setTimeout(() => {
+                row.style.transition = 'all 0.5s ease';
+                row.style.opacity = '1';
+                row.style.transform = 'translateY(0)';
+            }, index * 50);
+        });
+    });
+
+    // Fallback for broken profile pictures
+    function handleImageError(img) {
+        img.onerror = null;
+        img.src = '../assets/default_profile.png';
+        return true;
+    }
+    </script>
 
 </body>
 </html>

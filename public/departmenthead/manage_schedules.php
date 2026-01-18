@@ -35,6 +35,10 @@ if(isset($_SESSION['schedule_message'])) {
     unset($_SESSION['schedule_message_type']);
 }
 
+// Initialize search variables
+$search = isset($_GET['search']) ? trim($_GET['search']) : '';
+$search_placeholder = "Search by course name, code, instructor, room, or year...";
+
 // Helpers
 function fetchAllSafe($stmt) {
     $res = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -98,6 +102,70 @@ function ensureTablesExist($pdo) {
 // Ensure tables exist
 ensureTablesExist($pdo);
 
+// ---------------- CSV EXPORT ----------------
+if(isset($_GET['export']) && $_GET['export'] == 'csv') {
+    // Set headers for CSV download
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename=schedule_export_' . date('Y-m-d_H-i-s') . '.csv');
+    
+    // Create output stream
+    $output = fopen('php://output', 'w');
+    
+    // CSV header
+    fputcsv($output, [
+        'Schedule ID',
+        'Course Code',
+        'Course Name',
+        'Instructor',
+        'Room',
+        'Day',
+        'Start Time',
+        'End Time',
+        'Duration',
+        'Academic Year',
+        'Semester',
+        'Year/Extension',
+        'Student Type',
+        'Created At'
+    ]);
+    
+    // Fetch all schedules for export
+    $export_query = "
+        SELECT 
+            s.schedule_id,
+            c.course_code,
+            c.course_name,
+            COALESCE(u.full_name, u.username) as instructor_name,
+            r.room_name,
+            s.day,
+            TIME_FORMAT(s.start_time,'%H:%i') as start_time,
+            TIME_FORMAT(s.end_time,'%H:%i') as end_time,
+            TIMEDIFF(s.end_time, s.start_time) as duration,
+            s.academic_year,
+            s.semester,
+            s.year,
+            CASE WHEN s.is_extension = 1 THEN 'Extension' ELSE 'Regular' END as student_type,
+            s.created_at
+        FROM schedule s
+        LEFT JOIN courses c ON s.course_id = c.course_id
+        LEFT JOIN users u ON s.instructor_id = u.user_id
+        LEFT JOIN rooms r ON s.room_id = r.room_id
+        WHERE (c.department_id = ? OR (c.department_id IS NULL AND s.course_id IN (SELECT course_id FROM courses WHERE department_id = ?)))
+        ORDER BY FIELD(s.day, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'), s.start_time
+    ";
+    
+    $export_stmt = $pdo->prepare($export_query);
+    $export_stmt->execute([$dept_id, $dept_id]);
+    
+    // Write data rows
+    while ($row = $export_stmt->fetch(PDO::FETCH_ASSOC)) {
+        fputcsv($output, $row);
+    }
+    
+    fclose($output);
+    exit;
+}
+
 // ---------------- DELETE SELECTED ----------------
 if(isset($_POST['delete_selected'])){
     $to_delete = $_POST['delete_ids'] ?? [];
@@ -141,7 +209,7 @@ if(isset($_POST['auto_generate'])){
     $auto_year = trim($_POST['auto_year'] ?? '');
     $auto_semester = trim($_POST['auto_semester'] ?? '');
     $auto_academic_year = trim($_POST['auto_academic_year'] ?? '');
-    $auto_room_id = $_POST['room_id'] ?? null; // NEW: Room selection
+    $auto_room_id = $_POST['room_id'] ?? null;
 
     // Validate year (supports regular years 1-5 and extension years E1-E5)
     $is_extension = substr($auto_year, 0, 1) === 'E';
@@ -481,19 +549,59 @@ $rooms_stmt = $pdo->prepare("SELECT * FROM rooms ORDER BY room_name");
 $rooms_stmt->execute();
 $all_rooms = fetchAllSafe($rooms_stmt);
 
-// Fetch current schedules
-$schedules_stmt = $pdo->prepare("
+// Build base query for schedules with search condition
+$schedule_query = "
     SELECT s.*, c.course_name, c.course_code, u.full_name AS instructor_name, r.room_name,
            TIME_FORMAT(s.start_time,'%H:%i') as start_time, TIME_FORMAT(s.end_time,'%H:%i') as end_time
     FROM schedule s
     LEFT JOIN courses c ON s.course_id = c.course_id
     LEFT JOIN users u ON s.instructor_id = u.user_id
     LEFT JOIN rooms r ON s.room_id = r.room_id
-    WHERE c.department_id = ? OR (c.department_id IS NULL AND s.course_id IN (SELECT course_id FROM courses WHERE department_id = ?))
+    WHERE (c.department_id = ? OR (c.department_id IS NULL AND s.course_id IN (SELECT course_id FROM courses WHERE department_id = ?)))
+";
+
+// Add search condition if search term is provided
+$search_query = "";
+$search_params = [];
+$where_conditions = [];
+
+if (!empty($search)) {
+    // Build search conditions for multiple fields
+    $search_condition = "(c.course_name LIKE ? OR c.course_code LIKE ? OR u.full_name LIKE ? OR r.room_name LIKE ? OR s.year LIKE ? OR s.semester LIKE ? OR s.academic_year LIKE ? OR s.day LIKE ?)";
+    $search_param = "%{$search}%";
+    $search_params = array_fill(0, 8, $search_param);
+    $where_conditions[] = $search_condition;
+}
+
+// Combine all where conditions
+if (!empty($where_conditions)) {
+    $search_query = " AND " . implode(" AND ", $where_conditions);
+}
+
+// Complete query with ordering
+$complete_query = $schedule_query . $search_query . "
     ORDER BY FIELD(s.day, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'), s.start_time
-");
-$schedules_stmt->execute([$dept_id, $dept_id]);
+";
+
+// Prepare and execute the schedule query
+$schedules_stmt = $pdo->prepare($complete_query);
+$execute_params = array_merge([$dept_id, $dept_id], $search_params);
+$schedules_stmt->execute($execute_params);
 $all_schedules = fetchAllSafe($schedules_stmt);
+
+// Count total schedules for search info
+$count_query = "
+    SELECT COUNT(*) as total_count
+    FROM schedule s
+    LEFT JOIN courses c ON s.course_id = c.course_id
+    LEFT JOIN users u ON s.instructor_id = u.user_id
+    LEFT JOIN rooms r ON s.room_id = r.room_id
+    WHERE (c.department_id = ? OR (c.department_id IS NULL AND s.course_id IN (SELECT course_id FROM courses WHERE department_id = ?)))
+" . $search_query;
+
+$count_stmt = $pdo->prepare($count_query);
+$count_stmt->execute(array_merge([$dept_id, $dept_id], $search_params));
+$schedule_count = $count_stmt->fetch(PDO::FETCH_ASSOC)['total_count'];
 
 // Group schedules for display
 $grouped_schedules = [];
@@ -534,7 +642,7 @@ $scheduled_classes = $pdo->prepare("
 $scheduled_classes->execute([$dept_id]);
 $scheduled_classes_count = $scheduled_classes->fetchColumn();
 
-// Fetch recent schedules for preview
+// Fetch recent schedules for preview (without search filter)
 $recent_schedules_stmt = $pdo->prepare("
     SELECT s.day, TIME_FORMAT(s.start_time,'%H:%i') as start_time, 
            TIME_FORMAT(s.end_time,'%H:%i') as end_time, 
@@ -596,6 +704,8 @@ foreach($recent_schedules as $schedule){
             --error-text: #991b1b;
             --warning-bg: #fef3c7;
             --warning-text: #92400e;
+            --info-bg: #dbeafe;
+            --info-text: #1e40af;
         }
 
         /* Dark mode overrides */
@@ -614,6 +724,223 @@ foreach($recent_schedules as $schedule){
             --table-header: #374151;
         }
 
+        /* ================= EXPORT/PRINT CONTROLS ================= */
+        .export-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            justify-content: flex-end;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: var(--bg-card);
+            border-radius: 12px;
+            box-shadow: 0 4px 12px var(--shadow-color);
+            border: 1px solid var(--border-color);
+        }
+
+        .export-btn {
+            padding: 12px 20px;
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+        .export-btn:hover {
+            background: linear-gradient(135deg, #059669, #047857);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+
+        .export-btn.csv {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+        }
+
+        .export-btn.csv:hover {
+            background: linear-gradient(135deg, #2563eb, #1e40af);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        .export-btn.print {
+            background: linear-gradient(135deg, #6366f1, #4f46e5);
+        }
+
+        .export-btn.print:hover {
+            background: linear-gradient(135deg, #4f46e5, #4338ca);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+
+        .export-btn i {
+            font-size: 1.1rem;
+        }
+
+        /* ================= SEARCH BAR STYLES ================= */
+        .search-container {
+            margin: 30px 0;
+            position: relative;
+            max-width: 600px;
+        }
+
+        .search-form {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .search-box {
+            flex: 1;
+            padding: 14px 50px 14px 20px;
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            background: var(--bg-card);
+            color: var(--text-primary);
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px var(--shadow-color);
+        }
+
+        .search-box:focus {
+            outline: none;
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        .search-btn {
+            padding: 14px 24px;
+            background: linear-gradient(135deg, #6366f1, #3b82f6);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px var(--shadow-color);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .search-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px var(--shadow-color);
+            background: linear-gradient(135deg, #4f46e5, #2563eb);
+        }
+
+        .clear-btn {
+            padding: 14px 20px;
+            background: linear-gradient(135deg, #6b7280, #4b5563);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px var(--shadow-color);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+        .clear-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px var(--shadow-color);
+            background: linear-gradient(135deg, #4b5563, #374151);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-light);
+            font-size: 1.1rem;
+        }
+
+        .search-results-info {
+            margin-top: 15px;
+            padding: 12px 18px;
+            background: var(--info-bg);
+            border-radius: 10px;
+            color: var(--info-text);
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            border: 1px solid var(--info-text);
+        }
+
+        .search-results-info i {
+            color: #3b82f6;
+        }
+
+        .search-results-info span {
+            font-weight: 600;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 50px 30px;
+            background: var(--bg-card);
+            border-radius: 12px;
+            margin-top: 20px;
+            border: 2px dashed var(--border-color);
+        }
+
+        .no-results i {
+            font-size: 3.5rem;
+            color: var(--text-light);
+            margin-bottom: 20px;
+            opacity: 0.7;
+        }
+
+        .no-results h3 {
+            color: var(--text-primary);
+            margin-bottom: 15px;
+            font-size: 1.5rem;
+        }
+
+        .no-results p {
+            color: var(--text-light);
+            margin-bottom: 25px;
+            max-width: 400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .try-again-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #6366f1, #3b82f6);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            font-size: 0.95rem;
+        }
+
+        .try-again-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(99, 102, 241, 0.3);
+            background: linear-gradient(135deg, #4f46e5, #2563eb);
+        }
+
         /* ================= RESET & BASE STYLES ================= */
         * { 
             box-sizing: border-box; 
@@ -629,91 +956,184 @@ foreach($recent_schedules as $schedule){
             overflow-x: hidden;
         }
 
+        /* ================= University Header ================= */
+        .university-header {
+            background: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%);
+            color: white;
+            padding: 0.5rem 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 1201;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .dku-logo-img {
+            width: 45px;
+            height: 45px;
+            object-fit: contain;
+            border-radius: 5px;
+            background: white;
+            padding: 4px;
+        }
+
+        .system-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            opacity: 0.95;
+        }
+
+        .header-right {
+            font-size: 0.8rem;
+            opacity: 0.9;
+        }
+
+        @media (max-width: 768px) {
+            .university-header {
+                padding: 0.5rem 15px;
+                flex-direction: column;
+                gap: 0.5rem;
+                text-align: center;
+            }
+            
+            .header-left, .header-right {
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .system-title {
+                font-size: 0.8rem;
+            }
+            
+            .header-right {
+                font-size: 0.75rem;
+            }
+        }
+
+        /* Adjust other elements for university header */
+        .topbar {
+            top: 60px !important; /* Adjusted for university header */
+        }
+
+        .sidebar {
+            top: 60px !important; /* Adjusted for university header */
+            height: calc(100% - 60px) !important;
+        }
+
         /* ================= TOPBAR FOR MOBILE ================= */
         .topbar {
             display: none;
             position: fixed;
-            top:0;
-            left:0;
-            width:100%;
-            background:var(--bg-sidebar);
-            color:var(--text-sidebar);
-            padding:15px 20px;
-            z-index:1200;
-            justify-content:space-between;
-            align-items:center;
+            top: 60px; /* Adjusted for university header */
+            left: 0;
+            width: 100%;
+            background: var(--bg-sidebar);
+            color: var(--text-sidebar);
+            padding: 12px 20px;
+            z-index: 1200;
+            justify-content: space-between;
+            align-items: center;
             box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .menu-btn {
-            font-size:26px;
-            background:#1abc9c;
-            border:none;
-            color:var(--text-sidebar);
-            cursor:pointer;
-            padding:10px 14px;
-            border-radius:8px;
-            font-weight:600;
+            font-size: 26px;
+            background: #1abc9c;
+            border: none;
+            color: var(--text-sidebar);
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-weight: 600;
             transition: background 0.3s, transform 0.2s;
         }
 
         .menu-btn:hover {
-            background:#159b81;
-            transform:translateY(-2px);
+            background: #159b81;
+            transform: translateY(-2px);
         }
 
         /* ================= SIDEBAR ================= */
         .sidebar {
             position: fixed;
-            top:0;
-            left:0;
-            width:250px;
-            height:100%;
-            background:var(--bg-sidebar);
-            color:var(--text-sidebar);
-            z-index:1100;
+            top: 60px; /* Adjusted for university header */
+            left: 0;
+            width: 250px;
+            height: calc(100% - 60px);
+            background: var(--bg-sidebar);
+            color: var(--text-sidebar);
+            z-index: 1100;
             transition: transform 0.3s ease;
-            padding: 20px 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
             box-shadow: 2px 0 10px rgba(0,0,0,0.1);
         }
 
         .sidebar.hidden {
-            transform:translateX(-260px);
+            transform: translateX(-260px);
         }
 
-        .sidebar a {
-            display:block;
-            padding:12px 20px;
-            color:var(--text-sidebar);
-            text-decoration:none;
-            transition: background 0.3s;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            font-size: 0.95rem;
+        /* Sidebar Content (scrollable) */
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 20px 0;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
         }
 
-        .sidebar a i {
-            width: 20px;
-            margin-right: 10px;
-            text-align: center;
+        /* Custom scrollbar for sidebar */
+        .sidebar-content::-webkit-scrollbar {
+            width: 6px;
         }
 
-        .sidebar a:hover,
-        .sidebar a.active {
-            background:#1abc9c;
-            color:white;
-            padding-left: 25px;
+        .sidebar-content::-webkit-scrollbar-track {
+            background: transparent;
+            border-radius: 3px;
         }
 
+        .sidebar-content::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 3px;
+        }
+
+        .sidebar-content::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        [data-theme="dark"] .sidebar-content::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        [data-theme="dark"] .sidebar-content::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Sidebar Profile */
         .sidebar-profile {
             text-align: center;
-            margin-bottom: 20px;
+            margin-bottom: 25px;
             padding: 0 20px 20px;
             border-bottom: 1px solid rgba(255,255,255,0.2);
+            flex-shrink: 0;
         }
 
         .sidebar-profile img {
-            width: 100px;
-            height: 100px;
+            width: 90px;
+            height: 90px;
             border-radius: 50%;
             object-fit: cover;
             margin-bottom: 10px;
@@ -725,198 +1145,67 @@ foreach($recent_schedules as $schedule){
             color: var(--text-sidebar);
             font-weight: bold;
             margin: 0;
-            font-size: 16px;
+            font-size: 15px;
         }
-        /* ================= Updated Sidebar ================= */
-.sidebar {
-    position: fixed; 
-    top:0; 
-    left:0;
-    width:250px; 
-    height:100%;
-    background: var(--bg-sidebar); 
-    color: var(--text-sidebar);
-    z-index:1100;
-    transition: transform 0.3s ease;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
 
-.sidebar.hidden { 
-    transform:translateX(-260px); 
-}
+        /* Sidebar Navigation */
+        .sidebar nav {
+            display: flex;
+            flex-direction: column;
+        }
 
-/* Sidebar Content (scrollable) */
-.sidebar-content {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: 20px 0;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
-}
+        .sidebar a { 
+            display: flex; 
+            align-items: center;
+            gap: 10px;
+            padding: 12px 20px; 
+            color: var(--text-sidebar); 
+            text-decoration: none; 
+            transition: all 0.3s; 
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            font-size: 0.95rem;
+        }
 
-/* Custom scrollbar for sidebar */
-.sidebar-content::-webkit-scrollbar {
-    width: 6px;
-}
+        .sidebar a i {
+            width: 20px;
+            text-align: center;
+        }
 
-.sidebar-content::-webkit-scrollbar-track {
-    background: transparent;
-    border-radius: 3px;
-}
-
-.sidebar-content::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.3);
-    border-radius: 3px;
-}
-
-.sidebar-content::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.5);
-}
-
-[data-theme="dark"] .sidebar-content::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
-}
-
-[data-theme="dark"] .sidebar-content::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.3);
-}
-
-/* Sidebar Profile */
-.sidebar-profile {
-    text-align: center;
-    margin-bottom: 25px;
-    padding: 0 20px 20px;
-    border-bottom: 1px solid rgba(255,255,255,0.2);
-    flex-shrink: 0; /* Prevent shrinking */
-}
-
-.sidebar-profile img {
-    width: 100px;
-    height: 100px;
-    border-radius: 50%;
-    object-fit: cover;
-    margin-bottom: 10px;
-    border: 2px solid #1abc9c;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-}
-
-.sidebar-profile p {
-    color: var(--text-sidebar);
-    font-weight: bold;
-    margin: 0;
-    font-size: 16px;
-}
-
-/* Sidebar Navigation */
-.sidebar nav {
-    display: flex;
-    flex-direction: column;
-}
-
-.sidebar a { 
-    display: flex; 
-    align-items: center;
-    gap: 10px;
-    padding: 12px 20px; 
-    color: var(--text-sidebar); 
-    text-decoration: none; 
-    transition: all 0.3s; 
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-}
-.sidebar a:hover, .sidebar a.active { 
-    background: #1abc9c; 
-    color: white; 
-    padding-left: 25px;
-}
-
-.sidebar a i {
-    width: 20px;
-    text-align: center;
-}
-
-/* Optional: Add fade effect at bottom when scrolling */
-.sidebar-content::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 30px;
-    background: linear-gradient(to bottom, transparent, var(--bg-sidebar));
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.3s;
-}
-
-.sidebar-content.scrolled::after {
-    opacity: 1;
-}
-
-/* ================= Overlay ================= */
-.overlay {
-    position: fixed; 
-    top:0; 
-    left:0; 
-    width:100%; 
-    height:100%;
-    background: rgba(0,0,0,0.4); 
-    z-index:1050;
-    display:none; 
-    opacity:0; 
-    transition: opacity 0.3s ease;
-}
-
-.overlay.active { 
-    display:block; 
-    opacity:1; 
-}
-
-/* ================= Main content ================= */
-.main-content {
-    margin-left: 250px;
-    padding:30px 50px;
-    min-height:100vh;
-    background:var(--bg-primary);
-    color:var(--text-primary);
-    transition: all 0.3s ease;
-}
-
-@media(max-width: 768px){
-    .main-content {
-        margin-left: 0;
-        padding: 20px;
-        padding-top: 80px;
-    }
-}
+        .sidebar a:hover,
+        .sidebar a.active {
+            background: #1abc9c;
+            color: white;
+            padding-left: 25px;
+        }
 
         /* ================= OVERLAY ================= */
         .overlay {
             position: fixed;
-            top:0;
-            left:0;
-            width:100%;
-            height:100%;
-            background: rgba(0,0,0,0.5);
-            z-index:1050;
-            display:none;
-            opacity:0;
+            top: 60px; /* Adjusted for university header */
+            left: 0;
+            width: 100%;
+            height: calc(100% - 60px);
+            background: rgba(0,0,0,0.4);
+            z-index: 1050;
+            display: none;
+            opacity: 0;
             transition: opacity 0.3s ease;
         }
 
         .overlay.active {
-            display:block;
-            opacity:1;
+            display: block;
+            opacity: 1;
         }
 
         /* ================= MAIN CONTENT ================= */
         .main-content {
             margin-left: 250px;
-            padding:30px 50px;
-            min-height:100vh;
+            padding: 30px 50px;
+            min-height: 100vh;
+            background: var(--bg-primary);
+            color: var(--text-primary);
             transition: all 0.3s ease;
+            margin-top: 60px; /* Added for university header */
         }
 
         /* ================= HEADER STYLES ================= */
@@ -1541,24 +1830,93 @@ foreach($recent_schedules as $schedule){
             line-height: 1.6;
         }
 
+        /* ================= PRINT STYLES ================= */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            
+            .printable-area, 
+            .printable-area * {
+                visibility: visible;
+            }
+            
+            .printable-area {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                background: white !important;
+                color: black !important;
+            }
+            
+            .no-print {
+                display: none !important;
+            }
+            
+            a {
+                text-decoration: none !important;
+                color: black !important;
+            }
+            
+            .btn, .export-controls, .search-container, .sidebar, .topbar, 
+            .university-header, .header, .stats, .card-header .badge {
+                display: none !important;
+            }
+            
+            table {
+                border-collapse: collapse;
+                width: 100%;
+            }
+            
+            th, td {
+                border: 1px solid #ddd !important;
+                padding: 8px;
+            }
+            
+            th {
+                background-color: #f2f2f2 !important;
+                color: black !important;
+            }
+            
+            .year-badge, .semester-badge {
+                background: #ddd !important;
+                color: black !important;
+                border: 1px solid #999 !important;
+            }
+        }
+
         /* ================= RESPONSIVE ================= */
         @media(max-width: 768px){
-            .topbar {
-                display:flex;
+            .university-header {
+                padding: 0.5rem 15px;
             }
             
-            .sidebar {
-                transform:translateX(-100%);
+            .topbar { 
+                display: flex; 
+                top: 60px;
             }
             
-            .sidebar.active {
-                transform:translateX(0);
+            .sidebar { 
+                transform: translateX(-100%); 
+                top: 120px; /* 60px university header + 60px topbar */
+                height: calc(100% - 120px) !important;
             }
             
-            .main-content {
-                margin-left:0;
-                padding: 20px;
-                padding-top: 80px;
+            .sidebar.active { 
+                transform: translateX(0); 
+            }
+            
+            .overlay {
+                top: 120px;
+                height: calc(100% - 120px);
+            }
+            
+            .main-content { 
+                margin-left: 0; 
+                padding: 20px; 
+                padding-top: 140px; /* Adjusted for headers */
+                margin-top: 120px; /* 60px university header + 60px topbar */
             }
             
             .stats {
@@ -1595,6 +1953,36 @@ foreach($recent_schedules as $schedule){
             .room-option {
                 min-width: 100%;
             }
+            
+            .search-form {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .search-box, .search-btn, .clear-btn {
+                width: 100%;
+            }
+            
+            .search-container {
+                max-width: 100%;
+            }
+            
+            .search-results-info {
+                flex-direction: column;
+                text-align: center;
+                gap: 10px;
+            }
+            
+            .export-controls {
+                flex-direction: column;
+                gap: 10px;
+                align-items: stretch;
+            }
+            
+            .export-btn {
+                width: 100%;
+                justify-content: center;
+            }
         }
 
         @media (max-width: 1200px) {
@@ -1612,7 +2000,7 @@ foreach($recent_schedules as $schedule){
         @media (max-width: 576px) {
             .main-content {
                 padding: 15px;
-                padding-top: 70px;
+                padding-top: 140px;
             }
             
             .card-body {
@@ -1622,6 +2010,22 @@ foreach($recent_schedules as $schedule){
             .btn {
                 padding: 12px 20px;
                 font-size: 0.9rem;
+            }
+            
+            .stats {
+                gap: 15px;
+            }
+            
+            .stat-card {
+                padding: 20px;
+            }
+            
+            .stat-card i {
+                font-size: 2rem;
+            }
+            
+            .stat-card h3 {
+                font-size: 1.5rem;
             }
         }
 
@@ -1646,8 +2050,20 @@ foreach($recent_schedules as $schedule){
     </style>
 </head>
 <body>
+    <!-- University Header -->
+    <div class="university-header no-print">
+        <div class="header-left">
+            <!-- Using the DKU logo image -->
+            <img src="../assets/images/dku logo.jpg" alt="Debark University Logo" class="dku-logo-img">
+            <div class="system-title">Debark University Class Scheduling System</div>
+        </div>
+        <div class="header-right">
+            Schedule Management
+        </div>
+    </div>
+
     <!-- Topbar for Mobile -->
-    <div class="topbar">
+    <div class="topbar no-print">
         <button class="menu-btn" onclick="toggleSidebar()">☰</button>
         <h2>Schedule Management</h2>
     </div>
@@ -1655,50 +2071,48 @@ foreach($recent_schedules as $schedule){
     <!-- Overlay for Mobile -->
     <div class="overlay" onclick="toggleSidebar()"></div>
 
-<!-- Sidebar -->
-<div class="sidebar" id="sidebar">
-    <div class="sidebar-content" id="sidebarContent">
-        <div class="sidebar-profile">
-            <img src="<?= htmlspecialchars($profile_src) ?>" alt="Profile Picture">
-            <p><?= htmlspecialchars($user['username'] ?? 'User') ?></p>
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-content" id="sidebarContent">
+            <div class="sidebar-profile">
+                <img src="<?= htmlspecialchars($profile_src) ?>" alt="Profile Picture">
+                <p><?= htmlspecialchars($user['username'] ?? 'User') ?></p>
+            </div>
+            <nav>
+                <a href="departmenthead_dashboard.php" class="<?= $current_page=='departmenthead_dashboard.php'?'active':'' ?>">
+                    <i class="fas fa-home"></i> Dashboard
+                </a>
+                <a href="manage_enrollments.php" class="<?= $current_page=='manage_enrollments.php'?'active':'' ?>">
+                    <i class="fas fa-users"></i> Manage Enrollments
+                </a>
+                <a href="manage_schedules.php" class="active">
+                    <i class="fas fa-calendar-alt"></i> Manage Schedules
+                </a>
+                <a href="assign_courses.php" class="<?= $current_page=='assign_courses.php'?'active':'' ?>">
+                    <i class="fas fa-chalkboard-teacher"></i> Assign Courses
+                </a>
+                <a href="add_courses.php" class="<?= $current_page=='add_courses.php'?'active':'' ?>">
+                    <i class="fas fa-book"></i> Add Courses
+                </a>
+                <a href="exam_schedules.php" class="<?= $current_page=='exam_schedules.php'?'active':'' ?>">
+                    <i class="fas fa-clipboard-list"></i> Exam Schedules
+                </a>
+                <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
+                    <i class="fas fa-user-edit"></i> Edit Profile
+                </a>
+                <a href="manage_announcements.php" class="<?= $current_page=='manage_announcements.php'?'active':'' ?>">
+                    <i class="fas fa-bullhorn"></i> Announcements
+                </a>
+                <a href="../logout.php">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </nav>
         </div>
-        <nav>
-            <a href="departmenthead_dashboard.php" class="<?= $current_page=='departmenthead_dashboard.php'?'active':'' ?>">
-                <i class="fas fa-home"></i> Dashboard
-            </a>
-            <a href="manage_enrollments.php" class="<?= $current_page=='manage_enrollments.php'?'active':'' ?>">
-                <i class="fas fa-users"></i> Manage Enrollments
-            </a>
-            <a href="manage_schedules.php" class="active">
-                <i class="fas fa-calendar-alt"></i> Manage Schedules
-            </a>
-            <a href="assign_courses.php" class="<?= $current_page=='assign_courses.php'?'active':'' ?>">
-                <i class="fas fa-chalkboard-teacher"></i> Assign Courses
-            </a>
-            <a href="add_courses.php" class="<?= $current_page=='add_courses.php'?'active':'' ?>">
-                <i class="fas fa-book"></i> Add Courses
-            </a>
-            <a href="exam_schedules.php" class="<?= $current_page=='exam_schedules.php'?'active':'' ?>">
-                <i class="fas fa-clipboard-list"></i> Exam Schedules
-            </a>
-            <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
-                <i class="fas fa-user-edit"></i> Edit Profile
-            </a>
-            <a href="manage_announcements.php" class="<?= $current_page=='manage_announcements.php'?'active':'' ?>">
-                <i class="fas fa-bullhorn"></i> Announcements
-            </a>
-            <a href="../logout.php">
-                <i class="fas fa-sign-out-alt"></i> Logout
-            </a>
-        </nav>
     </div>
-</div>
 
-<!-- Overlay for Mobile -->
-<div class="overlay" onclick="toggleSidebar()"></div>
     <!-- Main Content -->
     <div class="main-content">
-        <div class="header">
+        <div class="header no-print">
             <h1>Schedule Management</h1>
             <div class="user-info">
                 <img src="<?= htmlspecialchars($profile_src) ?>" alt="Profile">
@@ -1710,7 +2124,7 @@ foreach($recent_schedules as $schedule){
         </div>
 
         <!-- Stats -->
-        <div class="stats">
+        <div class="stats no-print">
             <div class="stat-card">
                 <i class="fas fa-book"></i>
                 <h3><?php echo $total_courses_count; ?></h3>
@@ -1741,276 +2155,390 @@ foreach($recent_schedules as $schedule){
             </div>
         <?php endif; ?>
 
-        <!-- Time Slot Information -->
-        <div class="time-slot-info">
-            <h5><i class="fas fa-clock"></i> Scheduling Information</h5>
-            <div><strong>Regular Students (Year 1-5):</strong> Monday to Friday | Time Slots: 2:30-4:20, 4:30-6:20, 8:00-11:00</div>
-            <div><strong>Extension Students (Extension Year 1-5):</strong> Saturday & Sunday only | Time Slots: 2:30-4:00, 4:30-6:00, 8:00-11:00</div>
-            <div><strong>Total Weekday Slots:</strong> 15 (5 days × 3 time slots)</div>
-            <div><strong>Total Weekend Slots:</strong> 6 (2 days × 3 time slots)</div>
-            <div><strong>Important:</strong> All classes will be scheduled in the SAME room</div>
-        </div>
-
-        <!-- Course Information -->
-        <div class="course-info">
-            <h4><i class="fas fa-info-circle"></i> Available Courses</h4>
-            <ul class="course-list">
-                <?php foreach($courses as $course): ?>
-                    <li>
-                        <strong><?= htmlspecialchars($course['course_name']) ?> (<?= htmlspecialchars($course['course_code']) ?>)</strong>
-                        <span style="color: var(--text-light);">- ID: <?= $course['course_id'] ?></span>
-                    </li>
-                <?php endforeach; ?>
-            </ul>
-        </div>
-
-        <!-- Auto Generate Schedule Card -->
-        <div class="card">
-            <div class="card-header">
-                <h3><i class="fas fa-magic"></i> Auto Generate Schedule</h3>
-                <span class="badge">Smart Scheduling</span>
+        <!-- Export/Print Controls -->
+        <div class="export-controls no-print">
+            <div style="flex: 1;">
+                <h3 style="margin: 0; color: var(--text-primary);">
+                    <i class="fas fa-download"></i> Export & Print
+                </h3>
             </div>
-            <div class="card-body">
-                <form method="POST" id="scheduleForm">
-                    <input type="hidden" name="auto_generate" value="1">
-                    
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="auto_courses">Select Courses</label>
-                            <select name="auto_courses[]" id="auto_courses" multiple class="form-control" required>
-                                <?php foreach($courses as $c): ?>
-                                    <option value="<?= $c['course_id'] ?>">
-                                        <?= htmlspecialchars($c['course_name']) ?> 
-                                        (<?= htmlspecialchars($c['course_code']) ?>)
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                            <small style="color: var(--text-light);">Hold Ctrl/Cmd to select multiple courses. All selected courses will be scheduled.</small>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="auto_year">Year / Extension</label>
-                            <select name="auto_year" id="auto_year" class="form-control" required>
-                                <option value="">Select Year / Extension</option>
-                                <!-- Regular Years -->
-                                <?php for($y=1;$y<=5;$y++): ?>
-                                <option value="<?= $y ?>">Year <?= $y ?></option>
-                                <?php endfor; ?>
-                                
-                                <!-- Extension Years -->
-                                <?php for($e=1;$e<=5;$e++): ?>
-                                <option value="E<?= $e ?>">Extension Year <?= $e ?></option>
-                                <?php endfor; ?>
-                            </select>
-                        </div>
+            <div style="display: flex; gap: 10px;">
+                <a href="?export=csv<?= !empty($search) ? '&search=' . urlencode($search) : '' ?>" class="export-btn csv">
+                    <i class="fas fa-file-csv"></i> Export to CSV
+                </a>
+                <button onclick="printSchedule()" class="export-btn print">
+                    <i class="fas fa-print"></i> Print Schedule
+                </button>
+            </div>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="search-container no-print">
+            <form method="GET" class="search-form">
+                <div style="position: relative; flex: 1;">
+                    <i class="fas fa-search search-icon"></i>
+                    <input 
+                        type="text" 
+                        name="search" 
+                        class="search-box" 
+                        placeholder="<?= $search_placeholder ?>"
+                        value="<?= htmlspecialchars($search) ?>"
+                        autocomplete="off"
+                        autofocus
+                    >
+                </div>
+                <button type="submit" class="search-btn">
+                    <i class="fas fa-search"></i> Search Schedules
+                </button>
+                <?php if(!empty($search)): ?>
+                    <a href="manage_schedules.php" class="clear-btn">
+                        <i class="fas fa-times"></i> Clear Search
+                    </a>
+                <?php endif; ?>
+            </form>
+            
+            <?php if(!empty($search)): ?>
+                <div class="search-results-info">
+                    <div>
+                        <i class="fas fa-info-circle"></i>
+                        Showing results for "<strong><?= htmlspecialchars($search) ?></strong>"
                     </div>
-                    
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="auto_academic_year">Academic Year</label>
-                            <input type="text" name="auto_academic_year" id="auto_academic_year" class="form-control" placeholder="e.g., 2024-2025" required value="2024-2025">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="auto_semester">Semester</label>
-                            <select name="auto_semester" id="auto_semester" class="form-control" required>
-                                <option value="">Select Semester</option>
-                                <option value="1st Semester" selected>1st Semester</option>
-                                <option value="2nd Semester">2nd Semester</option>
-                                <option value="Summer">Summer</option>
-                            </select>
-                        </div>
+                    <div>
+                        Found <strong><?= $schedule_count ?></strong> schedule(s)
+                        <?php if($schedule_count > 0): ?>
+                            <span style="margin-left: 10px; color: var(--text-light);">
+                                <i class="fas fa-filter"></i> Filtered from total schedules
+                            </span>
+                        <?php endif; ?>
                     </div>
-                    
-                    <!-- Room Selection Section -->
-                    <div class="room-selection">
-                        <h6><i class="fas fa-door-open"></i> Room Selection (All classes will use the same room)</h6>
-                        <div class="room-options">
-                            <div class="room-option">
-                                <select name="room_id" id="room_id" class="form-control">
-                                    <option value="">Auto-select first available classroom</option>
-                                    <?php foreach($all_rooms as $room): 
-                                        $room_type = $room['room_type'];
-                                        $type_display = ucfirst($room_type);
-                                        $capacity = $room['capacity'] ? " - Capacity: {$room['capacity']}" : "";
-                                    ?>
-                                        <option value="<?= $room['room_id'] ?>">
-                                            <?= htmlspecialchars($room['room_name']) ?> (<?= $type_display ?><?= $capacity ?>)
+                </div>
+            <?php endif; ?>
+        </div>
+
+        <!-- Printable Area -->
+        <div class="printable-area">
+            <!-- Print Header -->
+            <div style="text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; display: none;" class="print-only">
+                <h1 style="color: #333; margin-bottom: 10px;">Debark University</h1>
+                <h2 style="color: #555; margin-bottom: 5px;">Class Schedule</h2>
+                <p style="color: #666; margin-bottom: 5px;">
+                    Generated on: <?= date('F j, Y g:i A') ?>
+                </p>
+                <p style="color: #666;">
+                    Department Head: <?= htmlspecialchars($user['username'] ?? 'User') ?>
+                </p>
+                <?php if(!empty($search)): ?>
+                    <p style="color: #666; font-style: italic;">
+                        Search Filter: "<?= htmlspecialchars($search) ?>"
+                    </p>
+                <?php endif; ?>
+            </div>
+
+            <!-- Time Slot Information -->
+            <div class="time-slot-info">
+                <h5><i class="fas fa-clock"></i> Scheduling Information</h5>
+                <div><strong>Regular Students (Year 1-5):</strong> Monday to Friday | Time Slots: 2:30-4:20, 4:30-6:20, 8:00-11:00</div>
+                <div><strong>Extension Students (Extension Year 1-5):</strong> Saturday & Sunday only | Time Slots: 2:30-4:00, 4:30-6:00, 8:00-11:00</div>
+                <div><strong>Total Weekday Slots:</strong> 15 (5 days × 3 time slots)</div>
+                <div><strong>Total Weekend Slots:</strong> 6 (2 days × 3 time slots)</div>
+                <div><strong>Important:</strong> All classes will be scheduled in the SAME room</div>
+            </div>
+
+            <!-- Course Information -->
+            <div class="course-info">
+                <h4><i class="fas fa-info-circle"></i> Available Courses</h4>
+                <ul class="course-list">
+                    <?php foreach($courses as $course): ?>
+                        <li>
+                            <strong><?= htmlspecialchars($course['course_name']) ?> (<?= htmlspecialchars($course['course_code']) ?>)</strong>
+                            <span style="color: var(--text-light);">- ID: <?= $course['course_id'] ?></span>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+
+            <!-- Auto Generate Schedule Card -->
+            <div class="card no-print">
+                <div class="card-header">
+                    <h3><i class="fas fa-magic"></i> Auto Generate Schedule</h3>
+                    <span class="badge">Smart Scheduling</span>
+                </div>
+                <div class="card-body">
+                    <form method="POST" id="scheduleForm">
+                        <input type="hidden" name="auto_generate" value="1">
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="auto_courses">Select Courses</label>
+                                <select name="auto_courses[]" id="auto_courses" multiple class="form-control" required>
+                                    <?php foreach($courses as $c): ?>
+                                        <option value="<?= $c['course_id'] ?>">
+                                            <?= htmlspecialchars($c['course_name']) ?> 
+                                            (<?= htmlspecialchars($c['course_code']) ?>)
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
+                                <small style="color: var(--text-light);">Hold Ctrl/Cmd to select multiple courses. All selected courses will be scheduled.</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="auto_year">Year / Extension</label>
+                                <select name="auto_year" id="auto_year" class="form-control" required>
+                                    <option value="">Select Year / Extension</option>
+                                    <!-- Regular Years -->
+                                    <?php for($y=1;$y<=5;$y++): ?>
+                                    <option value="<?= $y ?>">Year <?= $y ?></option>
+                                    <?php endfor; ?>
+                                    
+                                    <!-- Extension Years -->
+                                    <?php for($e=1;$e<=5;$e++): ?>
+                                    <option value="E<?= $e ?>">Extension Year <?= $e ?></option>
+                                    <?php endfor; ?>
+                                </select>
                             </div>
                         </div>
-                        <div class="room-details">
-                            <span><i class="fas fa-info-circle"></i> Leave empty to auto-select first classroom</span>
-                            <span><i class="fas fa-check-circle"></i> All classes will be in the same room</span>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="auto_academic_year">Academic Year</label>
+                                <input type="text" name="auto_academic_year" id="auto_academic_year" class="form-control" placeholder="e.g., 2024-2025" required value="2024-2025">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="auto_semester">Semester</label>
+                                <select name="auto_semester" id="auto_semester" class="form-control" required>
+                                    <option value="">Select Semester</option>
+                                    <option value="1st Semester" selected>1st Semester</option>
+                                    <option value="2nd Semester">2nd Semester</option>
+                                    <option value="Summer">Summer</option>
+                                </select>
+                            </div>
                         </div>
-                    </div>
-                    
-                    <div class="form-row">
-                        <div class="form-group">
-                            <button type="submit" class="btn btn-primary" id="generateBtn">
-                                <i class="fas fa-bolt"></i> Generate Schedule
-                            </button>
-                            <button type="button" class="btn btn-warning" onclick="clearAllSchedules()" style="margin-left: 10px;">
-                                <i class="fas fa-trash-alt"></i> Clear All Schedules First
-                            </button>
+                        
+                        <!-- Room Selection Section -->
+                        <div class="room-selection">
+                            <h6><i class="fas fa-door-open"></i> Room Selection (All classes will use the same room)</h6>
+                            <div class="room-options">
+                                <div class="room-option">
+                                    <select name="room_id" id="room_id" class="form-control">
+                                        <option value="">Auto-select first available classroom</option>
+                                        <?php foreach($all_rooms as $room): 
+                                            $room_type = $room['room_type'];
+                                            $type_display = ucfirst($room_type);
+                                            $capacity = $room['capacity'] ? " - Capacity: {$room['capacity']}" : "";
+                                        ?>
+                                            <option value="<?= $room['room_id'] ?>">
+                                                <?= htmlspecialchars($room['room_name']) ?> (<?= $type_display ?><?= $capacity ?>)
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="room-details">
+                                <span><i class="fas fa-info-circle"></i> Leave empty to auto-select first classroom</span>
+                                <span><i class="fas fa-check-circle"></i> All classes will be in the same room</span>
+                            </div>
                         </div>
-                    </div>
-                    
-                    <div class="tip-box">
-                        <small><i class="fas fa-lightbulb"></i> <strong>Tip:</strong> All selected courses will be scheduled in the SAME room across all time slots. This ensures consistency and avoids room conflicts.</small>
-                    </div>
-                </form>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <button type="submit" class="btn btn-primary" id="generateBtn">
+                                    <i class="fas fa-bolt"></i> Generate Schedule
+                                </button>
+                                <button type="button" class="btn btn-warning" onclick="clearAllSchedules()" style="margin-left: 10px;">
+                                    <i class="fas fa-trash-alt"></i> Clear All Schedules First
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="tip-box">
+                            <small><i class="fas fa-lightbulb"></i> <strong>Tip:</strong> All selected courses will be scheduled in the SAME room across all time slots. This ensures consistency and avoids room conflicts.</small>
+                        </div>
+                    </form>
+                </div>
             </div>
-        </div>
 
-        <!-- Schedule Preview -->
-        <div class="card schedule-preview">
-            <div class="card-header">
-                <h3><i class="fas fa-eye"></i> Schedule Preview</h3>
-                <span class="badge">Recent Schedules</span>
-            </div>
-            <div class="card-body">
-                <?php if(!empty($recent_schedules)): ?>
-                <div class="preview-grid">
-                    <?php foreach($preview_schedules as $day => $day_schedules): ?>
-                        <div class="preview-day">
-                            <h4><?= $day ?></h4>
-                            <?php if(!empty($day_schedules)): ?>
-                                <?php foreach($day_schedules as $schedule): 
-                                    // Determine time slot type for styling
-                                    $start_time = $schedule['start_time'];
-                                    $time_slot_class = '';
-                                    if ($start_time == '02:30') $time_slot_class = 'morning';
-                                    elseif ($start_time == '04:30') $time_slot_class = 'afternoon1';
-                                    elseif ($start_time == '08:00') $time_slot_class = 'afternoon2';
-                                    elseif ($start_time == '11:30') $time_slot_class = 'morning';
-                                    elseif ($start_time == '15:00') $time_slot_class = 'afternoon1';
-                                    
-                                    // Determine year display
-                                    $year_display = $schedule['year'] ?? '';
-                                    if (is_numeric($year_display)) {
-                                        $year_text = "Year $year_display";
-                                    } elseif (substr($year_display, 0, 1) === 'E') {
-                                        $extension_num = substr($year_display, 1);
-                                        $year_text = "Ext. Year $extension_num";
-                                    } else {
-                                        $year_text = $year_display;
-                                    }
-                                ?>
-                                    <div class="time-slot <?= $time_slot_class ?>">
-                                        <strong><?= htmlspecialchars($schedule['course_name']) ?></strong><br>
-                                        (<?= htmlspecialchars($schedule['course_code']) ?>)<br>
-                                        <?= htmlspecialchars($schedule['instructor_name']) ?> | <?= htmlspecialchars($schedule['room_name']) ?><br>
-                                        <?= $schedule['start_time'] ?> - <?= $schedule['end_time'] ?><br>
-                                        <small><?= $year_text ?></small>
-                                    </div>
-                                <?php endforeach; ?>
-                            <?php else: ?>
-                                <p style="text-align:center; color:var(--text-light); font-style:italic; margin-top: 20px;">No classes</p>
-                            <?php endif; ?>
-                        </div>
-                    <?php endforeach; ?>
+            <!-- No Search Results Message -->
+            <?php if(!empty($search) && empty($grouped_schedules)): ?>
+                <div class="no-results">
+                    <i class="fas fa-search"></i>
+                    <h3>No schedules found</h3>
+                    <p>No schedules match your search for "<strong><?= htmlspecialchars($search) ?></strong>"</p>
+                    <a href="manage_schedules.php" class="try-again-btn">
+                        <i class="fas fa-redo"></i> View All Schedules
+                    </a>
                 </div>
-                <?php else: ?>
-                <div class="empty-state">
-                    <i class="fas fa-calendar-plus"></i>
-                    <h3>No Schedules Yet</h3>
-                    <p>Generate your first schedule to see the preview here.</p>
-                </div>
-                <?php endif; ?>
-            </div>
-        </div>
+            <?php endif; ?>
 
-        <!-- Current Schedules -->
-        <div class="card">
-            <div class="card-header">
-                <h3><i class="fas fa-list"></i> Current Schedules</h3>
-                <div>
-                    <button type="button" class="btn btn-warning" onclick="clearAllSchedules()" style="margin-right: 10px;">
-                        <i class="fas fa-trash-alt"></i> Clear All
-                    </button>
-                    <button type="submit" form="deleteForm" name="delete_selected" class="btn btn-danger" id="deleteBtn" disabled onclick="return confirm('Are you sure you want to delete selected schedules?')">
-                        <i class="fas fa-trash"></i> Delete Selected
-                    </button>
+            <!-- Schedule Preview (only show if no search or search has results) -->
+            <?php if(empty($search) || (!empty($search) && !empty($grouped_schedules))): ?>
+            <div class="card schedule-preview">
+                <div class="card-header">
+                    <h3><i class="fas fa-eye"></i> Schedule Preview <?php if(!empty($search)) echo '(Filtered)'; ?></h3>
+                    <span class="badge"><?= !empty($search) ? 'Search Results' : 'Recent Schedules' ?></span>
                 </div>
-            </div>
-            <div class="card-body">
-                <?php if(!empty($grouped_schedules)): ?>
-                <form method="POST" id="deleteForm">
-                    <div class="table-container">
-                        <table class="schedule-table">
-                            <thead>
-                                <tr>
-                                    <th class="checkbox-cell">
-                                        <input type="checkbox" id="select_all" onclick="toggleAll(this)">
-                                    </th>
-                                    <th>Course</th>
-                                    <th>Instructor</th>
-                                    <th>Room</th>
-                                    <th>Academic Year</th>
-                                    <th>Semester</th>
-                                    <th>Year / Extension</th>
-                                    <th>Schedule</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach($grouped_schedules as $key=>$s): ?>
-                                    <tr>
-                                        <td class="checkbox-cell">
-                                            <input type="checkbox" name="delete_ids[]" value="<?= $s['schedule_id'] ?>" class="delete-checkbox">
-                                        </td>
-                                        <td>
-                                            <strong><?= htmlspecialchars($s['course_name']) ?></strong><br>
-                                            <small style="color: var(--text-light);"><?= htmlspecialchars($s['course_code']) ?></small>
-                                        </td>
-                                        <td><?= htmlspecialchars($s['instructor_name']) ?></td>
-                                        <td><?= htmlspecialchars($s['room_name']) ?></td>
-                                        <td><?= htmlspecialchars($s['academic_year']) ?></td>
-                                        <td>
-                                            <?php 
-                                            $semester_display = $s['semester'];
-                                            if ($semester_display == '1st Semester') {
-                                                echo '<span class="semester-badge semester-1">1st Semester</span>';
-                                            } elseif ($semester_display == '2nd Semester') {
-                                                echo '<span class="semester-badge semester-2">2nd Semester</span>';
-                                            } elseif ($semester_display == 'Summer') {
-                                                echo '<span class="semester-badge semester-summer">Summer</span>';
-                                            } else {
-                                                echo htmlspecialchars($semester_display);
-                                            }
-                                            ?>
-                                        </td>
-                                        <td>
-                                            <?php 
-                                            $year_display = $s['year'];
-                                            if (is_numeric($year_display)) {
-                                                echo '<span class="year-badge regular-year">Year ' . htmlspecialchars($year_display) . '</span>';
-                                            } elseif (substr($year_display, 0, 1) === 'E') {
-                                                $extension_num = substr($year_display, 1);
-                                                echo '<span class="year-badge extension-year">Ext. ' . htmlspecialchars($extension_num) . '</span>';
-                                            } else {
-                                                echo htmlspecialchars($year_display);
-                                            }
-                                            ?>
-                                        </td>
-                                        <td><?= implode('<br>', $s['time_slots']) ?></td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
+                <div class="card-body">
+                    <?php if(!empty($grouped_schedules)): ?>
+                    <div class="preview-grid">
+                        <?php 
+                        // Get all days that have schedules
+                        $scheduled_days = [];
+                        foreach($grouped_schedules as $schedule) {
+                            if(!in_array($schedule['day'], $scheduled_days)) {
+                                $scheduled_days[] = $schedule['day'];
+                            }
+                        }
+                        
+                        // Display only days that have schedules (or all days if empty)
+                        $days_to_display = !empty($scheduled_days) ? $scheduled_days : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+                        
+                        foreach($days_to_display as $day): 
+                            // Filter schedules for this day
+                            $day_schedules = array_filter($grouped_schedules, function($s) use ($day) {
+                                return $s['day'] === $day;
+                            });
+                        ?>
+                            <div class="preview-day">
+                                <h4><?= $day ?></h4>
+                                <?php if(!empty($day_schedules)): ?>
+                                    <?php foreach($day_schedules as $schedule): 
+                                        // Determine time slot type for styling
+                                        $start_time = substr($schedule['time_slots'][0], strpos($schedule['time_slots'][0], ' ') + 1, 5);
+                                        $time_slot_class = '';
+                                        if ($start_time == '02:30') $time_slot_class = 'morning';
+                                        elseif ($start_time == '04:30') $time_slot_class = 'afternoon1';
+                                        elseif ($start_time == '08:00') $time_slot_class = 'afternoon2';
+                                        elseif ($start_time == '11:30') $time_slot_class = 'morning';
+                                        elseif ($start_time == '15:00') $time_slot_class = 'afternoon1';
+                                        
+                                        // Determine year display
+                                        $year_display = $schedule['year'] ?? '';
+                                        if (is_numeric($year_display)) {
+                                            $year_text = "Year $year_display";
+                                        } elseif (substr($year_display, 0, 1) === 'E') {
+                                            $extension_num = substr($year_display, 1);
+                                            $year_text = "Ext. Year $extension_num";
+                                        } else {
+                                            $year_text = $year_display;
+                                        }
+                                    ?>
+                                        <div class="time-slot <?= $time_slot_class ?>">
+                                            <strong><?= htmlspecialchars($schedule['course_name']) ?></strong><br>
+                                            (<?= htmlspecialchars($schedule['course_code']) ?>)<br>
+                                            <?= htmlspecialchars($schedule['instructor_name']) ?> | <?= htmlspecialchars($schedule['room_name']) ?><br>
+                                            <?= htmlspecialchars($schedule['time_slots'][0]) ?><br>
+                                            <small><?= $year_text ?> | <?= htmlspecialchars($schedule['semester']) ?> <?= htmlspecialchars($schedule['academic_year']) ?></small>
+                                        </div>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <p style="text-align:center; color:var(--text-light); font-style:italic; margin-top: 20px;">No classes</p>
+                                <?php endif; ?>
+                            </div>
+                        <?php endforeach; ?>
                     </div>
-                </form>
-                <?php else: ?>
+                    <?php else: ?>
                     <div class="empty-state">
-                        <i class="fas fa-calendar-times"></i>
-                        <h3>No Schedules Found</h3>
-                        <p>Generate a schedule using the form above to get started.</p>
+                        <i class="fas fa-calendar-plus"></i>
+                        <h3>No Schedules Yet</h3>
+                        <p>Generate your first schedule to see the preview here.</p>
                     </div>
-                <?php endif; ?>
+                    <?php endif; ?>
+                </div>
             </div>
-        </div>
+            <?php endif; ?>
+
+            <!-- Current Schedules -->
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-list"></i> Current Schedules <?php if(!empty($search)) echo '(Filtered)'; ?></h3>
+                    <div class="no-print">
+                        <button type="button" class="btn btn-warning" onclick="clearAllSchedules()" style="margin-right: 10px;">
+                            <i class="fas fa-trash-alt"></i> Clear All
+                        </button>
+                        <button type="submit" form="deleteForm" name="delete_selected" class="btn btn-danger" id="deleteBtn" disabled onclick="return confirm('Are you sure you want to delete selected schedules?')">
+                            <i class="fas fa-trash"></i> Delete Selected
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <?php if(!empty($grouped_schedules)): ?>
+                    <form method="POST" id="deleteForm">
+                        <input type="hidden" name="search" value="<?= htmlspecialchars($search) ?>">
+                        <div class="table-container">
+                            <table class="schedule-table">
+                                <thead>
+                                    <tr>
+                                        <th class="checkbox-cell no-print">
+                                            <input type="checkbox" id="select_all" onclick="toggleAll(this)">
+                                        </th>
+                                        <th>Course</th>
+                                        <th>Instructor</th>
+                                        <th>Room</th>
+                                        <th>Academic Year</th>
+                                        <th>Semester</th>
+                                        <th>Year / Extension</th>
+                                        <th>Schedule</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach($grouped_schedules as $key=>$s): ?>
+                                        <tr>
+                                            <td class="checkbox-cell no-print">
+                                                <input type="checkbox" name="delete_ids[]" value="<?= $s['schedule_id'] ?>" class="delete-checkbox">
+                                            </td>
+                                            <td>
+                                                <strong><?= htmlspecialchars($s['course_name']) ?></strong><br>
+                                                <small style="color: var(--text-light);"><?= htmlspecialchars($s['course_code']) ?></small>
+                                            </td>
+                                            <td><?= htmlspecialchars($s['instructor_name']) ?></td>
+                                            <td><?= htmlspecialchars($s['room_name']) ?></td>
+                                            <td><?= htmlspecialchars($s['academic_year']) ?></td>
+                                            <td>
+                                                <?php 
+                                                $semester_display = $s['semester'];
+                                                if ($semester_display == '1st Semester') {
+                                                    echo '<span class="semester-badge semester-1">1st Semester</span>';
+                                                } elseif ($semester_display == '2nd Semester') {
+                                                    echo '<span class="semester-badge semester-2">2nd Semester</span>';
+                                                } elseif ($semester_display == 'Summer') {
+                                                    echo '<span class="semester-badge semester-summer">Summer</span>';
+                                                } else {
+                                                    echo htmlspecialchars($semester_display);
+                                                }
+                                                ?>
+                                            </td>
+                                            <td>
+                                                <?php 
+                                                $year_display = $s['year'];
+                                                if (is_numeric($year_display)) {
+                                                    echo '<span class="year-badge regular-year">Year ' . htmlspecialchars($year_display) . '</span>';
+                                                } elseif (substr($year_display, 0, 1) === 'E') {
+                                                    $extension_num = substr($year_display, 1);
+                                                    echo '<span class="year-badge extension-year">Ext. ' . htmlspecialchars($extension_num) . '</span>';
+                                                } else {
+                                                    echo htmlspecialchars($year_display);
+                                                }
+                                                ?>
+                                            </td>
+                                            <td><?= implode('<br>', $s['time_slots']) ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </form>
+                    <?php else: ?>
+                        <?php if(empty($search)): ?>
+                        <div class="empty-state">
+                            <i class="fas fa-calendar-times"></i>
+                            <h3>No Schedules Found</h3>
+                            <p>Generate a schedule using the form above to get started.</p>
+                        </div>
+                        <?php endif; ?>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div> <!-- End printable-area -->
     </div>
 
     <script>
@@ -2056,6 +2584,61 @@ foreach($recent_schedules as $schedule){
                 
                 document.body.appendChild(form);
                 form.submit();
+            }
+        }
+
+        // Print schedule function
+        function printSchedule() {
+            // Show print header
+            const printHeaders = document.querySelectorAll('.print-only');
+            printHeaders.forEach(header => {
+                header.style.display = 'block';
+            });
+            
+            // Set print title
+            const originalTitle = document.title;
+            document.title = 'Debark University - Schedule Report - ' + new Date().toLocaleDateString();
+            
+            // Trigger print
+            window.print();
+            
+            // Restore original title
+            document.title = originalTitle;
+            
+            // Hide print header
+            printHeaders.forEach(header => {
+                header.style.display = 'none';
+            });
+        }
+
+        // Keyboard shortcuts for search
+        function setupSearchShortcuts() {
+            const searchBox = document.querySelector('.search-box');
+            if (searchBox) {
+                // Focus search box with Ctrl+F or Cmd+F
+                document.addEventListener('keydown', function(e) {
+                    if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                        e.preventDefault();
+                        searchBox.focus();
+                        searchBox.select();
+                    }
+                    
+                    // Clear search with Escape key
+                    if (e.key === 'Escape' && searchBox.value) {
+                        window.location.href = 'manage_schedules.php';
+                    }
+                    
+                    // Submit search with Enter key if search box is focused
+                    if (e.key === 'Enter' && document.activeElement === searchBox) {
+                        searchBox.form.submit();
+                    }
+                    
+                    // Print with Ctrl+P
+                    if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+                        e.preventDefault();
+                        printSchedule();
+                    }
+                });
             }
         }
 
@@ -2109,6 +2692,21 @@ foreach($recent_schedules as $schedule){
                         roomSelect.value = roomSelect.options[i].value;
                         break;
                     }
+                }
+            }
+
+            // Set up search shortcuts
+            setupSearchShortcuts();
+
+            // Focus search box if search parameter exists
+            const urlParams = new URLSearchParams(window.location.search);
+            const searchParam = urlParams.get('search');
+            if (searchParam) {
+                const searchBox = document.querySelector('.search-box');
+                if (searchBox) {
+                    searchBox.focus();
+                    // Move cursor to end of text
+                    searchBox.setSelectionRange(searchParam.length, searchParam.length);
                 }
             }
         });

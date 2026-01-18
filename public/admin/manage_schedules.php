@@ -87,6 +87,393 @@ if (isset($_GET['view']) && $_GET['view'] === 'enrollments') {
     $view_mode = true;
 }
 
+// Clean up duplicate schedules (run this once to fix existing duplicates)
+if(isset($_GET['cleanup_duplicates']) && $view_mode){
+    // CSRF validation
+    if(!isset($_GET['csrf_token']) || $_GET['csrf_token'] !== $_SESSION['csrf_token']){
+        $_SESSION['message'] = "Security token invalid. Please try again.";
+        $_SESSION['message_type'] = "error";
+        header("Location: ?view=enrollments");
+        exit;
+    }
+    
+    try {
+        $pdo->beginTransaction();
+        
+        // Find duplicate schedules (same course, same section, different rooms)
+        $duplicates_query = "
+            SELECT 
+                s1.course_id,
+                s1.academic_year,
+                s1.semester,
+                COALESCE(s1.section_number, 1) as section_number,
+                GROUP_CONCAT(DISTINCT s1.room_id ORDER BY s1.room_id) as room_ids,
+                COUNT(DISTINCT s1.room_id) as room_count
+            FROM schedule s1
+            WHERE s1.year = 'freshman'
+            GROUP BY s1.course_id, s1.academic_year, s1.semester, COALESCE(s1.section_number, 1)
+            HAVING COUNT(DISTINCT s1.room_id) > 1
+        ";
+        
+        $duplicates = $pdo->query($duplicates_query)->fetchAll(PDO::FETCH_ASSOC);
+        
+        $deleted_count = 0;
+        $cleaned_courses = [];
+        
+        foreach($duplicates as $duplicate) {
+            $course_id = $duplicate['course_id'];
+            $academic_year = $duplicate['academic_year'];
+            $semester = $duplicate['semester'];
+            $section_number = $duplicate['section_number'];
+            
+            // Get all rooms for this course in this section
+            $rooms_query = "
+                SELECT DISTINCT s.room_id
+                FROM schedule s
+                WHERE s.course_id = ?
+                AND s.academic_year = ?
+                AND s.semester = ?
+                AND s.year = 'freshman'
+                AND COALESCE(s.section_number, 1) = ?
+            ";
+            
+            $rooms_stmt = $pdo->prepare($rooms_query);
+            $rooms_stmt->execute([$course_id, $academic_year, $semester, $section_number]);
+            $rooms = $rooms_stmt->fetchAll(PDO::FETCH_COLUMN, 0);
+            
+            // Keep the room with the most enrollments
+            $best_room = null;
+            $max_enrollments = -1;
+            
+            foreach($rooms as $room_id) {
+                // Count enrollments for this course in this room
+                $enrollment_count_query = "
+                    SELECT COUNT(DISTINCT e.student_id) as enrollments
+                    FROM schedule s
+                    LEFT JOIN enrollments e ON s.schedule_id = e.schedule_id
+                    WHERE s.course_id = ?
+                    AND s.room_id = ?
+                    AND s.academic_year = ?
+                    AND s.semester = ?
+                    AND s.year = 'freshman'
+                    AND COALESCE(s.section_number, 1) = ?
+                ";
+                
+                $count_stmt = $pdo->prepare($enrollment_count_query);
+                $count_stmt->execute([$course_id, $room_id, $academic_year, $semester, $section_number]);
+                $enrollment_count = $count_stmt->fetchColumn();
+                
+                if($enrollment_count > $max_enrollments) {
+                    $max_enrollments = $enrollment_count;
+                    $best_room = $room_id;
+                } elseif($enrollment_count == $max_enrollments && $max_enrollments >= 0) {
+                    // If tie, keep the first one (lowest room_id)
+                    if($room_id < $best_room) {
+                        $best_room = $room_id;
+                    }
+                }
+            }
+            
+            if($best_room) {
+                // Delete schedules in other rooms
+                $delete_query = "
+                    DELETE FROM schedule 
+                    WHERE course_id = ?
+                    AND academic_year = ?
+                    AND semester = ?
+                    AND year = 'freshman'
+                    AND COALESCE(section_number, 1) = ?
+                    AND room_id != ?
+                ";
+                
+                $delete_stmt = $pdo->prepare($delete_query);
+                $delete_stmt->execute([$course_id, $academic_year, $semester, $section_number, $best_room]);
+                
+                $deleted_count += $delete_stmt->rowCount();
+                $cleaned_courses[] = [
+                    'course_id' => $course_id,
+                    'section' => $section_number,
+                    'kept_room' => $best_room,
+                    'deleted' => $delete_stmt->rowCount()
+                ];
+            }
+        }
+        
+        $pdo->commit();
+        
+        $message_details = "✅ Cleaned up $deleted_count duplicate schedules.\n\n";
+        foreach($cleaned_courses as $cleaned) {
+            $message_details .= "• Course ID {$cleaned['course_id']} (Section {$cleaned['section']}): Kept room {$cleaned['kept_room']}, deleted {$cleaned['deleted']} duplicates\n";
+        }
+        
+        $_SESSION['message'] = $message_details;
+        $_SESSION['message_type'] = "success";
+        header("Location: ?view=enrollments");
+        exit;
+        
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        $_SESSION['message'] = "❌ Error cleaning up duplicates: " . $e->getMessage();
+        $_SESSION['message_type'] = "error";
+        header("Location: ?view=enrollments");
+        exit;
+    }
+}
+
+// Handle CSV export
+if(isset($_GET['export_csv']) && $view_mode && !isset($_GET['schedule_id'])){
+    // CSRF validation
+    if(!isset($_GET['csrf_token']) || $_GET['csrf_token'] !== $_SESSION['csrf_token']){
+        $_SESSION['message'] = "Security token invalid. Please try again.";
+        $_SESSION['message_type'] = "error";
+        header("Location: ?view=enrollments");
+        exit;
+    }
+    
+    try {
+        // Get all schedule data for CSV - Grouped by course and section to avoid duplicates
+        $csv_query = "
+            SELECT 
+                c.course_code,
+                c.course_name,
+                r.room_name,
+                COALESCE(u.username, 'TBA') as instructor_name,
+                GROUP_CONCAT(DISTINCT s.day ORDER BY 
+                    CASE s.day 
+                        WHEN 'Monday' THEN 1
+                        WHEN 'Tuesday' THEN 2
+                        WHEN 'Wednesday' THEN 3
+                        WHEN 'Thursday' THEN 4
+                        WHEN 'Friday' THEN 5
+                        ELSE 6
+                    END SEPARATOR ', ') as days,
+                GROUP_CONCAT(DISTINCT CONCAT(s.day, ': ', TIME_FORMAT(s.start_time, '%h:%i %p'), '-', TIME_FORMAT(s.end_time, '%h:%i %p')) 
+                    ORDER BY 
+                        CASE s.day 
+                            WHEN 'Monday' THEN 1
+                            WHEN 'Tuesday' THEN 2
+                            WHEN 'Wednesday' THEN 3
+                            WHEN 'Thursday' THEN 4
+                            WHEN 'Friday' THEN 5
+                            ELSE 6
+                        END, 
+                        s.start_time SEPARATOR '; ') as schedule_times,
+                COALESCE(s.section_number, 1) as section_number,
+                s.academic_year,
+                s.semester,
+                s.year as student_year,
+                COUNT(DISTINCT s.schedule_id) as total_sessions,
+                COUNT(DISTINCT e.student_id) as enrolled_students,
+                GROUP_CONCAT(DISTINCT u2.username ORDER BY u2.username SEPARATOR '; ') as student_list
+            FROM schedule s
+            JOIN courses c ON s.course_id = c.course_id
+            JOIN rooms r ON s.room_id = r.room_id
+            LEFT JOIN users u ON s.instructor_id = u.user_id
+            LEFT JOIN enrollments e ON s.schedule_id = e.schedule_id
+            LEFT JOIN users u2 ON e.student_id = u2.user_id
+            WHERE s.year = 'freshman'
+            GROUP BY c.course_id, r.room_id, COALESCE(s.section_number, 1), s.academic_year, s.semester
+            ORDER BY COALESCE(s.section_number, 1), c.course_code
+        ";
+        
+        $schedules_for_csv = $pdo->query($csv_query)->fetchAll(PDO::FETCH_ASSOC);
+        
+        if(empty($schedules_for_csv)) {
+            $_SESSION['message'] = "No schedules available for export.";
+            $_SESSION['message_type'] = "warning";
+            header("Location: ?view=enrollments");
+            exit;
+        }
+        
+        // Set headers for CSV download
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename=freshman_schedules_' . date('Y-m-d') . '.csv');
+        
+        // Create output stream
+        $output = fopen('php://output', 'w');
+        
+        // Add BOM for UTF-8
+        fputs($output, $bom = (chr(0xEF) . chr(0xBB) . chr(0xBF)));
+        
+        // CSV headers
+        $headers = [
+            'Section',
+            'Course Code',
+            'Course Name',
+            'Classroom',
+            'Instructor',
+            'Scheduled Days',
+            'Time Schedule',
+            'Total Sessions',
+            'Academic Year',
+            'Semester',
+            'Year Level',
+            'Enrolled Students',
+            'Student List'
+        ];
+        
+        fputcsv($output, $headers);
+        
+        // Add data rows
+        foreach($schedules_for_csv as $schedule) {
+            $row = [
+                'Section ' . $schedule['section_number'],
+                $schedule['course_code'],
+                $schedule['course_name'],
+                $schedule['room_name'],
+                $schedule['instructor_name'],
+                $schedule['days'],
+                $schedule['schedule_times'],
+                $schedule['total_sessions'],
+                $schedule['academic_year'],
+                $schedule['semester'] == '1' ? '1st Semester' : '2nd Semester',
+                ucfirst($schedule['student_year']),
+                $schedule['enrolled_students'],
+                $schedule['student_list'] ?? 'None'
+            ];
+            fputcsv($output, $row);
+        }
+        
+        fclose($output);
+        exit;
+        
+    } catch (Exception $e) {
+        $_SESSION['message'] = "Error generating CSV: " . $e->getMessage();
+        $_SESSION['message_type'] = "error";
+        header("Location: ?view=enrollments");
+        exit;
+    }
+}
+
+// Handle CSV export for specific section
+if(isset($_GET['export_section_csv']) && $view_mode && !isset($_GET['schedule_id'])){
+    $section_number = (int)$_GET['export_section_csv'];
+    
+    // CSRF validation
+    if(!isset($_GET['csrf_token']) || $_GET['csrf_token'] !== $_SESSION['csrf_token']){
+        $_SESSION['message'] = "Security token invalid. Please try again.";
+        $_SESSION['message_type'] = "error";
+        header("Location: ?view=enrollments");
+        exit;
+    }
+    
+    try {
+        // Get schedule data for specific section - Grouped by course to avoid duplicates
+        $csv_query = "
+            SELECT 
+                c.course_code,
+                c.course_name,
+                r.room_name,
+                COALESCE(u.username, 'TBA') as instructor_name,
+                GROUP_CONCAT(DISTINCT s.day ORDER BY 
+                    CASE s.day 
+                        WHEN 'Monday' THEN 1
+                        WHEN 'Tuesday' THEN 2
+                        WHEN 'Wednesday' THEN 3
+                        WHEN 'Thursday' THEN 4
+                        WHEN 'Friday' THEN 5
+                        ELSE 6
+                    END SEPARATOR ', ') as days,
+                GROUP_CONCAT(DISTINCT CONCAT(s.day, ': ', TIME_FORMAT(s.start_time, '%h:%i %p'), '-', TIME_FORMAT(s.end_time, '%h:%i %p')) 
+                    ORDER BY 
+                        CASE s.day 
+                            WHEN 'Monday' THEN 1
+                            WHEN 'Tuesday' THEN 2
+                            WHEN 'Wednesday' THEN 3
+                            WHEN 'Thursday' THEN 4
+                            WHEN 'Friday' THEN 5
+                            ELSE 6
+                        END, 
+                        s.start_time SEPARATOR '; ') as schedule_times,
+                s.academic_year,
+                s.semester,
+                s.year as student_year,
+                COUNT(DISTINCT s.schedule_id) as total_sessions,
+                COUNT(DISTINCT e.student_id) as enrolled_students,
+                GROUP_CONCAT(DISTINCT u2.username ORDER BY u2.username SEPARATOR '; ') as student_list
+            FROM schedule s
+            JOIN courses c ON s.course_id = c.course_id
+            JOIN rooms r ON s.room_id = r.room_id
+            LEFT JOIN users u ON s.instructor_id = u.user_id
+            LEFT JOIN enrollments e ON s.schedule_id = e.schedule_id
+            LEFT JOIN users u2 ON e.student_id = u2.user_id
+            WHERE s.year = 'freshman'
+            AND COALESCE(s.section_number, 1) = ?
+            GROUP BY c.course_id, r.room_id
+            ORDER BY c.course_code
+        ";
+        
+        $stmt = $pdo->prepare($csv_query);
+        $stmt->execute([$section_number]);
+        $schedules_for_csv = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        if(empty($schedules_for_csv)) {
+            $_SESSION['message'] = "No schedules available for Section {$section_number}.";
+            $_SESSION['message_type'] = "warning";
+            header("Location: ?view=enrollments");
+            exit;
+        }
+        
+        // Set headers for CSV download
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename=section_' . $section_number . '_schedules_' . date('Y-m-d') . '.csv');
+        
+        // Create output stream
+        $output = fopen('php://output', 'w');
+        
+        // Add BOM for UTF-8
+        fputs($output, $bom = (chr(0xEF) . chr(0xBB) . chr(0xBF)));
+        
+        // CSV headers
+        $headers = [
+            'Section',
+            'Course Code',
+            'Course Name',
+            'Classroom',
+            'Instructor',
+            'Scheduled Days',
+            'Time Schedule',
+            'Total Sessions',
+            'Academic Year',
+            'Semester',
+            'Year Level',
+            'Enrolled Students',
+            'Student List'
+        ];
+        
+        fputcsv($output, $headers);
+        
+        // Add data rows
+        foreach($schedules_for_csv as $schedule) {
+            $row = [
+                'Section ' . $section_number,
+                $schedule['course_code'],
+                $schedule['course_name'],
+                $schedule['room_name'],
+                $schedule['instructor_name'],
+                $schedule['days'],
+                $schedule['schedule_times'],
+                $schedule['total_sessions'],
+                $schedule['academic_year'],
+                $schedule['semester'] == '1' ? '1st Semester' : '2nd Semester',
+                ucfirst($schedule['student_year']),
+                $schedule['enrolled_students'],
+                $schedule['student_list'] ?? 'None'
+            ];
+            fputcsv($output, $row);
+        }
+        
+        fclose($output);
+        exit;
+        
+    } catch (Exception $e) {
+        $_SESSION['message'] = "Error generating CSV: " . $e->getMessage();
+        $_SESSION['message_type'] = "error";
+        header("Location: ?view=enrollments");
+        exit;
+    }
+}
+
 // Handle delete all schedules
 if(isset($_GET['delete_all']) && $view_mode){
     // CSRF validation
@@ -273,9 +660,47 @@ if(isset($_POST['batch_schedule']) && !$view_mode){
                     $room_data = $room_stmt->fetch();
                     $section_result['room_name'] = $room_data['room_name'] ?? 'Unknown';
                     
-                    // Clear existing schedules for this room/academic year/semester/freshman combination
-                    $clear_stmt = $pdo->prepare("DELETE FROM schedule WHERE room_id = ? AND academic_year = ? AND semester = ? AND year = 'freshman' AND section_number = ?");
-                    $clear_stmt->execute([$room_id, $academic_year, $semester, $section_number]);
+                    // Check if any courses are already scheduled in other rooms for this section
+                    // This prevents duplicate scheduling of the same course in multiple rooms
+                    $existing_course_check = $pdo->prepare("
+                        SELECT DISTINCT course_id 
+                        FROM schedule 
+                        WHERE academic_year = ? 
+                        AND semester = ? 
+                        AND year = 'freshman' 
+                        AND COALESCE(section_number, 1) = ?
+                        AND course_id IN (" . implode(',', array_fill(0, count($course_ids), '?')) . ")
+                    ");
+                    
+                    $check_params = array_merge([$academic_year, $semester, $section_number], $course_ids);
+                    $existing_course_check->execute($check_params);
+                    $existing_courses_in_section = $existing_course_check->fetchAll(PDO::FETCH_COLUMN, 0);
+                    
+                    // Filter out courses already scheduled in this section
+                    $courses_to_schedule = array_diff($course_ids, $existing_courses_in_section);
+                    
+                    if(empty($courses_to_schedule)) {
+                        // All courses already scheduled in this section, skip
+                        $section_result['created_sessions'] = 0;
+                        $section_result['courses_scheduled'] = 0;
+                        $section_results[] = $section_result;
+                        continue;
+                    }
+                    
+                    // Clear existing schedules for this specific room/academic year/semester/freshman combination
+                    // Only clear courses that we're going to schedule
+                    $clear_stmt = $pdo->prepare("
+                        DELETE FROM schedule 
+                        WHERE room_id = ? 
+                        AND academic_year = ? 
+                        AND semester = ? 
+                        AND year = 'freshman' 
+                        AND COALESCE(section_number, 1) = ?
+                        AND course_id IN (" . implode(',', array_fill(0, count($courses_to_schedule), '?')) . ")
+                    ");
+                    
+                    $clear_params = array_merge([$room_id, $academic_year, $semester, $section_number], $courses_to_schedule);
+                    $clear_stmt->execute($clear_params);
                     
                     // Track which courses have been scheduled on which days
                     $scheduled_on_day = [];
@@ -290,23 +715,26 @@ if(isset($_POST['batch_schedule']) && !$view_mode){
                     }
                     
                     // Calculate slots distribution
-                    $total_courses = count($course_ids);
+                    $total_courses_to_schedule = count($courses_to_schedule);
                     $total_slots_per_week = 15;
-                    $slots_per_course = floor($total_slots_per_week / $total_courses);
-                    $extra_slots = $total_slots_per_week % $total_courses;
+                    $slots_per_course = floor($total_slots_per_week / $total_courses_to_schedule);
+                    $extra_slots = $total_slots_per_week % $total_courses_to_schedule;
                     
                     // Schedule courses for this section
-                    $course_slot_counts = array_fill(0, $total_courses, 0);
+                    $course_slot_counts = array_fill(0, $total_courses_to_schedule, 0);
                     $section_created_sessions = 0;
                     $scheduled_course_ids = [];
                     $attempts = 0;
                     $max_attempts = $total_slots_per_week * 3;
                     
+                    // Create arrays to track scheduling
+                    $courses_to_schedule_array = array_values($courses_to_schedule); // Reset array keys
+                    
                     while ($section_created_sessions < $total_slots_per_week && $attempts < $max_attempts) {
                         $attempts++;
                         
-                        for($course_index = 0; $course_index < $total_courses && $section_created_sessions < $total_slots_per_week; $course_index++) {
-                            $course_id = $course_ids[$course_index];
+                        for($course_index = 0; $course_index < $total_courses_to_schedule && $section_created_sessions < $total_slots_per_week; $course_index++) {
+                            $course_id = $courses_to_schedule_array[$course_index];
                             $course = $course_details[$course_id];
                             
                             $target_slots = $slots_per_course + ($course_index < $extra_slots ? 1 : 0);
@@ -314,8 +742,6 @@ if(isset($_POST['batch_schedule']) && !$view_mode){
                             if($course_slot_counts[$course_index] >= $target_slots) {
                                 continue;
                             }
-                            
-                            $course_scheduled_this_round = true;
                             
                             foreach($days_of_week as $day) {
                                 if(in_array($course_id, $scheduled_on_day[$day])) {
@@ -502,62 +928,202 @@ if (!$column_check) {
     }
 }
 
-// Fetch existing schedules with enrollment count from enrollments table
-$existing_schedules = [];
+// Get search query if exists
+$search_query = '';
+if ($view_mode && isset($_GET['search'])) {
+    $search_query = trim($_GET['search']);
+}
+
+// Fetch existing schedules - FIXED: Proper grouping to avoid duplicates
+$existing_schedules_grouped = [];
+$all_sections = [];
+
 try {
-    $schedules_query = "
-        SELECT 
-            s.schedule_id,
-            s.course_id,
-            s.room_id,
-            s.day,
-            s.start_time,
-            s.end_time,
-            s.academic_year,
-            s.semester,
-            s.year,
-            COALESCE(s.section_number, 1) as section_number,
-            c.course_code, 
-            c.course_name,
-            r.room_name,
-            COALESCE(u.username, 'TBA') as instructor_name,
-            COALESCE(u.email, 'Not Assigned') as instructor_email,
-            COALESCE(
-                (SELECT COUNT(DISTINCT e.student_id) 
-                 FROM enrollments e 
-                 WHERE e.schedule_id = s.schedule_id),
-                0
-            ) as enrolled_students,
-            (SELECT GROUP_CONCAT(DISTINCT u2.username SEPARATOR ', ') 
-             FROM enrollments e2 
-             JOIN users u2 ON e2.student_id = u2.user_id 
-             WHERE e2.schedule_id = s.schedule_id 
-             LIMIT 3) as sample_students
+    // First, get all unique sections
+    $sections_query = "
+        SELECT DISTINCT COALESCE(s.section_number, 1) as section_number
         FROM schedule s
-        JOIN courses c ON s.course_id = c.course_id
-        JOIN rooms r ON s.room_id = r.room_id
-        LEFT JOIN users u ON s.instructor_id = u.user_id
-        WHERE (s.year = 'freshman' OR c.is_freshman = 1)
-        ORDER BY 
-            s.section_number,
-            c.course_name,
-            CASE s.day 
-                WHEN 'Monday' THEN 1
-                WHEN 'Tuesday' THEN 2
-                WHEN 'Wednesday' THEN 3
-                WHEN 'Thursday' THEN 4
-                WHEN 'Friday' THEN 5
-                ELSE 6
-            END,
-            s.start_time
+        WHERE s.year = 'freshman'
+        ORDER BY COALESCE(s.section_number, 1)
     ";
     
-    $existing_schedules = $pdo->query($schedules_query)->fetchAll(PDO::FETCH_ASSOC);
+    $all_sections = $pdo->query($sections_query)->fetchAll(PDO::FETCH_COLUMN, 0);
+    
+    if(empty($all_sections)) {
+        $all_sections = [1];
+    }
+    
+    // For each section, get the courses and their schedules
+    foreach($all_sections as $section_number) {
+        // Get the main schedule data grouped by course_id, room_id, section_number
+        $section_query = "
+            SELECT 
+                c.course_id,
+                c.course_code, 
+                c.course_name,
+                r.room_id,
+                r.room_name,
+                COALESCE(u.username, 'TBA') as instructor_name,
+                COALESCE(u.email, 'Not Assigned') as instructor_email,
+                s.academic_year,
+                s.semester,
+                s.year,
+                COALESCE(s.section_number, 1) as section_number,
+                COUNT(DISTINCT s.schedule_id) as total_sessions,
+                COUNT(DISTINCT e.student_id) as enrolled_students,
+                GROUP_CONCAT(DISTINCT 
+                    CONCAT(s.day, ': ', TIME_FORMAT(s.start_time, '%h:%i %p'), '-', TIME_FORMAT(s.end_time, '%h:%i %p'))
+                    ORDER BY 
+                        CASE s.day 
+                            WHEN 'Monday' THEN 1
+                            WHEN 'Tuesday' THEN 2
+                            WHEN 'Wednesday' THEN 3
+                            WHEN 'Thursday' THEN 4
+                            WHEN 'Friday' THEN 5
+                            ELSE 6
+                        END,
+                        s.start_time
+                    SEPARATOR '; '
+                ) as schedule_times,
+                GROUP_CONCAT(DISTINCT u2.username ORDER BY u2.username SEPARATOR ', ') as sample_students
+            FROM schedule s
+            JOIN courses c ON s.course_id = c.course_id
+            JOIN rooms r ON s.room_id = r.room_id
+            LEFT JOIN users u ON s.instructor_id = u.user_id
+            LEFT JOIN enrollments e ON s.schedule_id = e.schedule_id
+            LEFT JOIN users u2 ON e.student_id = u2.user_id
+            WHERE s.year = 'freshman'
+            AND COALESCE(s.section_number, 1) = ?
+        ";
+        
+        // Add search condition if search query exists
+        if (!empty($search_query)) {
+            $section_query .= " AND (c.course_code LIKE ? OR c.course_name LIKE ?)";
+        }
+        
+        $section_query .= " GROUP BY s.course_id, s.room_id, COALESCE(s.section_number, 1), s.academic_year, s.semester
+            ORDER BY c.course_name";
+        
+        $stmt = $pdo->prepare($section_query);
+        
+        if (!empty($search_query)) {
+            $search_term = "%{$search_query}%";
+            $stmt->execute([$section_number, $search_term, $search_term]);
+        } else {
+            $stmt->execute([$section_number]);
+        }
+        
+        $section_schedules = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Get individual sessions for each course in this section
+        foreach($section_schedules as &$course_schedule) {
+            $course_id = $course_schedule['course_id'];
+            $room_id = $course_schedule['room_id'];
+            $academic_year = $course_schedule['academic_year'];
+            $semester = $course_schedule['semester'];
+            
+            $sessions_query = "
+                SELECT 
+                    s.schedule_id,
+                    s.day,
+                    s.start_time,
+                    s.end_time,
+                    COALESCE(s.section_number, 1) as section_number,
+                    COUNT(DISTINCT e.student_id) as enrolled_students,
+                    GROUP_CONCAT(DISTINCT u2.username ORDER BY u2.username SEPARATOR ', ') as sample_students
+                FROM schedule s
+                LEFT JOIN enrollments e ON s.schedule_id = e.schedule_id
+                LEFT JOIN users u2 ON e.student_id = u2.user_id
+                WHERE s.course_id = ?
+                AND s.room_id = ?
+                AND s.year = 'freshman'
+                AND s.academic_year = ?
+                AND s.semester = ?
+                AND COALESCE(s.section_number, 1) = ?
+                GROUP BY s.schedule_id
+                ORDER BY 
+                    CASE s.day 
+                        WHEN 'Monday' THEN 1
+                        WHEN 'Tuesday' THEN 2
+                        WHEN 'Wednesday' THEN 3
+                        WHEN 'Thursday' THEN 4
+                        WHEN 'Friday' THEN 5
+                        ELSE 6
+                    END,
+                    s.start_time
+            ";
+            
+            $sessions_stmt = $pdo->prepare($sessions_query);
+            $sessions_stmt->execute([
+                $course_id, 
+                $room_id,
+                $academic_year,
+                $semester,
+                $section_number
+            ]);
+            $course_schedule['individual_sessions'] = $sessions_stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+        
+        $existing_schedules_grouped[$section_number] = $section_schedules;
+    }
     
 } catch (Exception $e) {
     error_log("Error fetching schedules: " . $e->getMessage());
-    $existing_schedules = [];
+    $existing_schedules_grouped = [];
+    $all_sections = [1];
 }
+
+// Fetch all individual sessions for existing schedules (for the delete functionality)
+$individual_sessions_query = "
+    SELECT 
+        s.schedule_id,
+        s.course_id,
+        s.room_id,
+        s.day,
+        s.start_time,
+        s.end_time,
+        s.academic_year,
+        s.semester,
+        s.year,
+        COALESCE(s.section_number, 1) as section_number,
+        c.course_code, 
+        c.course_name,
+        r.room_name,
+        COALESCE(u.username, 'TBA') as instructor_name
+    FROM schedule s
+    JOIN courses c ON s.course_id = c.course_id
+    JOIN rooms r ON s.room_id = r.room_id
+    LEFT JOIN users u ON s.instructor_id = u.user_id
+    WHERE s.year = 'freshman'
+";
+
+// Add search condition if exists
+if (!empty($search_query)) {
+    $individual_sessions_query .= " AND (c.course_code LIKE ? OR c.course_name LIKE ?)";
+}
+
+$individual_sessions_query .= " ORDER BY 
+    COALESCE(s.section_number, 1),
+    c.course_name,
+    CASE s.day 
+        WHEN 'Monday' THEN 1
+        WHEN 'Tuesday' THEN 2
+        WHEN 'Wednesday' THEN 3
+        WHEN 'Thursday' THEN 4
+        WHEN 'Friday' THEN 5
+        ELSE 6
+    END,
+    s.start_time";
+
+$stmt = $pdo->prepare($individual_sessions_query);
+if (!empty($search_query)) {
+    $search_term = "%{$search_query}%";
+    $stmt->execute([$search_term, $search_term]);
+} else {
+    $stmt->execute();
+}
+
+$individual_sessions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Fetch enrollments if in view mode
 $schedule_enrollments = [];
@@ -596,9 +1162,13 @@ if ($view_mode && isset($_GET['schedule_id'])) {
 
 // Count total freshman schedules for delete all confirmation
 $total_freshman_schedules = 0;
+$total_freshman_sessions = 0;
 if($view_mode) {
     $count_stmt = $pdo->query("SELECT COUNT(*) as total FROM schedule WHERE year = 'freshman'");
     $total_freshman_schedules = $count_stmt->fetchColumn();
+    
+    // Count total individual sessions
+    $total_freshman_sessions = count($individual_sessions);
 }
 
 // Fetch pending approvals count
@@ -685,22 +1255,110 @@ $current_page = basename($_SERVER['PHP_SELF']);
 * { margin:0; padding:0; box-sizing:border-box; font-family: "Segoe UI", Arial, sans-serif; }
 body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x:hidden; }
 
+/* ================= University Header ================= */
+.university-header {
+    background: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%);
+    color: white;
+    padding: 0.5rem 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1201;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.dku-logo-img {
+    width: 45px;
+    height: 45px;
+    object-fit: contain;
+    border-radius: 5px;
+    background: white;
+    padding: 4px;
+}
+
+.system-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    opacity: 0.95;
+}
+
+.header-right {
+    font-size: 0.8rem;
+    opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+    .university-header {
+        padding: 0.5rem 15px;
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+    }
+    
+    .header-left, .header-right {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .system-title {
+        font-size: 0.8rem;
+    }
+    
+    .header-right {
+        font-size: 0.75rem;
+    }
+}
+
+/* Adjust other elements for university header */
+.topbar {
+    top: 60px !important; /* Adjusted for university header */
+}
+
+.sidebar {
+    top: 60px !important; /* Adjusted for university header */
+    height: calc(100% - 60px) !important;
+}
+
+.overlay {
+    top: 60px; /* Adjusted for university header */
+    height: calc(100% - 60px);
+}
+
+.main-content {
+    margin-top: 60px; /* Added for university header */
+}
+
 /* ================= Topbar for Mobile ================= */
 .topbar {
     display: none;
-    position: fixed; top:0; left:0; width:100%;
-    background:var(--bg-sidebar); color:var(--text-sidebar);
-    padding:15px 20px;
+    position: fixed; 
+    top:60px; 
+    left:0; 
+    width:100%;
+    background:var(--bg-sidebar); 
+    color:var(--text-sidebar);
+    padding:12px 20px;
     z-index:1200;
-    justify-content:space-between; align-items:center;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    justify-content:space-between; 
+    align-items:center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 .menu-btn {
     font-size:26px;
     background:#1abc9c;
     border:none; color:var(--text-sidebar);
     cursor:pointer;
-    padding:10px 14px;
+    padding:8px 12px;
     border-radius:8px;
     font-weight:600;
     transition: background 0.3s, transform 0.2s;
@@ -710,81 +1368,18 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
 /* ================= Sidebar ================= */
 .sidebar { 
     position: fixed; 
-    top:0; left:0; 
+    top:60px; 
+    left:0;
     width:250px; 
-    height:100%; 
+    height:calc(100% - 60px);
     background:var(--bg-sidebar); 
     color:var(--text-sidebar);
     z-index:1100;
     transition: transform 0.3s ease;
-    padding: 20px 0;
-}
-.sidebar.hidden { transform:translateX(-260px); }
-
-.sidebar-profile {
-    text-align: center;
-    margin-bottom: 25px;
-    padding: 0 20px 20px;
-    border-bottom: 1px solid rgba(255,255,255,0.2);
-}
-
-.sidebar-profile img {
-    width: 100px;
-    height: 100px;
-    border-radius: 50%;
-    object-fit: cover;
-    margin-bottom: 10px;
-    border: 2px solid #1abc9c;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-}
-
-.sidebar-profile p {
-    color: var(--text-sidebar);
-    font-weight: bold;
-    margin: 0;
-    font-size: 16px;
-}
-
-.sidebar h2 {
-    text-align: center;
-    color: var(--text-sidebar);
-    margin-bottom: 25px;
-    font-size: 22px;
-    padding: 0 20px;
-}
-
-.sidebar a { 
-    display:block; 
-    padding:12px 20px; 
-    color:var(--text-sidebar); 
-    text-decoration:none; 
-    transition: background 0.3s; 
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    position: relative;
-}
-.sidebar a:hover, .sidebar a.active { background:#1abc9c; color:white; }
-
-/* ================= Updated Sidebar ================= */
-.sidebar { 
-    position: fixed; 
-    top: 0; 
-    left: 0; 
-    width: 250px; 
-    height: 100%; 
-    background: var(--bg-sidebar); 
-    color: var(--text-sidebar);
-    z-index: 1100;
-    transition: transform 0.3s ease;
     display: flex;
     flex-direction: column;
     overflow: hidden;
-}
-
-.sidebar.hidden { 
-    transform: translateX(-260px); 
+    box-shadow: 2px 0 10px rgba(0,0,0,0.2);
 }
 
 /* Sidebar Content (scrollable) */
@@ -830,7 +1425,7 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
     margin-bottom: 25px;
     padding: 0 20px 20px;
     border-bottom: 1px solid rgba(255,255,255,0.2);
-    flex-shrink: 0; /* Prevent shrinking */
+    flex-shrink: 0;
 }
 
 .sidebar-profile img {
@@ -857,89 +1452,88 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
     margin-bottom: 25px;
     font-size: 22px;
     padding: 0 20px;
-    flex-shrink: 0; /* Prevent shrinking */
 }
 
-/* Sidebar Links */
+/* Sidebar Navigation */
 .sidebar a { 
-    display: block; 
+    display: flex; 
+    align-items: center;
+    gap: 10px;
     padding: 12px 20px; 
     color: var(--text-sidebar); 
     text-decoration: none; 
-    transition: background 0.3s; 
+    transition: all 0.3s; 
     border-bottom: 1px solid rgba(255,255,255,0.1);
-    display: flex;
-    align-items: center;
-    gap: 10px;
     position: relative;
-    flex-shrink: 0; /* Prevent shrinking */
 }
 .sidebar a:hover, .sidebar a.active { 
     background: #1abc9c; 
     color: white; 
+    padding-left: 25px;
 }
 
-/* Pending Badge */
-.pending-badge {
-    background: #ef4444;
-    color: white;
-    border-radius: 50%;
+.sidebar a i {
     width: 20px;
-    height: 20px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.75rem;
-    margin-left: auto;
+    text-align: center;
+    font-size: 1.1rem;
 }
 
-/* Optional: Add fade effect at bottom when scrolling */
-.sidebar-content::after {
-    content: '';
+/* Pending badge */
+.pending-badge {
     position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 30px;
-    background: linear-gradient(to bottom, transparent, var(--bg-sidebar));
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.3s;
-}
-
-.sidebar-content.scrolled::after {
-    opacity: 1;
-}
-
-.pending-badge {
+    right: 15px;
     background: #ef4444;
     color: white;
-    border-radius: 50%;
-    width: 20px;
-    height: 20px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.75rem;
-    margin-left: auto;
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-weight: bold;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
 }
 
 /* ================= Overlay ================= */
 .overlay {
-    position: fixed; top:0; left:0; width:100%; height:100%;
-    background: rgba(0,0,0,0.4); z-index:1050;
-    display:none; opacity:0; transition: opacity 0.3s ease;
+    position: fixed; 
+    top:60px; 
+    left:0; 
+    width:100%; 
+    height:calc(100% - 60px);
+    background: rgba(0,0,0,0.4); 
+    z-index:1050;
+    display:none; 
+    opacity:0; 
+    transition: opacity 0.3s ease;
 }
-.overlay.active { display:block; opacity:1; }
+.overlay.active { 
+    display:block; 
+    opacity:1; 
+}
 
 /* ================= Main Content ================= */
-.main-content { 
-    margin-left:250px; 
-    padding:30px;
-    min-height:100vh;
-    background: var(--bg-primary);
-    transition: all 0.3s ease;
-    width: calc(100% - 250px);
+.main-content {
+  margin-left: 250px;
+  padding: 30px;
+  min-height: 100vh;
+  background: var(--bg-primary);
+  transition: all 0.3s ease;
+  margin-top: 60px;
+  width: calc(100% - 250px);
+}
+
+@media (max-width: 768px) {
+    .main-content {
+        margin-left: 0;
+        padding: 15px;
+        padding-top: 140px; /* Adjusted for headers on mobile */
+        margin-top: 120px; /* 60px header + 60px topbar */
+        width: 100%;
+    }
 }
 
 /* Content Wrapper */
@@ -1050,6 +1644,190 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
 
 .message i {
     font-size: 1.2rem;
+}
+
+/* ================= Search Bar ================= */
+.search-section {
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 25px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 2px 4px var(--shadow-color);
+}
+
+.search-title {
+    font-size: 1.1rem;
+    color: var(--text-primary);
+    margin-bottom: 15px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.search-form {
+    display: flex;
+    gap: 10px;
+}
+
+.search-input {
+    flex: 1;
+    padding: 12px 20px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    font-size: 1rem;
+    background: var(--bg-card);
+    color: var(--text-primary);
+    transition: all 0.3s;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+}
+
+.search-btn {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s;
+}
+
+.search-btn:hover {
+    background: linear-gradient(135deg, var(--primary-hover), #1d4ed8);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(37, 99, 235, 0.3);
+}
+
+.clear-search-btn {
+    background: linear-gradient(135deg, #6b7280, #4b5563);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s;
+    text-decoration: none;
+}
+
+.clear-search-btn:hover {
+    background: linear-gradient(135deg, #4b5563, #374151);
+    transform: translateY(-2px);
+}
+
+.search-results-info {
+    margin-top: 15px;
+    padding: 12px 16px;
+    background: var(--hover-color);
+    border-radius: 8px;
+    border-left: 4px solid var(--primary-color);
+}
+
+.search-results-info p {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+}
+
+.search-results-info .highlight {
+    font-weight: 700;
+    color: var(--primary-color);
+    background: rgba(37, 99, 235, 0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+/* ================= Print/Export Actions ================= */
+.print-actions {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.print-btn,
+.export-btn {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+    text-decoration: none;
+}
+
+.print-btn:hover,
+.export-btn:hover {
+    background: linear-gradient(135deg, #059669, #047857);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
+}
+
+.export-btn {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+}
+
+.export-btn:hover {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    box-shadow: 0 4px 8px rgba(37, 99, 235, 0.3);
+}
+
+/* Section export buttons */
+.section-export-btn {
+    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+    color: white;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.8rem;
+    text-decoration: none;
+    margin-top: 10px;
+}
+
+.section-export-btn:hover {
+    background: linear-gradient(135deg, #7c3aed, #6d28d9);
+    transform: translateY(-2px);
+}
+
+/* Print instructions */
+.print-instructions {
+    background: linear-gradient(135deg, #fef3c7, #fde68a);
+    border-left: 4px solid #f59e0b;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    color: #92400e;
+    display: none;
+}
+
+[data-theme="dark"] .print-instructions {
+    background: linear-gradient(135deg, #78350f, #92400e);
+    color: #fde68a;
+    border-left-color: #f59e0b;
 }
 
 /* ================= Recent Schedules Preview ================= */
@@ -1231,6 +2009,28 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
     box-shadow: none;
 }
 
+/* Clean duplicates button */
+.clean-duplicates-btn {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s;
+    text-decoration: none;
+}
+
+.clean-duplicates-btn:hover {
+    background: linear-gradient(135deg, #d97706, #b45309);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(245, 158, 11, 0.3);
+}
+
 .schedule-card {
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
@@ -1376,6 +2176,22 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
 .delete-schedule-btn:hover {
     background: var(--danger-color);
     color: white;
+}
+
+/* Session item styling */
+.session-item {
+    background: var(--bg-primary);
+    padding: 8px;
+    border-radius: 6px;
+    margin-bottom: 5px;
+    border-left: 3px solid var(--primary-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.session-item:hover {
+    background: var(--hover-color);
 }
 
 /* ================= Enrollment View ================= */
@@ -2080,10 +2896,10 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); overflow-x
 .confirmation-modal {
     display: none;
     position: fixed;
-    top: 0;
+    top: 60px; /* Adjusted for header */
     left: 0;
     width: 100%;
-    height: 100%;
+    height: calc(100% - 60px);
     background: rgba(0,0,0,0.5);
     z-index: 2000;
     justify-content: center;
@@ -2183,17 +2999,174 @@ input[type="checkbox"]:checked + .student-info .student-name {
     font-weight: 700;
 }
 
+/* ================= Print Styles ================= */
+@media print {
+    .university-header,
+    .topbar,
+    .sidebar,
+    .overlay,
+    .view-tabs,
+    .delete-all-btn,
+    .clean-duplicates-btn,
+    .action-buttons,
+    .form-actions,
+    .back-button,
+    .add-section-btn,
+    .remove-section-btn,
+    .btn,
+    .btn-small,
+    .confirmation-modal,
+    .info-box,
+    .print-actions,
+    .print-instructions,
+    .search-section {
+        display: none !important;
+    }
+    
+    .main-content {
+        margin-left: 0 !important;
+        margin-top: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+    }
+    
+    .content-wrapper {
+        padding: 20px !important;
+        box-shadow: none !important;
+        border: none !important;
+        border-radius: 0 !important;
+        background: white !important;
+    }
+    
+    .header {
+        text-align: center;
+        flex-direction: column;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+    }
+    
+    .header h1 {
+        font-size: 24px !important;
+        color: black !important;
+    }
+    
+    .user-info {
+        display: none !important;
+    }
+    
+    body {
+        background: white !important;
+        color: black !important;
+    }
+    
+    .schedule-card {
+        break-inside: avoid;
+        page-break-inside: avoid;
+        margin-bottom: 15px;
+        border: 1px solid #ddd !important;
+    }
+    
+    .enrollment-view,
+    .existing-schedules-section,
+    .classroom-sections-form {
+        display: block !important;
+    }
+    
+    a {
+        color: black !important;
+        text-decoration: none !important;
+    }
+    
+    /* Hide action buttons in print */
+    .action-buttons,
+    .delete-schedule-btn {
+        display: none !important;
+    }
+    
+    /* Show print header */
+    .print-header {
+        display: block !important;
+        text-align: center;
+        margin-bottom: 20px;
+        border-bottom: 2px solid #000;
+        padding-bottom: 10px;
+    }
+    
+    .print-header h2 {
+        margin: 0;
+        font-size: 18px;
+    }
+    
+    .print-header .print-date {
+        font-size: 14px;
+        color: #666;
+    }
+    
+    /* Ensure table cells have borders */
+    .schedules-table th,
+    .schedules-table td {
+        border: 1px solid #ddd !important;
+        padding: 8px !important;
+    }
+    
+    .schedules-table th {
+        background-color: #f2f2f2 !important;
+        color: black !important;
+    }
+}
+
+/* Print-specific elements (hidden by default) */
+.print-header {
+    display: none;
+}
+
 /* Responsive adjustments */
 @media(max-width: 768px){
-    .topbar{ display:flex; }
-    .sidebar{ transform:translateX(-100%); }
-    .sidebar.active{ transform:translateX(0); }
-    .main-content{ 
-        margin-left:0; 
-        padding: 15px;
-        padding-top: 80px;
-        width: 100%;
+    .university-header {
+        padding: 0.5rem 15px;
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
     }
+    
+    .header-left, .header-right {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .system-title {
+        font-size: 0.8rem;
+    }
+    
+    .header-right {
+        font-size: 0.75rem;
+    }
+    
+    .topbar { 
+        display:flex;
+        top: 60px; /* Adjusted for mobile with header */
+    }
+    
+    .sidebar { 
+        transform:translateX(-100%); 
+        top: 120px; /* 60px header + 60px topbar */
+        height: calc(100% - 120px) !important;
+    }
+    
+    .sidebar.active { 
+        transform:translateX(0); 
+    }
+    
+    .overlay {
+        top: 120px;
+        height: calc(100% - 120px);
+    }
+    
+    .main-content {
+        padding-top: 140px; /* Adjusted for headers on mobile */
+        margin-top: 120px; /* 60px header + 60px topbar */
+    }
+    
     .content-wrapper {
         padding: 15px;
         border-radius: 0;
@@ -2249,6 +3222,17 @@ input[type="checkbox"]:checked + .student-info .student-name {
         text-align: left;
     }
     
+    .search-form {
+        flex-direction: column;
+    }
+    
+    .search-input,
+    .search-btn,
+    .clear-search-btn {
+        width: 100%;
+        justify-content: center;
+    }
+    
     .schedule-header {
         flex-direction: column;
         gap: 10px;
@@ -2270,6 +3254,11 @@ input[type="checkbox"]:checked + .student-info .student-name {
     .btn-small {
         width: 100%;
         justify-content: center;
+    }
+    
+    .confirmation-modal {
+        top: 120px;
+        height: calc(100% - 120px);
     }
     
     .confirmation-modal-content {
@@ -2295,7 +3284,18 @@ input[type="checkbox"]:checked + .student-info .student-name {
         align-items: stretch;
     }
     
-    .delete-all-btn {
+    .delete-all-btn,
+    .clean-duplicates-btn {
+        width: 100%;
+        justify-content: center;
+        margin-top: 10px;
+    }
+    
+    .print-actions {
+        flex-direction: column;
+    }
+    
+    .print-btn, .export-btn {
         width: 100%;
         justify-content: center;
     }
@@ -2303,432 +3303,369 @@ input[type="checkbox"]:checked + .student-info .student-name {
 </style>
 </head>
 <body>
-
-<!-- Mobile Topbar -->
-<div class="topbar">
-    <button class="menu-btn" onclick="toggleMenu()">☰</button>
-    <span>Schedule Sections</span>
-</div>
-
-<!-- Overlay for Mobile -->
-<div class="overlay" onclick="toggleMenu()"></div>
-
-<!-- Sidebar -->
-<div class="sidebar" id="sidebar">
-    <div class="sidebar-content" id="sidebarContent">
-        <div class="sidebar-profile">
-            <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic"
-                 onerror="this.onerror=null; this.src='../assets/default_profile.png';">
-            <p><?= htmlspecialchars($current_user['username']) ?></p>
+    <!-- University Header -->
+    <div class="university-header">
+        <div class="header-left">
+            <img src="../assets/images/dku logo.jpg" alt="Debark University Logo" class="dku-logo-img">
+            <div class="system-title">Debark University Class Scheduling System</div>
         </div>
-        <h2>Admin Panel</h2>
-        <a href="dashboard.php" class="<?= $current_page=='dashboard.php'?'active':'' ?>">
-            <i class="fas fa-home"></i> Dashboard
-        </a>
-        <a href="manage_users.php" class="<?= $current_page=='manage_users.php'?'active':'' ?>">
-            <i class="fas fa-users"></i> Manage Users
-        </a>
-        <a href="approve_users.php" class="<?= $current_page=='approve_users.php'?'active':'' ?>">
-            <i class="fas fa-user-check"></i> Approve Users
-            <?php if($pending_approvals > 0): ?>
-                <span class="pending-badge"><?= $pending_approvals ?></span>
-            <?php endif; ?>
-        </a>
-        <a href="manage_departments.php" class="<?= $current_page=='manage_departments.php'?'active':'' ?>">
-            <i class="fas fa-building"></i> Manage Departments
-        </a>
-        <a href="manage_courses.php" class="<?= $current_page=='manage_courses.php'?'active':'' ?>">
-            <i class="fas fa-book"></i> Manage Courses
-        </a>
-        <a href="manage_rooms.php" class="<?= $current_page=='manage_rooms.php'?'active':'' ?>">
-            <i class="fas fa-door-closed"></i> Manage Rooms
-        </a>
-        <a href="manage_schedules.php" class="active">
-            <i class="fas fa-calendar-alt"></i> Manage Schedule
-        </a>
-        <a href="assign_instructors.php" class="<?= $current_page=='assign_instructors.php'?'active':'' ?>">
-            <i class="fas fa-chalkboard-teacher"></i> Assign Instructors
-        </a>
-        <a href="admin_exam_schedules.php" class="<?= $current_page=='admin_exam_schedules.php'?'active':'' ?>">
-            <i class="fas fa-clipboard-list"></i> Exam Scheduling
-        </a>
-        <a href="manage_announcements.php" class="<?= $current_page=='manage_announcements.php'?'active':'' ?>">
-            <i class="fas fa-bullhorn"></i> Manage Announcements
-        </a>
-        <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
-            <i class="fas fa-user-edit"></i> Edit Profile
-        </a>
-        <a href="../logout.php">
-            <i class="fas fa-sign-out-alt"></i> Logout
-        </a>
-    </div>
-</div>
-
-<!-- Confirmation Modal -->
-<div class="confirmation-modal" id="confirmationModal">
-    <div class="confirmation-modal-content">
-        <h3><i class="fas fa-exclamation-triangle"></i> Confirm Delete</h3>
-        <p id="confirmationModalText">Are you sure you want to delete this schedule? This action cannot be undone.</p>
-        <div class="confirmation-modal-actions">
-            <button class="btn-cancel" onclick="closeConfirmationModal()">Cancel</button>
-            <a class="btn-confirm-delete" id="confirmDeleteBtn" href="#">Delete Schedule</a>
+        <div class="header-right">
+            Manage Schedule
         </div>
     </div>
-</div>
 
-<!-- Delete All Confirmation Modal -->
-<div class="confirmation-modal" id="deleteAllConfirmationModal">
-    <div class="confirmation-modal-content">
-        <h3><i class="fas fa-exclamation-triangle"></i> Delete All Schedules</h3>
-        <p id="deleteAllConfirmationText">
-            Are you sure you want to delete ALL freshman schedules?<br><br>
-            This will delete <strong><?= $total_freshman_schedules ?> schedules</strong> and remove all student enrollments.<br>
-            This action cannot be undone!
-        </p>
-        <div class="confirmation-modal-actions">
-            <button class="btn-cancel" onclick="closeDeleteAllConfirmationModal()">Cancel</button>
-            <a class="btn-confirm-delete" id="confirmDeleteAllBtn" href="?view=enrollments&delete_all=true&csrf_token=<?= $_SESSION['csrf_token'] ?>">Delete All Schedules</a>
-        </div>
+    <!-- Mobile Topbar -->
+    <div class="topbar">
+        <button class="menu-btn" onclick="toggleMenu()">☰</button>
+        <span>Schedule Sections</span>
     </div>
-</div>
 
-<!-- Main Content -->
-<div class="main-content">
-    <div class="content-wrapper">
-        <!-- Header -->
-        <div class="header">
-            <div>
-                <h1>Schedule Multiple Classroom Sections</h1>
-                <p>Create parallel sections of the same courses in different classrooms with different students.</p>
-            </div>
-            <div class="user-info">
-                <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile" id="headerProfilePic"
+    <!-- Overlay for Mobile -->
+    <div class="overlay" onclick="toggleMenu()"></div>
+
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-content" id="sidebarContent">
+            <div class="sidebar-profile">
+                <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile Picture" id="sidebarProfilePic"
                      onerror="this.onerror=null; this.src='../assets/default_profile.png';">
+                <p><?= htmlspecialchars($current_user['username']) ?></p>
+            </div>
+            <h2>Admin Dashboard</h2>
+            <a href="dashboard.php" class="<?= $current_page=='dashboard.php'?'active':'' ?>">
+                <i class="fas fa-home"></i> Dashboard
+            </a>
+            <a href="manage_users.php" class="<?= $current_page=='manage_users.php'?'active':'' ?>">
+                <i class="fas fa-users"></i> Manage Users
+            </a>
+            <a href="approve_users.php" class="<?= $current_page=='approve_users.php'?'active':'' ?>">
+                <i class="fas fa-user-check"></i> Approve Users
+                <?php if($pending_approvals > 0): ?>
+                    <span class="pending-badge"><?= $pending_approvals ?></span>
+                <?php endif; ?>
+            </a>
+            <a href="manage_departments.php" class="<?= $current_page=='manage_departments.php'?'active':'' ?>">
+                <i class="fas fa-building"></i> Manage Departments
+            </a>
+            <a href="manage_courses.php" class="<?= $current_page=='manage_courses.php'?'active':'' ?>">
+                <i class="fas fa-book"></i> Manage Courses
+            </a>
+            <a href="manage_rooms.php" class="<?= $current_page=='manage_rooms.php'?'active':'' ?>">
+                <i class="fas fa-door-closed"></i> Manage Rooms
+            </a>
+            <a href="manage_schedules.php" class="active">
+                <i class="fas fa-calendar-alt"></i> Manage Schedule
+            </a>
+            <a href="assign_instructors.php" class="<?= $current_page=='assign_instructors.php'?'active':'' ?>">
+                <i class="fas fa-chalkboard-teacher"></i> Assign Instructors
+            </a>
+            <a href="admin_exam_schedules.php" class="<?= $current_page=='admin_exam_schedules.php'?'active':'' ?>">
+                <i class="fas fa-clipboard-list"></i> Exam Scheduling
+            </a>
+            <a href="manage_announcements.php" class="<?= $current_page=='manage_announcements.php'?'active':'' ?>">
+                <i class="fas fa-bullhorn"></i> Manage Announcements
+            </a>
+            <a href="edit_profile.php" class="<?= $current_page=='edit_profile.php'?'active':'' ?>">
+                <i class="fas fa-user-edit"></i> Edit Profile
+            </a>
+            <a href="../logout.php">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div class="confirmation-modal" id="confirmationModal">
+        <div class="confirmation-modal-content">
+            <h3><i class="fas fa-exclamation-triangle"></i> Confirm Delete</h3>
+            <p id="confirmationModalText">Are you sure you want to delete this schedule? This action cannot be undone.</p>
+            <div class="confirmation-modal-actions">
+                <button class="btn-cancel" onclick="closeConfirmationModal()">Cancel</button>
+                <a class="btn-confirm-delete" id="confirmDeleteBtn" href="#">Delete Schedule</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete All Confirmation Modal -->
+    <div class="confirmation-modal" id="deleteAllConfirmationModal">
+        <div class="confirmation-modal-content">
+            <h3><i class="fas fa-exclamation-triangle"></i> Delete All Schedules</h3>
+            <p id="deleteAllConfirmationText">
+                Are you sure you want to delete ALL freshman schedules?<br><br>
+                This will delete <strong><?= $total_freshman_schedules ?> schedules</strong> and remove all student enrollments.<br>
+                This action cannot be undone!
+            </p>
+            <div class="confirmation-modal-actions">
+                <button class="btn-cancel" onclick="closeDeleteAllConfirmationModal()">Cancel</button>
+                <a class="btn-confirm-delete" id="confirmDeleteAllBtn" href="?view=enrollments&delete_all=true&csrf_token=<?= $_SESSION['csrf_token'] ?>">Delete All Schedules</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="content-wrapper">
+            <!-- Print Header (for print view only) -->
+            <div class="print-header">
+                <h2>Freshman Class Schedules Report</h2>
+                <div class="print-date">Generated on: <?= date('F j, Y') ?></div>
+            </div>
+
+            <!-- Header -->
+            <div class="header">
                 <div>
-                    <div><?= htmlspecialchars($current_user['username']) ?></div>
-                    <small>Administrator</small>
+                    <h1>Schedule Multiple Classroom Sections</h1>
+                    <p>Create parallel sections of the same courses in different classrooms with different students.</p>
                 </div>
-            </div>
-        </div>
-
-        <!-- View Tabs -->
-        <div class="view-tabs">
-            <a href="?view=create" class="tab-button <?= !$view_mode ? 'active' : '' ?>">
-                <i class="fas fa-calendar-plus"></i>
-                Create Sections
-            </a>
-            <a href="?view=enrollments" class="tab-button <?= $view_mode ? 'active' : '' ?>">
-                <i class="fas fa-users"></i>
-                View Scheduled Classes
-                <span class="badge"><?= count($existing_schedules) ?> sessions</span>
-            </a>
-        </div>
-
-        <!-- Info Box -->
-        <div class="info-box">
-            <i class="fas fa-info-circle"></i>
-            <div>
-                <strong>Classroom Sections System:</strong> 
-                <ol style="margin-left: 20px; margin-top: 8px;">
-                    <li>Create <strong>parallel sections</strong> of the same freshman courses</li>
-                    <li>Each section is in a <strong>different classroom</strong> with <strong>different students</strong></li>
-                    <li>All sections have the <strong>same course schedule</strong> (same days/times)</li>
-                    <li>Students are automatically enrolled in their assigned section</li>
-                    <li>Each section gets 15 weekly time slots to distribute</li>
-                </ol>
-            </div>
-        </div>
-
-        <!-- Display Error/Success Messages -->
-        <?php if($message): ?>
-            <div class="message <?= $message_type ?>">
-                <i class="fas fa-<?= $message_type === 'error' ? 'exclamation-circle' : ($message_type === 'warning' ? 'exclamation-triangle' : 'check-circle') ?>"></i>
-                <?= nl2br(htmlspecialchars($message)) ?>
-            </div>
-        <?php endif; ?>
-
-        <!-- Enrollment View -->
-        <?php if($view_mode && isset($_GET['schedule_id'])): ?>
-        <div class="enrollment-view">
-            <a href="?view=enrollments" class="back-button">
-                <i class="fas fa-arrow-left"></i>
-                Back to Schedules
-            </a>
-            
-            <?php if($schedule_details): ?>
-                <div class="enrollment-summary">
-                    <h2>Class Enrollment Details</h2>
-                    <div class="summary-grid">
-                        <div class="summary-item">
-                            <label>Course:</label>
-                            <span><?= htmlspecialchars($schedule_details['course_code']) ?> - <?= htmlspecialchars($schedule_details['course_name']) ?></span>
-                        </div>
-                        <div class="summary-item">
-                            <label>Classroom:</label>
-                            <span><?= htmlspecialchars($schedule_details['room_name']) ?></span>
-                        </div>
-                        <div class="summary-item">
-                            <label>Section:</label>
-                            <span>Section <?= $schedule_details['section_number'] ?? 1 ?></span>
-                        </div>
-                        <div class="summary-item">
-                            <label>Instructor:</label>
-                            <span>
-                                <?= htmlspecialchars($schedule_details['instructor_name']) ?>
-                                <?php if($schedule_details['instructor_name'] == 'TBA'): ?>
-                                    <span class="instructor-badge instructor-tba">TBA</span>
-                                <?php else: ?>
-                                    <span class="instructor-badge instructor-assigned">Assigned</span>
-                                <?php endif; ?>
-                            </span>
-                        </div>
-                        <div class="summary-item">
-                            <label>Day & Time:</label>
-                            <span><?= htmlspecialchars($schedule_details['day']) ?>, 
-                                <?= date('g:i A', strtotime($schedule_details['start_time'])) ?> - 
-                                <?= date('g:i A', strtotime($schedule_details['end_time'])) ?></span>
-                        </div>
-                        <div class="summary-item">
-                            <label>Academic Year:</label>
-                            <span><?= htmlspecialchars($schedule_details['academic_year']) ?></span>
-                        </div>
-                        <div class="summary-item">
-                            <label>Semester:</label>
-                            <span><?= $schedule_details['semester'] == '1' ? '1st Semester' : '2nd Semester' ?></span>
-                        </div>
-                        <div class="summary-item">
-                            <label>Total Enrolled Students:</label>
-                            <span><?= count($schedule_enrollments) ?></span>
-                        </div>
+                <div class="user-info">
+                    <img src="<?= htmlspecialchars($profile_img_path) ?>" alt="Profile" id="headerProfilePic"
+                         onerror="this.onerror=null; this.src='../assets/default_profile.png';">
+                    <div>
+                        <div><?= htmlspecialchars($current_user['username']) ?></div>
+                        <small>Administrator</small>
                     </div>
                 </div>
-                
-                <h3 style="color: var(--text-primary); margin-bottom: 15px;">Enrolled Students (<?= count($schedule_enrollments) ?>)</h3>
-                
-                <?php if(!empty($schedule_enrollments)): ?>
-                    <table class="enrolled-students-table">
-                        <thead>
-                            <tr>
-                                <th>Student Name</th>
-                                <th>Email</th>
-                                <th>Year</th>
-                                <th>Department</th>
-                                <th>Enrollment Date</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach($schedule_enrollments as $enrollment): ?>
-                                <tr>
-                                    <td><?= htmlspecialchars($enrollment['username']) ?></td>
-                                    <td><?= htmlspecialchars($enrollment['email']) ?></td>
-                                    <td><?= htmlspecialchars(ucfirst($enrollment['year'])) ?></td>
-                                    <td><?= htmlspecialchars($enrollment['department_name'] ?? 'N/A') ?></td>
-                                    <td><?= date('M d, Y', strtotime($enrollment['enrolled_at'])) ?></td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                <?php else: ?>
-                    <div class="empty-state">
-                        <i class="fas fa-user-graduate"></i>
-                        <h3>No Students Enrolled</h3>
-                        <p>No students are currently enrolled in this class schedule.</p>
+            </div>
+
+            <!-- View Tabs -->
+            <div class="view-tabs">
+                <a href="?view=create" class="tab-button <?= !$view_mode ? 'active' : '' ?>">
+                    <i class="fas fa-calendar-plus"></i>
+                    Create Sections
+                </a>
+                <a href="?view=enrollments" class="tab-button <?= $view_mode ? 'active' : '' ?>">
+                    <i class="fas fa-users"></i>
+                    View Scheduled Classes
+                    <span class="badge"><?= $total_freshman_sessions ?> sessions</span>
+                </a>
+            </div>
+
+            <!-- Print Instructions -->
+            <div class="print-instructions" id="printInstructions">
+                <i class="fas fa-info-circle"></i>
+                <div>
+                    <strong>Printing Instructions:</strong> 
+                    <ul style="margin-left: 20px; margin-top: 8px;">
+                        <li>Click the <strong>Print</strong> button to print all schedules</li>
+                        <li>Click the <strong>Export CSV</strong> button to download all data as Excel/CSV file</li>
+                        <li>For best print results, use Chrome or Firefox browser</li>
+                        <li>Print in <strong>Landscape</strong> orientation for better table formatting</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Info Box -->
+            <div class="info-box">
+                <i class="fas fa-info-circle"></i>
+                <div>
+                    <strong>Classroom Sections System:</strong> 
+                    <ol style="margin-left: 20px; margin-top: 8px;">
+                        <li>Create <strong>parallel sections</strong> of the same freshman courses</li>
+                        <li>Each section is in a <strong>different classroom</strong> with <strong>different students</strong></li>
+                        <li>All sections have the <strong>same course schedule</strong> (same days/times)</li>
+                        <li>Students are automatically enrolled in their assigned section</li>
+                        <li>Each section gets 15 weekly time slots to distribute</li>
+                    </ol>
+                </div>
+            </div>
+
+            <!-- Display Error/Success Messages -->
+            <?php if($message): ?>
+                <div class="message <?= $message_type ?>">
+                    <i class="fas fa-<?= $message_type === 'error' ? 'exclamation-circle' : ($message_type === 'warning' ? 'exclamation-triangle' : 'check-circle') ?>"></i>
+                    <?= nl2br(htmlspecialchars($message)) ?>
+                </div>
+            <?php endif; ?>
+
+            <!-- Print/Export Actions (Visible in View Mode) -->
+            <?php if($view_mode && !isset($_GET['schedule_id'])): ?>
+            <div class="print-actions" id="printExportActions">
+                <button class="print-btn" onclick="window.print()">
+                    <i class="fas fa-print"></i> Print All Schedules
+                </button>
+                <a href="?view=enrollments&export_csv=true&csrf_token=<?= $_SESSION['csrf_token'] ?>" 
+                   class="export-btn" onclick="return confirmExport()">
+                    <i class="fas fa-file-csv"></i> Export to CSV
+                </a>
+            </div>
+            <?php endif; ?>
+
+            <!-- Search Section (Visible in View Mode) -->
+            <?php if($view_mode && !isset($_GET['schedule_id'])): ?>
+            <div class="search-section">
+                <div class="search-title">
+                    <i class="fas fa-search"></i>
+                    Search Schedules
+                </div>
+                <form method="GET" class="search-form">
+                    <input type="hidden" name="view" value="enrollments">
+                    <input type="text" 
+                           name="search" 
+                           class="search-input" 
+                           placeholder="Search by course code or course name..."
+                           value="<?= htmlspecialchars($search_query) ?>">
+                    <button type="submit" class="search-btn">
+                        <i class="fas fa-search"></i>
+                        Search
+                    </button>
+                    <?php if(!empty($search_query)): ?>
+                        <a href="?view=enrollments" class="clear-search-btn">
+                            <i class="fas fa-times"></i>
+                            Clear Search
+                        </a>
+                    <?php endif; ?>
+                </form>
+                <?php if(!empty($search_query)): ?>
+                    <div class="search-results-info">
+                        <p>
+                            Showing results for: <span class="highlight"><?= htmlspecialchars($search_query) ?></span>
+                            <?php 
+                            // Calculate total search results
+                            $search_results_count = 0;
+                            foreach($existing_schedules_grouped as $section_schedules) {
+                                $search_results_count += count($section_schedules);
+                            }
+                            ?>
+                            - Found <span class="highlight"><?= $search_results_count ?> courses</span> across all sections
+                        </p>
                     </div>
                 <?php endif; ?>
-            <?php else: ?>
-                <div class="message error">
-                    <i class="fas fa-exclamation-circle"></i>
-                    Schedule not found or invalid schedule ID.
-                </div>
-            <?php endif; ?>
-        </div>
-        <?php endif; ?>
-
-        <!-- Existing Schedules List -->
-        <?php if($view_mode && !isset($_GET['schedule_id'])): ?>
-        <div class="existing-schedules-section">
-            <div class="section-header-actions">
-                <h2>
-                    <i class="fas fa-calendar-alt"></i>
-                    Existing Classroom Sections
-                </h2>
-                <button class="delete-all-btn" id="deleteAllBtn" onclick="showDeleteAllConfirmation()" 
-                        <?= $total_freshman_schedules == 0 ? 'disabled' : '' ?>>
-                    <i class="fas fa-trash-alt"></i>
-                    Delete All Schedules
-                    <?php if($total_freshman_schedules > 0): ?>
-                        <span style="background: white; color: var(--danger-color); border-radius: 50%; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; margin-left: 5px; font-size: 0.8rem;">
-                            <?= $total_freshman_schedules ?>
-                        </span>
-                    <?php endif; ?>
-                </button>
             </div>
-            
-            <?php if(!empty($existing_schedules)): ?>
-                <?php 
-                // First, get all unique sections from the schedules
-                $all_sections = [];
-                foreach($existing_schedules as $schedule) {
-                    $section_num = isset($schedule['section_number']) ? $schedule['section_number'] : 1;
-                    if(!in_array($section_num, $all_sections)) {
-                        $all_sections[] = $section_num;
-                    }
-                }
-                sort($all_sections); // Sort sections numerically
+            <?php endif; ?>
+
+            <!-- Enrollment View -->
+            <?php if($view_mode && isset($_GET['schedule_id'])): ?>
+            <div class="enrollment-view">
+                <a href="?view=enrollments" class="back-button">
+                    <i class="fas fa-arrow-left"></i>
+                    Back to Schedules
+                </a>
                 
-                // Display schedules grouped by section first
-                foreach($all_sections as $section_number): ?>
-                    <div style="margin-bottom: 30px; border-bottom: 2px solid var(--border-color); padding-bottom: 20px;">
-                        <h2 style="color: var(--text-primary); margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
-                            <span class="section-badge section-<?= (($section_number - 1) % 5) + 1 ?>" style="font-size: 1.2rem; padding: 8px 16px;">
-                                Section <?= $section_number ?>
-                            </span>
-                            <span style="font-size: 1rem; color: var(--text-secondary); margin-left: 10px;">
-                                (<?= count(array_filter($existing_schedules, function($s) use ($section_number) { 
-                                    $section_num = isset($s['section_number']) ? $s['section_number'] : 1;
-                                    return $section_num == $section_number; 
-                                })) ?> sessions)
-                            </span>
-                        </h2>
-                        
-                        <?php
-                        // Get schedules for this specific section
-                        $section_schedules = array_filter($existing_schedules, function($schedule) use ($section_number) {
-                            $section_num = isset($schedule['section_number']) ? $schedule['section_number'] : 1;
-                            return $section_num == $section_number;
-                        });
-                        
-                        // Group by course for this specific section
-                        $grouped_by_course = [];
-                        foreach($section_schedules as $schedule) {
-                            $course_key = $schedule['course_id'] . '-' . $schedule['room_id'];
-                            if(!isset($grouped_by_course[$course_key])) {
-                                $grouped_by_course[$course_key] = [
-                                    'course_id' => $schedule['course_id'],
-                                    'course_code' => $schedule['course_code'],
-                                    'course_name' => $schedule['course_name'],
-                                    'room_name' => $schedule['room_name'],
-                                    'instructor_name' => $schedule['instructor_name'],
-                                    'instructor_email' => $schedule['instructor_email'],
-                                    'academic_year' => $schedule['academic_year'],
-                                    'semester' => $schedule['semester'],
-                                    'schedules' => []
-                                ];
-                            }
-                            $grouped_by_course[$course_key]['schedules'][] = $schedule;
-                        }
-                        ?>
-                        
-                        <?php if(empty($grouped_by_course)): ?>
-                            <div class="empty-state" style="padding: 20px;">
-                                <i class="fas fa-calendar-times"></i>
-                                <p>No schedules found for Section <?= $section_number ?></p>
+                <?php if($schedule_details): ?>
+                    <div class="enrollment-summary">
+                        <h2>Class Enrollment Details</h2>
+                        <div class="summary-grid">
+                            <div class="summary-item">
+                                <label>Course:</label>
+                                <span><?= htmlspecialchars($schedule_details['course_code']) ?> - <?= htmlspecialchars($schedule_details['course_name']) ?></span>
                             </div>
-                        <?php else: ?>
-                            <?php foreach($grouped_by_course as $course_key => $course_data): ?>
-                                <div class="schedule-card">
-                                    <div class="schedule-header">
-                                        <div class="schedule-info">
-                                            <h3>
-                                                <?= htmlspecialchars($course_data['course_code']) ?> - <?= htmlspecialchars($course_data['course_name']) ?>
-                                                <span class="section-badge section-<?= (($section_number - 1) % 5) + 1 ?>">
-                                                    Section <?= $section_number ?>
-                                                </span>
-                                            </h3>
-                                            <p><i class="fas fa-door-closed"></i> Classroom: <?= htmlspecialchars($course_data['room_name']) ?></p>
-                                            <p>
-                                                <i class="fas fa-chalkboard-teacher"></i> Instructor: 
-                                                <?= htmlspecialchars($course_data['instructor_name']) ?>
-                                                <?php if($course_data['instructor_name'] == 'TBA'): ?>
-                                                    <span class="instructor-badge instructor-tba">TBA</span>
-                                                <?php else: ?>
-                                                    <span class="instructor-badge instructor-assigned">Assigned</span>
-                                                <?php endif; ?>
-                                            </p>
-                                            <p><i class="fas fa-calendar-day"></i> Academic Year: <?= htmlspecialchars($course_data['academic_year']) ?></p>
-                                            <p><i class="fas fa-book"></i> Semester: <?= $course_data['semester'] == '1' ? '1st Semester' : '2nd Semester' ?></p>
-                                            <p><i class="fas fa-clock"></i> Total Sessions: <?= count($course_data['schedules']) ?></p>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="schedule-details">
-                                        <?php 
-                                        // Calculate total enrolled students across all sessions
-                                        $total_enrolled = 0;
-                                        $days_with_sessions = [];
-                                        foreach($course_data['schedules'] as $session) {
-                                            $total_enrolled += $session['enrolled_students'];
-                                            $days_with_sessions[$session['day']] = true;
-                                        }
-                                        ?>
-                                        <div class="detail-item">
-                                            <i class="fas fa-users"></i>
-                                            <div>
-                                                <div class="detail-label">Total Enrolled Students:</div>
-                                                <div class="detail-value"><?= $total_enrolled ?> students</div>
-                                            </div>
-                                        </div>
-                                        <div class="detail-item">
-                                            <i class="fas fa-calendar-week"></i>
-                                            <div>
-                                                <div class="detail-label">Scheduled Days:</div>
-                                                <div class="detail-value"><?= count($days_with_sessions) ?> / 5 days</div>
-                                            </div>
-                                        </div>
-                                        <div class="detail-item">
-                                            <i class="fas fa-chart-bar"></i>
-                                            <div>
-                                                <div class="detail-label">Weekly Sessions:</div>
-                                                <div class="detail-value"><?= count($course_data['schedules']) ?> / 15 slots</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Show individual session details -->
-                                    <div style="margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 15px;">
-                                        <h4 style="color: var(--text-primary); margin-bottom: 10px; font-size: 1rem;">
-                                            <i class="fas fa-list"></i> Individual Class Sessions:
-                                        </h4>
-                                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px;">
-                                            <?php foreach($course_data['schedules'] as $session): ?>
-                                                <div style="background: var(--bg-primary); padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
-                                                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                                                        <div>
-                                                            <span class="day-badge day-<?= strtolower(substr($session['day'], 0, 3)) ?>">
-                                                                <?= htmlspecialchars($session['day']) ?>
-                                                            </span>
-                                                            <span style="font-family: 'Courier New', monospace; font-weight: 600; margin-left: 8px;">
-                                                                <?= date('g:i A', strtotime($session['start_time'])) ?> - <?= date('g:i A', strtotime($session['end_time'])) ?>
-                                                            </span>
-                                                        </div>
-                                                        <div style="font-size: 0.8rem; color: var(--text-secondary);">
-                                                            <?= $session['enrolled_students'] ?> students
-                                                        </div>
-                                                    </div>
-                                                    <div style="margin-top: 5px; display: flex; gap: 5px; justify-content: flex-end;">
-                                                        <button class="btn-small btn-primary-small" style="padding: 4px 8px; font-size: 0.75rem;" 
-                                                                onclick="location.href='?view=enrollments&schedule_id=<?= $session['schedule_id'] ?>'">
-                                                            <i class="fas fa-eye"></i> View
-                                                        </button>
-                                                        <button class="delete-schedule-btn" style="padding: 4px 8px; font-size: 0.75rem;" 
-                                                                onclick="showDeleteConfirmation(<?= $session['schedule_id'] ?>, '<?= htmlspecialchars($session['course_code']) ?> - <?= date('g:i A', strtotime($session['start_time'])) ?> on <?= htmlspecialchars($session['day']) ?> (Section <?= $section_number ?>)')">
-                                                            <i class="fas fa-trash"></i> Delete
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            <?php endforeach; ?>
-                                        </div>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
+                            <div class="summary-item">
+                                <label>Classroom:</label>
+                                <span><?= htmlspecialchars($schedule_details['room_name']) ?></span>
+                            </div>
+                            <div class="summary-item">
+                                <label>Section:</label>
+                                <span>Section <?= $schedule_details['section_number'] ?? 1 ?></span>
+                            </div>
+                            <div class="summary-item">
+                                <label>Instructor:</label>
+                                <span>
+                                    <?= htmlspecialchars($schedule_details['instructor_name']) ?>
+                                    <?php if($schedule_details['instructor_name'] == 'TBA'): ?>
+                                        <span class="instructor-badge instructor-tba">TBA</span>
+                                    <?php else: ?>
+                                        <span class="instructor-badge instructor-assigned">Assigned</span>
+                                    <?php endif; ?>
+                                </span>
+                            </div>
+                            <div class="summary-item">
+                                <label>Day & Time:</label>
+                                <span><?= htmlspecialchars($schedule_details['day']) ?>, 
+                                    <?= date('g:i A', strtotime($schedule_details['start_time'])) ?> - 
+                                    <?= date('g:i A', strtotime($schedule_details['end_time'])) ?></span>
+                            </div>
+                            <div class="summary-item">
+                                <label>Academic Year:</label>
+                                <span><?= htmlspecialchars($schedule_details['academic_year']) ?></span>
+                            </div>
+                            <div class="summary-item">
+                                <label>Semester:</label>
+                                <span><?= $schedule_details['semester'] == '1' ? '1st Semester' : '2nd Semester' ?></span>
+                            </div>
+                            <div class="summary-item">
+                                <label>Total Enrolled Students:</label>
+                                <span><?= count($schedule_enrollments) ?></span>
+                            </div>
+                        </div>
                     </div>
-                <?php endforeach; ?>
+                    
+                    <h3 style="color: var(--text-primary); margin-bottom: 15px;">Enrolled Students (<?= count($schedule_enrollments) ?>)</h3>
+                    
+                    <?php if(!empty($schedule_enrollments)): ?>
+                        <table class="enrolled-students-table">
+                            <thead>
+                                <tr>
+                                    <th>Student Name</th>
+                                    <th>Email</th>
+                                    <th>Year</th>
+                                    <th>Department</th>
+                                    <th>Enrollment Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach($schedule_enrollments as $enrollment): ?>
+                                    <tr>
+                                        <td><?= htmlspecialchars($enrollment['username']) ?></td>
+                                        <td><?= htmlspecialchars($enrollment['email']) ?></td>
+                                        <td><?= htmlspecialchars(ucfirst($enrollment['year'])) ?></td>
+                                        <td><?= htmlspecialchars($enrollment['department_name'] ?? 'N/A') ?></td>
+                                        <td><?= date('M d, Y', strtotime($enrollment['enrolled_at'])) ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    <?php else: ?>
+                        <div class="empty-state">
+                            <i class="fas fa-user-graduate"></i>
+                            <h3>No Students Enrolled</h3>
+                            <p>No students are currently enrolled in this class schedule.</p>
+                        </div>
+                    <?php endif; ?>
+                <?php else: ?>
+                    <div class="message error">
+                        <i class="fas fa-exclamation-circle"></i>
+                        Schedule not found or invalid schedule ID.
+                    </div>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
+
+            <!-- Existing Schedules List -->
+            <?php if($view_mode && !isset($_GET['schedule_id'])): ?>
+            <div class="existing-schedules-section">
+                <div class="section-header-actions">
+                    <h2>
+                        <i class="fas fa-calendar-alt"></i>
+                        Existing Classroom Sections
+                        <?php if(!empty($search_query)): ?>
+                            <span style="font-size: 1rem; color: var(--text-secondary); margin-left: 10px;">
+                                (Search Results)
+                            </span>
+                        <?php endif; ?>
+                    </h2>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <a href="?view=enrollments&cleanup_duplicates=true&csrf_token=<?= $_SESSION['csrf_token'] ?>" 
+                           class="clean-duplicates-btn" 
+                           onclick="return confirm('Clean up duplicate schedules? This will remove duplicate course entries in the same section, keeping only the schedule with the most enrollments.')">
+                            <i class="fas fa-broom"></i> Clean Duplicates
+                        </a>
+                        <button class="delete-all-btn" id="deleteAllBtn" onclick="showDeleteAllConfirmation()" 
+                                <?= $total_freshman_schedules == 0 ? 'disabled' : '' ?>>
+                            <i class="fas fa-trash-alt"></i>
+                            Delete All Schedules
+                            <?php if($total_freshman_schedules > 0): ?>
+                                <span style="background: white; color: var(--danger-color); border-radius: 50%; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; margin-left: 5px; font-size: 0.8rem;">
+                                    <?= $total_freshman_schedules ?>
+                                </span>
+                            <?php endif; ?>
+                        </button>
+                    </div>
+                </div>
                 
-                <!-- Summary of all sections -->
-                <div style="background: linear-gradient(135deg, #f0f9ff, #e0f2fe); padding: 20px; border-radius: 10px; margin-top: 30px;">
+                <!-- Summary Statistics -->
+                <div style="background: linear-gradient(135deg, #f0f9ff, #e0f2fe); padding: 20px; border-radius: 10px; margin-bottom: 30px;">
                     <h3 style="color: var(--text-primary); margin-bottom: 15px;">
-                        <i class="fas fa-chart-pie"></i> Summary of All Sections
+                        <i class="fas fa-chart-pie"></i> Summary Statistics
                     </h3>
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
                         <div style="text-align: center; padding: 10px; background: white; border-radius: 8px;">
@@ -2739,335 +3676,487 @@ input[type="checkbox"]:checked + .student-info .student-name {
                         </div>
                         <div style="text-align: center; padding: 10px; background: white; border-radius: 8px;">
                             <div style="font-size: 1.2rem; font-weight: 600; color: var(--primary-color);">
-                                <?= count($existing_schedules) ?>
+                                <?= $total_freshman_sessions ?>
                             </div>
                             <div style="font-size: 0.9rem; color: var(--text-secondary);">Total Class Sessions</div>
                         </div>
+                        <?php 
+                        // Calculate unique courses across all sections
+                        $all_course_ids = [];
+                        $total_enrolled_all = 0;
+                        foreach($existing_schedules_grouped as $section_number => $schedules) {
+                            foreach($schedules as $schedule) {
+                                if(!in_array($schedule['course_id'], $all_course_ids)) {
+                                    $all_course_ids[] = $schedule['course_id'];
+                                }
+                                $total_enrolled_all += $schedule['enrolled_students'];
+                            }
+                        }
+                        ?>
                         <div style="text-align: center; padding: 10px; background: white; border-radius: 8px;">
                             <div style="font-size: 1.2rem; font-weight: 600; color: var(--primary-color);">
-                                <?= count(array_unique(array_column($existing_schedules, 'course_id'))) ?>
+                                <?= count($all_course_ids) ?>
                             </div>
                             <div style="font-size: 0.9rem; color: var(--text-secondary);">Unique Courses</div>
                         </div>
                         <div style="text-align: center; padding: 10px; background: white; border-radius: 8px;">
-                            <?php
-                            $total_enrolled_all = array_sum(array_column($existing_schedules, 'enrolled_students'));
-                            ?>
                             <div style="font-size: 1.2rem; font-weight: 600; color: var(--primary-color);">
                                 <?= $total_enrolled_all ?>
                             </div>
                             <div style="font-size: 0.9rem; color: var(--text-secondary);">Total Enrolled Students</div>
                         </div>
                     </div>
+                </div>
+                
+                <?php if(!empty($existing_schedules_grouped)): ?>
+                    <?php 
+                    // Check if any sections have schedules
+                    $has_schedules = false;
+                    foreach($all_sections as $section_number) {
+                        if(!empty($existing_schedules_grouped[$section_number])) {
+                            $has_schedules = true;
+                            break;
+                        }
+                    }
+                    ?>
                     
-                    <!-- Section breakdown -->
-                    <div style="margin-top: 20px;">
-                        <h4 style="color: var(--text-primary); margin-bottom: 10px; font-size: 1rem;">
-                            <i class="fas fa-door-closed"></i> Section Breakdown:
-                        </h4>
-                        <div style="display: flex; flex-wrap: wrap; gap: 10px;">
-                            <?php foreach($all_sections as $section): 
-                                $section_sessions = array_filter($existing_schedules, function($s) use ($section) { 
-                                    $section_num = isset($s['section_number']) ? $s['section_number'] : 1;
-                                    return $section_num == $section; 
-                                });
-                                $section_enrolled = array_sum(array_column($section_sessions, 'enrolled_students'));
-                                $section_rooms = array_unique(array_column($section_sessions, 'room_name'));
-                            ?>
-                                <div style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: white; border-radius: 8px;">
-                                    <span class="section-badge section-<?= (($section - 1) % 5) + 1 ?>">
-                                        Section <?= $section ?>
-                                    </span>
-                                    <span style="font-size: 0.9rem; color: var(--text-secondary);">
-                                        <?= count($section_sessions) ?> sessions, <?= $section_enrolled ?> students
-                                        <?php if(!empty($section_rooms)): ?>
-                                            <br><small>Room: <?= htmlspecialchars($section_rooms[0]) ?></small>
-                                        <?php endif; ?>
-                                    </span>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
-                    </div>
-                </div>
-                
-            <?php else: ?>
-                <div class="empty-state">
-                    <i class="fas fa-calendar-times"></i>
-                    <h3>No Classroom Sections Found</h3>
-                    <p>No classroom sections have been created yet. Use the form below to create new sections.</p>
-                </div>
-            <?php endif; ?>
-        </div>
-        <?php endif; ?>
-
-        <!-- Recent Schedules Preview -->
-        <?php if(!empty($recent_schedules) && !$view_mode): ?>
-        <div class="recent-schedules-preview" id="recent-schedules">
-            <div class="preview-header">
-                <i class="fas fa-eye"></i>
-                Recently Created Sections Preview
-            </div>
-            
-            <div class="preview-summary">
-                <p><strong>Schedule Summary:</strong></p>
-                <p>Total Sections: <span class="count"><?= $recent_schedule_details['total_sections'] ?></span></p>
-                <p>Total Sessions Created: <span class="count"><?= $recent_schedule_details['total_sessions'] ?></span></p>
-                <p>Academic Year: <span class="count"><?= htmlspecialchars($recent_schedule_details['academic_year']) ?></span></p>
-                <p>Semester: <span class="count"><?= $recent_schedule_details['semester'] == '1' ? '1st Semester' : '2nd Semester' ?></span></p>
-                
-                <?php foreach($recent_schedule_details['section_results'] as $result): ?>
-                    <div style="margin-top: 10px; padding: 10px; background: var(--bg-primary); border-radius: 6px;">
-                        <strong>Section <?= $result['section_number'] ?>:</strong>
-                        <p style="margin: 5px 0;">Classroom: <?= htmlspecialchars($result['room_name']) ?></p>
-                        <p style="margin: 5px 0;">Students: <?= $result['student_count'] ?></p>
-                        <p style="margin: 5px 0;">Sessions: <?= $result['created_sessions'] ?>/15</p>
-                    </div>
-                <?php endforeach; ?>
-            </div>
-            
-            <?php 
-            // Group recent schedules by course and section
-            $grouped_recent = [];
-            foreach($recent_schedules as $schedule) {
-                $key = $schedule['course_code'] . '-Section-' . $schedule['section_number'];
-                if(!isset($grouped_recent[$key])) {
-                    $grouped_recent[$key] = [
-                        'course_code' => $schedule['course_code'],
-                        'course_name' => $schedule['course_name'],
-                        'section_number' => $schedule['section_number'],
-                        'room_name' => $schedule['room_name'],
-                        'sessions' => []
-                    ];
-                }
-                $grouped_recent[$key]['sessions'][] = $schedule;
-            }
-            ?>
-            
-            <?php foreach($grouped_recent as $course_data): ?>
-                <h4 style="color: var(--text-primary); margin: 20px 0 10px 0;">
-                    <?= htmlspecialchars($course_data['course_code']) ?> - <?= htmlspecialchars($course_data['course_name']) ?>
-                    <span class="section-badge section-<?= (($course_data['section_number'] - 1) % 5) + 1 ?>" style="margin-left: 10px;">
-                        Section <?= $course_data['section_number'] ?>
-                    </span>
-                    <span style="font-size: 0.9rem; color: var(--text-secondary); margin-left: 10px;">
-                        (<?= count($course_data['sessions']) ?> sessions in <?= htmlspecialchars($course_data['room_name']) ?>)
-                    </span>
-                </h4>
-                <table class="schedules-table">
-                    <thead>
-                        <tr>
-                            <th>Day</th>
-                            <th>Time Slot</th>
-                            <th>Academic Year</th>
-                            <th>Semester</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach($course_data['sessions'] as $schedule): ?>
-                            <?php 
-                            $dayClass = strtolower(str_replace('day', '', $schedule['day']));
-                            ?>
-                            <tr>
-                                <td>
-                                    <span class="day-badge day-<?= $dayClass ?>">
-                                        <?= htmlspecialchars($schedule['day']) ?>
-                                    </span>
-                                </td>
-                                <td>
-                                    <span class="time-display">
-                                        <?= date('g:i A', strtotime($schedule['start_time'])) ?> - <?= date('g:i A', strtotime($schedule['end_time'])) ?>
-                                    </span>
-                                </td>
-                                <td><?= htmlspecialchars($schedule['academic_year']) ?></td>
-                                <td>
-                                    <?= $schedule['semester'] == '1' ? '1st Semester' : '2nd Semester' ?>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            <?php endforeach; ?>
-            
-            <button class="view-all-btn" onclick="location.href='?view=enrollments'">
-                <i class="fas fa-users"></i>
-                View All Scheduled Classes
-            </button>
-        </div>
-        <?php endif; ?>
-
-        <!-- Classroom Sections Form -->
-        <?php if(!$view_mode): ?>
-        <form method="POST" class="classroom-sections-form" id="classroomSectionsForm" onsubmit="return validateSectionsForm()">
-            <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-            
-            <!-- Course Selection (same for all sections) -->
-            <div class="form-group">
-                <div class="form-section-title">
-                    <i class="fas fa-book"></i>
-                    Select Freshman Courses (Same for All Sections)
-                </div>
-                
-                <?php if(empty($freshman_courses)): ?>
-                    <div class="empty-state">
-                        <i class="fas fa-book"></i>
-                        <h3>No Freshman Courses</h3>
-                        <p>No freshman courses available. Please add freshman courses first.</p>
-                    </div>
-                <?php else: ?>
-                    <div class="course-selection">
-                        <?php foreach($freshman_courses as $course): ?>
-                            <div class="course-item">
-                                <input type="checkbox" name="course_ids[]" value="<?= $course['course_id'] ?>" 
-                                       id="course_<?= $course['course_id'] ?>" class="course-checkbox"
-                                       onchange="updateSelectionCounts()">
-                                <label for="course_<?= $course['course_id'] ?>" class="course-info">
-                                    <div class="course-code">
-                                        <?= htmlspecialchars($course['course_code']) ?> - <?= htmlspecialchars($course['course_name']) ?>
-                                        <span class="freshman-badge">Freshman</span>
+                    <?php if($has_schedules): ?>
+                        <?php foreach($all_sections as $section_number): 
+                            $section_schedules = $existing_schedules_grouped[$section_number] ?? [];
+                        ?>
+                            <?php if(!empty($section_schedules)): ?>
+                                <div style="margin-bottom: 30px; border-bottom: 2px solid var(--border-color); padding-bottom: 20px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                                        <h2 style="color: var(--text-primary); display: flex; align-items: center; gap: 10px;">
+                                            <span class="section-badge section-<?= (($section_number - 1) % 5) + 1 ?>" style="font-size: 1.2rem; padding: 8px 16px;">
+                                                Section <?= $section_number ?>
+                                            </span>
+                                            <span style="font-size: 1rem; color: var(--text-secondary); margin-left: 10px;">
+                                                (<?= count($section_schedules) ?> courses)
+                                            </span>
+                                        </h2>
+                                        <a href="?view=enrollments&export_section_csv=<?= $section_number ?>&csrf_token=<?= $_SESSION['csrf_token'] ?>" 
+                                           class="section-export-btn" onclick="return confirmSectionExport(<?= $section_number ?>)">
+                                            <i class="fas fa-file-csv"></i> Export Section <?= $section_number ?> CSV
+                                        </a>
                                     </div>
-                                </label>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php endif; ?>
-            </div>
-
-            <!-- Classroom Sections -->
-            <div class="form-section-title" style="margin-top: 30px;">
-                <i class="fas fa-door-closed"></i>
-                Classroom Sections
-                <button type="button" class="add-section-btn" onclick="addSection()">
-                    <i class="fas fa-plus"></i> Add Section
-                </button>
-            </div>
-            
-            <div id="classroomSectionsContainer">
-                <!-- Section 1 (default) -->
-                <div class="section-container" data-section="1">
-                    <div class="section-header">
-                        <h3>
-                            <span class="section-number section-1">1</span>
-                            Classroom Section 1
-                        </h3>
-                        <button type="button" class="remove-section-btn" onclick="removeSection(1)" <?= count($freshman_students) > 0 ? '' : 'disabled' ?>>
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                    <div class="section-content">
-                        <!-- Room Selection for this section -->
-                        <div class="form-group">
-                            <label for="room_id_1" class="required">Classroom for Section 1:</label>
-                            <select name="classroom_sections[0][room_id]" id="room_id_1" class="section-room" required>
-                                <option value="">Select Classroom</option>
-                                <?php foreach($rooms as $room): ?>
-                                    <option value="<?= $room['room_id'] ?>">
-                                        <?= htmlspecialchars($room['room_name']) ?> (Capacity: <?= $room['capacity'] ?>)
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        
-                        <!-- Student Selection for this section -->
-                        <div class="form-group">
-                            <label for="students_section_1" class="required">Students for Section 1:</label>
-                            <?php if(empty($freshman_students)): ?>
-                                <div class="empty-state" style="padding: 10px;">
-                                    <p>No freshman students available.</p>
-                                </div>
-                            <?php else: ?>
-                                <div class="student-selection" style="max-height: 200px;">
-                                    <?php foreach($freshman_students as $student): ?>
-                                        <div class="student-item">
-                                            <input type="checkbox" name="classroom_sections[0][student_ids][]" 
-                                                   value="<?= $student['user_id'] ?>" 
-                                                   id="student_section_1_<?= $student['user_id'] ?>"
-                                                   class="section-student-checkbox"
-                                                   data-section="1">
-                                            <label for="student_section_1_<?= $student['user_id'] ?>" class="student-info">
-                                                <div class="student-name">
-                                                    <?= htmlspecialchars($student['username']) ?>
-                                                    <?php if($student['department_name']): ?>
-                                                        <span class="department-badge"><?= htmlspecialchars($student['department_name']) ?></span>
-                                                    <?php endif; ?>
+                                    
+                                    <?php foreach($section_schedules as $course_schedule): ?>
+                                        <div class="schedule-card">
+                                            <div class="schedule-header">
+                                                <div class="schedule-info">
+                                                    <h3>
+                                                        <?= htmlspecialchars($course_schedule['course_code']) ?> - <?= htmlspecialchars($course_schedule['course_name']) ?>
+                                                        <span class="section-badge section-<?= (($section_number - 1) % 5) + 1 ?>">
+                                                            Section <?= $section_number ?>
+                                                        </span>
+                                                    </h3>
+                                                    <p><i class="fas fa-door-closed"></i> Classroom: <?= htmlspecialchars($course_schedule['room_name']) ?></p>
+                                                    <p>
+                                                        <i class="fas fa-chalkboard-teacher"></i> Instructor: 
+                                                        <?= htmlspecialchars($course_schedule['instructor_name']) ?>
+                                                        <?php if($course_schedule['instructor_name'] == 'TBA'): ?>
+                                                            <span class="instructor-badge instructor-tba">TBA</span>
+                                                        <?php else: ?>
+                                                            <span class="instructor-badge instructor-assigned">Assigned</span>
+                                                        <?php endif; ?>
+                                                    </p>
+                                                    <p><i class="fas fa-calendar-day"></i> Academic Year: <?= htmlspecialchars($course_schedule['academic_year']) ?></p>
+                                                    <p><i class="fas fa-book"></i> Semester: <?= $course_schedule['semester'] == '1' ? '1st Semester' : '2nd Semester' ?></p>
+                                                    <p><i class="fas fa-clock"></i> Total Sessions: <?= $course_schedule['total_sessions'] ?></p>
                                                 </div>
-                                                <div class="student-email">
-                                                    <?= htmlspecialchars($student['email']) ?>
+                                            </div>
+                                            
+                                            <div class="schedule-details">
+                                                <div class="detail-item">
+                                                    <i class="fas fa-users"></i>
+                                                    <div>
+                                                        <div class="detail-label">Total Enrolled Students:</div>
+                                                        <div class="detail-value"><?= $course_schedule['enrolled_students'] ?> students</div>
+                                                    </div>
                                                 </div>
-                                            </label>
+                                                <div class="detail-item">
+                                                    <i class="fas fa-calendar-week"></i>
+                                                    <div>
+                                                        <div class="detail-label">Scheduled Days & Times:</div>
+                                                        <div class="detail-value"><?= $course_schedule['schedule_times'] ?></div>
+                                                    </div>
+                                                </div>
+                                                <div class="detail-item">
+                                                    <i class="fas fa-chart-bar"></i>
+                                                    <div>
+                                                        <div class="detail-label">Weekly Sessions:</div>
+                                                        <div class="detail-value"><?= $course_schedule['total_sessions'] ?> / 15 slots</div>
+                                                    </div>
+                                                </div>
+                                                <?php if($course_schedule['sample_students']): ?>
+                                                <div class="detail-item">
+                                                    <i class="fas fa-user-graduate"></i>
+                                                    <div>
+                                                        <div class="detail-label">Sample Students:</div>
+                                                        <div class="detail-value"><?= htmlspecialchars($course_schedule['sample_students']) ?></div>
+                                                    </div>
+                                                </div>
+                                                <?php endif; ?>
+                                            </div>
+                                            
+                                            <!-- Show individual session details -->
+                                            <?php if(!empty($course_schedule['individual_sessions'])): ?>
+                                            <div style="margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 15px;">
+                                                <h4 style="color: var(--text-primary); margin-bottom: 10px; font-size: 1rem;">
+                                                    <i class="fas fa-list"></i> Individual Class Sessions (<?= count($course_schedule['individual_sessions']) ?>):
+                                                </h4>
+                                                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px;">
+                                                    <?php foreach($course_schedule['individual_sessions'] as $session): ?>
+                                                        <div style="background: var(--bg-primary); padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+                                                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                                                <div>
+                                                                    <span class="day-badge day-<?= strtolower(substr($session['day'], 0, 3)) ?>">
+                                                                        <?= htmlspecialchars($session['day']) ?>
+                                                                    </span>
+                                                                    <span style="font-family: 'Courier New', monospace; font-weight: 600; margin-left: 8px;">
+                                                                        <?= date('g:i A', strtotime($session['start_time'])) ?> - <?= date('g:i A', strtotime($session['end_time'])) ?>
+                                                                    </span>
+                                                                </div>
+                                                                <div style="font-size: 0.8rem; color: var(--text-secondary);">
+                                                                    <?= $session['enrolled_students'] ?> students
+                                                                </div>
+                                                            </div>
+                                                            <div style="margin-top: 5px; display: flex; gap: 5px; justify-content: flex-end;">
+                                                                <button class="btn-small btn-primary-small" style="padding: 4px 8px; font-size: 0.75rem;" 
+                                                                        onclick="location.href='?view=enrollments&schedule_id=<?= $session['schedule_id'] ?>'">
+                                                                    <i class="fas fa-eye"></i> View
+                                                                </button>
+                                                                <button class="delete-schedule-btn" style="padding: 4px 8px; font-size: 0.75rem;" 
+                                                                        onclick="showDeleteConfirmation(<?= $session['schedule_id'] ?>, '<?= htmlspecialchars($course_schedule['course_code']) ?> - <?= date('g:i A', strtotime($session['start_time'])) ?> on <?= htmlspecialchars($session['day']) ?> (Section <?= $section_number ?>)')">
+                                                                    <i class="fas fa-trash"></i> Delete
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    <?php endforeach; ?>
+                                                </div>
+                                            </div>
+                                            <?php endif; ?>
                                         </div>
                                     <?php endforeach; ?>
                                 </div>
+                            <?php else: ?>
+                                <?php if(empty($search_query)): ?>
+                                    <div style="margin-bottom: 30px;">
+                                        <h2 style="color: var(--text-primary); margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+                                            <span class="section-badge section-<?= (($section_number - 1) % 5) + 1 ?>" style="font-size: 1.2rem; padding: 8px 16px;">
+                                                Section <?= $section_number ?>
+                                            </span>
+                                        </h2>
+                                        <div class="empty-state" style="padding: 20px;">
+                                            <i class="fas fa-calendar-times"></i>
+                                            <p>No schedules found for Section <?= $section_number ?></p>
+                                        </div>
+                                    </div>
+                                <?php endif; ?>
+                            <?php endif; ?>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <div class="empty-state">
+                            <i class="fas fa-calendar-times"></i>
+                            <h3>No Schedules Found</h3>
+                            <?php if(!empty($search_query)): ?>
+                                <p>No schedules found matching "<strong><?= htmlspecialchars($search_query) ?></strong>".</p>
+                                <a href="?view=enrollments" class="btn" style="margin-top: 15px;">
+                                    <i class="fas fa-times"></i>
+                                    Clear Search
+                                </a>
+                            <?php else: ?>
+                                <p>No classroom sections have been created yet. Use the form below to create new sections.</p>
                             <?php endif; ?>
                         </div>
+                    <?php endif; ?>
+                <?php else: ?>
+                    <div class="empty-state">
+                        <i class="fas fa-calendar-times"></i>
+                        <h3>No Schedules Found</h3>
+                        <?php if(!empty($search_query)): ?>
+                            <p>No schedules found matching "<strong><?= htmlspecialchars($search_query) ?></strong>".</p>
+                            <a href="?view=enrollments" class="btn" style="margin-top: 15px;">
+                                <i class="fas fa-times"></i>
+                                Clear Search
+                            </a>
+                        <?php else: ?>
+                            <p>No classroom sections have been created yet. Use the form below to create new sections.</p>
+                        <?php endif; ?>
                     </div>
-                </div>
+                <?php endif; ?>
             </div>
+            <?php endif; ?>
 
-            <!-- Academic Info -->
-            <div class="academic-info">
-                <div class="form-group">
-                    <label for="academic_year" class="required">Academic Year:</label>
-                    <input type="text" name="academic_year" id="academic_year" 
-                           placeholder="e.g., 2026-2027" required
-                           value="<?= date('Y') . '-' . (date('Y') + 1) ?>">
+            <!-- Recent Schedules Preview -->
+            <?php if(!empty($recent_schedules) && !$view_mode): ?>
+            <div class="recent-schedules-preview" id="recent-schedules">
+                <div class="preview-header">
+                    <i class="fas fa-eye"></i>
+                    Recently Created Sections Preview
                 </div>
                 
-                <div class="form-group">
-                    <label for="semester" class="required">Semester:</label>
-                    <select name="semester" id="semester" required>
-                        <option value="">Select Semester</option>
-                        <option value="1" selected>1st Semester</option>
-                        <option value="2">2nd Semester</option>
-                    </select>
-                </div>
-            </div>
-
-            <!-- Time Slots Info -->
-            <div class="time-slots-section">
-                <div class="time-slots-title">
-                    <i class="fas fa-clock"></i> Weekly Schedule Time Slots (Monday - Friday)
-                    <span style="font-size: 0.9rem; color: var(--text-secondary); margin-left: 10px;">
-                        Each course gets 1 session per day × 5 days = up to 15 sessions per course per section
-                    </span>
-                </div>
-                <div class="time-slots-grid">
-                    <?php foreach($days_of_week as $day): ?>
-                        <div class="time-slot-card">
-                            <div class="time-slot-day"><?= $day ?></div>
-                            <?php foreach($time_slots as $index => $slot): ?>
-                                <span class="time-slot">
-                                    Slot <?= $index + 1 ?>: <?= date('g:i A', strtotime($slot[0])) ?> - <?= date('g:i A', strtotime($slot[1])) ?>
-                                </span>
-                            <?php endforeach; ?>
+                <div class="preview-summary">
+                    <p><strong>Schedule Summary:</strong></p>
+                    <p>Total Sections: <span class="count"><?= $recent_schedule_details['total_sections'] ?></span></p>
+                    <p>Total Sessions Created: <span class="count"><?= $recent_schedule_details['total_sessions'] ?></span></p>
+                    <p>Academic Year: <span class="count"><?= htmlspecialchars($recent_schedule_details['academic_year']) ?></span></p>
+                    <p>Semester: <span class="count"><?= $recent_schedule_details['semester'] == '1' ? '1st Semester' : '2nd Semester' ?></span></p>
+                    
+                    <?php foreach($recent_schedule_details['section_results'] as $result): ?>
+                        <div style="margin-top: 10px; padding: 10px; background: var(--bg-primary); border-radius: 6px;">
+                            <strong>Section <?= $result['section_number'] ?>:</strong>
+                            <p style="margin: 5px 0;">Classroom: <?= htmlspecialchars($result['room_name']) ?></p>
+                            <p style="margin: 5px 0;">Students: <?= $result['student_count'] ?></p>
+                            <p style="margin: 5px 0;">Sessions: <?= $result['created_sessions'] ?>/15</p>
                         </div>
                     <?php endforeach; ?>
                 </div>
-            </div>
-
-            <!-- Selection Summary -->
-            <div class="selection-summary" id="selection-summary" style="display: none;">
-                <p><strong>Selected for Scheduling:</strong></p>
-                <p>Courses: <span class="count" id="summary-courses">0</span></p>
-                <p>Classroom Sections: <span class="count" id="summary-sections">1</span></p>
-                <p>Total Students: <span class="count" id="summary-students">0</span></p>
-                <div id="section-details"></div>
-            </div>
-
-            <!-- Form Actions -->
-            <div class="form-actions">
-                <button type="submit" name="batch_schedule" class="btn btn-primary" id="submit-btn" disabled>
-                    <i class="fas fa-calendar-plus"></i>
-                    Schedule All Sections
+                
+                <?php 
+                // Group recent schedules by course and section
+                $grouped_recent = [];
+                foreach($recent_schedules as $schedule) {
+                    $key = $schedule['course_code'] . '-Section-' . $schedule['section_number'];
+                    if(!isset($grouped_recent[$key])) {
+                        $grouped_recent[$key] = [
+                            'course_code' => $schedule['course_code'],
+                            'course_name' => $schedule['course_name'],
+                            'section_number' => $schedule['section_number'],
+                            'room_name' => $schedule['room_name'],
+                            'sessions' => []
+                        ];
+                    }
+                    $grouped_recent[$key]['sessions'][] = $schedule;
+                }
+                ?>
+                
+                <?php foreach($grouped_recent as $course_data): ?>
+                    <h4 style="color: var(--text-primary); margin: 20px 0 10px 0;">
+                        <?= htmlspecialchars($course_data['course_code']) ?> - <?= htmlspecialchars($course_data['course_name']) ?>
+                        <span class="section-badge section-<?= (($course_data['section_number'] - 1) % 5) + 1 ?>" style="margin-left: 10px;">
+                            Section <?= $course_data['section_number'] ?>
+                        </span>
+                        <span style="font-size: 0.9rem; color: var(--text-secondary); margin-left: 10px;">
+                            (<?= count($course_data['sessions']) ?> sessions in <?= htmlspecialchars($course_data['room_name']) ?>)
+                        </span>
+                    </h4>
+                    <table class="schedules-table">
+                        <thead>
+                            <tr>
+                                <th>Day</th>
+                                <th>Time Slot</th>
+                                <th>Academic Year</th>
+                                <th>Semester</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach($course_data['sessions'] as $schedule): ?>
+                                <?php 
+                                $dayClass = strtolower(str_replace('day', '', $schedule['day']));
+                                ?>
+                                <tr>
+                                    <td>
+                                        <span class="day-badge day-<?= $dayClass ?>">
+                                            <?= htmlspecialchars($schedule['day']) ?>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="time-display">
+                                            <?= date('g:i A', strtotime($schedule['start_time'])) ?> - <?= date('g:i A', strtotime($schedule['end_time'])) ?>
+                                        </span>
+                                    </td>
+                                    <td><?= htmlspecialchars($schedule['academic_year']) ?></td>
+                                    <td>
+                                        <?= $schedule['semester'] == '1' ? '1st Semester' : '2nd Semester' ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                <?php endforeach; ?>
+                
+                <button class="view-all-btn" onclick="location.href='?view=enrollments'">
+                    <i class="fas fa-users"></i>
+                    View All Scheduled Classes
                 </button>
-                <button type="reset" class="btn btn-secondary" onclick="resetForm()">
-                    <i class="fas fa-redo"></i>
-                    Reset All
-                </button>
             </div>
-        </form>
-        <?php endif; ?>
+            <?php endif; ?>
+
+            <!-- Classroom Sections Form -->
+            <?php if(!$view_mode): ?>
+            <form method="POST" class="classroom-sections-form" id="classroomSectionsForm" onsubmit="return validateSectionsForm()">
+                <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+                
+                <!-- Course Selection (same for all sections) -->
+                <div class="form-group">
+                    <div class="form-section-title">
+                        <i class="fas fa-book"></i>
+                        Select Freshman Courses (Same for All Sections)
+                    </div>
+                    
+                    <?php if(empty($freshman_courses)): ?>
+                        <div class="empty-state">
+                            <i class="fas fa-book"></i>
+                            <h3>No Freshman Courses</h3>
+                            <p>No freshman courses available. Please add freshman courses first.</p>
+                        </div>
+                    <?php else: ?>
+                        <div class="course-selection">
+                            <?php foreach($freshman_courses as $course): ?>
+                                <div class="course-item">
+                                    <input type="checkbox" name="course_ids[]" value="<?= $course['course_id'] ?>" 
+                                           id="course_<?= $course['course_id'] ?>" class="course-checkbox"
+                                           onchange="updateSelectionCounts()">
+                                    <label for="course_<?= $course['course_id'] ?>" class="course-info">
+                                        <div class="course-code">
+                                            <?= htmlspecialchars($course['course_code']) ?> - <?= htmlspecialchars($course['course_name']) ?>
+                                            <span class="freshman-badge">Freshman</span>
+                                        </div>
+                                    </label>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+                </div>
+
+                <!-- Classroom Sections -->
+                <div class="form-section-title" style="margin-top: 30px;">
+                    <i class="fas fa-door-closed"></i>
+                    Classroom Sections
+                    <button type="button" class="add-section-btn" onclick="addSection()">
+                        <i class="fas fa-plus"></i> Add Section
+                    </button>
+                </div>
+                
+                <div id="classroomSectionsContainer">
+                    <!-- Section 1 (default) -->
+                    <div class="section-container" data-section="1">
+                        <div class="section-header">
+                            <h3>
+                                <span class="section-number section-1">1</span>
+                                Classroom Section 1
+                            </h3>
+                            <button type="button" class="remove-section-btn" onclick="removeSection(1)" <?= count($freshman_students) > 0 ? '' : 'disabled' ?>>
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="section-content">
+                            <!-- Room Selection for this section -->
+                            <div class="form-group">
+                                <label for="room_id_1" class="required">Classroom for Section 1:</label>
+                                <select name="classroom_sections[0][room_id]" id="room_id_1" class="section-room" required>
+                                    <option value="">Select Classroom</option>
+                                    <?php foreach($rooms as $room): ?>
+                                        <option value="<?= $room['room_id'] ?>">
+                                            <?= htmlspecialchars($room['room_name']) ?> (Capacity: <?= $room['capacity'] ?>)
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            
+                            <!-- Student Selection for this section -->
+                            <div class="form-group">
+                                <label for="students_section_1" class="required">Students for Section 1:</label>
+                                <?php if(empty($freshman_students)): ?>
+                                    <div class="empty-state" style="padding: 10px;">
+                                        <p>No freshman students available.</p>
+                                    </div>
+                                <?php else: ?>
+                                    <div class="student-selection" style="max-height: 200px;">
+                                        <?php foreach($freshman_students as $student): ?>
+                                            <div class="student-item">
+                                                <input type="checkbox" name="classroom_sections[0][student_ids][]" 
+                                                       value="<?= $student['user_id'] ?>" 
+                                                       id="student_section_1_<?= $student['user_id'] ?>"
+                                                       class="section-student-checkbox"
+                                                       data-section="1">
+                                                <label for="student_section_1_<?= $student['user_id'] ?>" class="student-info">
+                                                    <div class="student-name">
+                                                        <?= htmlspecialchars($student['username']) ?>
+                                                        <?php if($student['department_name']): ?>
+                                                            <span class="department-badge"><?= htmlspecialchars($student['department_name']) ?></span>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                    <div class="student-email">
+                                                        <?= htmlspecialchars($student['email']) ?>
+                                                    </div>
+                                                </label>
+                                            </div>
+                                        <?php endforeach; ?>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Academic Info -->
+                <div class="academic-info">
+                    <div class="form-group">
+                        <label for="academic_year" class="required">Academic Year:</label>
+                        <input type="text" name="academic_year" id="academic_year" 
+                               placeholder="e.g., 2026-2027" required
+                               value="<?= date('Y') . '-' . (date('Y') + 1) ?>">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="semester" class="required">Semester:</label>
+                        <select name="semester" id="semester" required>
+                            <option value="">Select Semester</option>
+                            <option value="1" selected>1st Semester</option>
+                            <option value="2">2nd Semester</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Time Slots Info -->
+                <div class="time-slots-section">
+                    <div class="time-slots-title">
+                        <i class="fas fa-clock"></i> Weekly Schedule Time Slots (Monday - Friday)
+                        <span style="font-size: 0.9rem; color: var(--text-secondary); margin-left: 10px;">
+                            Each course gets 1 session per day × 5 days = up to 15 sessions per course per section
+                        </span>
+                    </div>
+                    <div class="time-slots-grid">
+                        <?php foreach($days_of_week as $day): ?>
+                            <div class="time-slot-card">
+                                <div class="time-slot-day"><?= $day ?></div>
+                                <?php foreach($time_slots as $index => $slot): ?>
+                                    <span class="time-slot">
+                                        Slot <?= $index + 1 ?>: <?= date('g:i A', strtotime($slot[0])) ?> - <?= date('g:i A', strtotime($slot[1])) ?>
+                                    </span>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+
+                <!-- Selection Summary -->
+                <div class="selection-summary" id="selection-summary" style="display: none;">
+                    <p><strong>Selected for Scheduling:</strong></p>
+                    <p>Courses: <span class="count" id="summary-courses">0</span></p>
+                    <p>Classroom Sections: <span class="count" id="summary-sections">1</span></p>
+                    <p>Total Students: <span class="count" id="summary-students">0</span></p>
+                    <div id="section-details"></div>
+                </div>
+
+                <!-- Form Actions -->
+                <div class="form-actions">
+                    <button type="submit" name="batch_schedule" class="btn btn-primary" id="submit-btn" disabled>
+                        <i class="fas fa-calendar-plus"></i>
+                        Schedule All Sections
+                    </button>
+                    <button type="reset" class="btn btn-secondary" onclick="resetForm()">
+                        <i class="fas fa-redo"></i>
+                        Reset All
+                    </button>
+                </div>
+            </form>
+            <?php endif; ?>
+        </div>
     </div>
-</div>
 
 <script>
 let sectionCounter = 1;
@@ -3403,6 +4492,15 @@ function closeDeleteAllConfirmationModal() {
     document.getElementById('deleteAllConfirmationModal').style.display = 'none';
 }
 
+// Export confirmation functions
+function confirmExport() {
+    return confirm('Export all freshman schedules to CSV file?\n\nThis will download a CSV file containing all schedule data.');
+}
+
+function confirmSectionExport(sectionNumber) {
+    return confirm(`Export Section ${sectionNumber} schedules to CSV file?\n\nThis will download a CSV file containing all schedule data for Section ${sectionNumber}.`);
+}
+
 // Close modal when clicking outside
 document.querySelectorAll('.confirmation-modal').forEach(modal => {
     modal.addEventListener('click', function(e) {
@@ -3458,6 +4556,13 @@ document.addEventListener('DOMContentLoaded', function() {
             updateSelectionCounts();
         }
     });
+    
+    // Show print instructions in view mode
+    const printInstructions = document.getElementById('printInstructions');
+    const printExportActions = document.getElementById('printExportActions');
+    if(printInstructions && printExportActions) {
+        printInstructions.style.display = 'block';
+    }
     
     // Initialize counters
     updateSelectionCounts();
