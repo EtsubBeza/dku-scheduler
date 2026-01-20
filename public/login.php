@@ -653,7 +653,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         
         <div class="login-footer">
           Secure access to Debark University's Academic Scheduling System<br>
-          For assistance, contact the IT department
         </div>
       </div>
     </div>

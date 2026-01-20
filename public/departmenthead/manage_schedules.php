@@ -247,6 +247,8 @@ function processAutoGeneration($is_extension = false, $selected_room_id = null) 
     
     error_log("Auto generation started for department $dept_id");
     error_log("Courses to schedule: " . implode(', ', $auto_courses));
+    error_log("Year/Extension: $auto_year");
+    error_log("Semester: $auto_semester, Academic Year: $auto_academic_year");
     
     // Define available days based on student type
     if ($is_extension) {
@@ -289,79 +291,182 @@ function processAutoGeneration($is_extension = false, $selected_room_id = null) 
         $rooms = fetchAllSafe($rooms_stmt);
         
         if(empty($rooms)) {
-            setMessage($message, $message_type, "No rooms found in the system. Please add rooms first.", "error");
-            return;
+            // Store error in session and redirect
+            $_SESSION['schedule_message'] = "No rooms found in the system. Please add rooms first.";
+            $_SESSION['schedule_message_type'] = "error";
+            header("Location: " . $_SERVER['PHP_SELF']);
+            exit;
         }
         
-        // Get ALL instructors from the department
-        $instructors_stmt = $pdo->prepare("
-            SELECT user_id, full_name, username 
-            FROM users 
-            WHERE role = 'instructor' 
-            AND department_id = ?
-            ORDER BY user_id
-        ");
-        $instructors_stmt->execute([$dept_id]);
-        $instructors = fetchAllSafe($instructors_stmt);
-        
-        if(empty($instructors)) {
-            setMessage($message, $message_type, "No instructors found in your department. Please add instructors first.", "error");
-            return;
-        }
-        
-        // Verify courses exist
+        // Verify courses exist and get their assigned instructors
         $course_details = [];
         foreach($auto_courses as $course_id) {
-            $course_stmt = $pdo->prepare("SELECT course_name, course_code FROM courses WHERE course_id = ? AND department_id = ?");
+            // Get course info
+            $course_stmt = $pdo->prepare("
+                SELECT 
+                    c.course_name, 
+                    c.course_code
+                FROM courses c
+                WHERE c.course_id = ? 
+                AND c.department_id = ?
+            ");
             $course_stmt->execute([$course_id, $dept_id]);
             $course = $course_stmt->fetch(PDO::FETCH_ASSOC);
             
             if(!$course) {
-                setMessage($message, $message_type, "Course ID $course_id not found or doesn't belong to your department.", "error");
-                return;
+                // Store error in session and redirect
+                $_SESSION['schedule_message'] = "Course ID $course_id not found or doesn't belong to your department.";
+                $_SESSION['schedule_message_type'] = "error";
+                header("Location: " . $_SERVER['PHP_SELF']);
+                exit;
             }
-            $course_details[$course_id] = $course;
+            
+            // Get assigned instructor for this course in the selected semester and academic year
+            $assign_stmt = $pdo->prepare("
+                SELECT 
+                    ca.user_id as instructor_id,
+                    COALESCE(u.full_name, u.username) as instructor_name
+                FROM course_assignments ca
+                LEFT JOIN users u ON ca.user_id = u.user_id
+                WHERE ca.course_id = ? 
+                AND ca.semester = ?
+                AND ca.academic_year = ?
+                AND ca.status = 'assigned'
+                LIMIT 1
+            ");
+            
+            $assign_stmt->execute([$course_id, $auto_semester, $auto_academic_year]);
+            $assignment = $assign_stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if(!$assignment || empty($assignment['instructor_id'])) {
+                // Try to find any assignment for this course (regardless of semester/year)
+                $fallback_stmt = $pdo->prepare("
+                    SELECT 
+                        ca.user_id as instructor_id,
+                        COALESCE(u.full_name, u.username) as instructor_name
+                    FROM course_assignments ca
+                    LEFT JOIN users u ON ca.user_id = u.user_id
+                    WHERE ca.course_id = ? 
+                    AND ca.status = 'assigned'
+                    ORDER BY ca.assigned_date DESC
+                    LIMIT 1
+                ");
+                
+                $fallback_stmt->execute([$course_id]);
+                $assignment = $fallback_stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if(!$assignment || empty($assignment['instructor_id'])) {
+                    // Store error in session and redirect
+                    $_SESSION['schedule_message'] = "Course '{$course['course_name']}' has no instructor assigned for $auto_semester $auto_academic_year. Please assign an instructor first.";
+                    $_SESSION['schedule_message_type'] = "error";
+                    header("Location: " . $_SERVER['PHP_SELF']);
+                    exit;
+                } else {
+                    error_log("Using fallback instructor assignment for course $course_id (not matching semester/year)");
+                }
+            }
+            
+            $course_details[$course_id] = [
+                'course_name' => $course['course_name'],
+                'course_code' => $course['course_code'],
+                'instructor_id' => $assignment['instructor_id'],
+                'instructor_name' => $assignment['instructor_name'] ?: 'Unknown Instructor'
+            ];
+            
+            error_log("Course {$course['course_name']} assigned to instructor: {$assignment['instructor_name']}");
         }
 
-        // DETERMINE ROOM TO USE
-        $room_id = null;
-        $room_name = "";
+        // FIND A ROOM FOR THIS SPECIFIC YEAR/EXTENSION
+        // Get ALL rooms currently in use by ANY other year (regardless of academic year or semester)
+        $used_rooms_stmt = $pdo->prepare("
+            SELECT DISTINCT room_id 
+            FROM schedule 
+            WHERE year != ? 
+            OR is_extension != ?
+        ");
+        
+        $used_rooms_stmt->execute([$auto_year, $is_extension ? 1 : 0]);
+        $used_rooms = $used_rooms_stmt->fetchAll(PDO::FETCH_COLUMN);
+        $used_rooms_ids = $used_rooms ? $used_rooms : [];
+        
+        error_log("Rooms already used by other years: " . implode(', ', $used_rooms_ids));
+        
+        // Determine which room to use for this year
+        $room_to_use = null;
+        $room_name_to_use = "";
         
         if($selected_room_id) {
-            // Use the user-selected room
-            $room_stmt = $pdo->prepare("SELECT * FROM rooms WHERE room_id = ?");
-            $room_stmt->execute([$selected_room_id]);
-            $selected_room = $room_stmt->fetch(PDO::FETCH_ASSOC);
-            
-            if($selected_room) {
-                $room_id = $selected_room['room_id'];
-                $room_name = $selected_room['room_name'];
+            // Check if user-selected room is already used by another year
+            if(in_array($selected_room_id, $used_rooms_ids)) {
+                error_log("Selected room ID $selected_room_id is already used by another year");
+                // Find alternative room that's not used by other years
+                foreach($rooms as $room) {
+                    if(!in_array($room['room_id'], $used_rooms_ids)) {
+                        $room_to_use = $room['room_id'];
+                        $room_name_to_use = $room['room_name'];
+                        break;
+                    }
+                }
+                
+                // If still no room found, use first available
+                if(!$room_to_use && !empty($rooms)) {
+                    $room_to_use = $rooms[0]['room_id'];
+                    $room_name_to_use = $rooms[0]['room_name'];
+                }
             } else {
-                // Fall back to first room if selected room doesn't exist
-                $room_id = $rooms[0]['room_id'];
-                $room_name = $rooms[0]['room_name'];
+                // Selected room is available for this year
+                $room_stmt = $pdo->prepare("SELECT * FROM rooms WHERE room_id = ?");
+                $room_stmt->execute([$selected_room_id]);
+                $selected_room = $room_stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if($selected_room) {
+                    $room_to_use = $selected_room['room_id'];
+                    $room_name_to_use = $selected_room['room_name'];
+                }
             }
-        } else {
-            // Auto-select the first available classroom (not lab or auditorium)
+        }
+        
+        // If no room selected or selected room is taken by another year, find an available room
+        if(!$room_to_use) {
+            // First try to find any room not currently in use by other years
             foreach($rooms as $room) {
-                if($room['room_type'] === 'classroom') {
-                    $room_id = $room['room_id'];
-                    $room_name = $room['room_name'];
+                if(!in_array($room['room_id'], $used_rooms_ids)) {
+                    $room_to_use = $room['room_id'];
+                    $room_name_to_use = $room['room_name'];
                     break;
                 }
             }
             
-            // If no classroom found, use first room
-            if(!$room_id && !empty($rooms)) {
-                $room_id = $rooms[0]['room_id'];
-                $room_name = $rooms[0]['room_name'];
+            // If all rooms are used by other years, use the first classroom
+            if(!$room_to_use) {
+                foreach($rooms as $room) {
+                    $room_type = isset($room['room_type']) ? $room['room_type'] : 'classroom';
+                    if($room_type === 'classroom') {
+                        $room_to_use = $room['room_id'];
+                        $room_name_to_use = $room['room_name'];
+                        error_log("All rooms in use, using classroom: $room_name_to_use");
+                        break;
+                    }
+                }
+            }
+            
+            // If still no room, use first available room
+            if(!$room_to_use && !empty($rooms)) {
+                $room_to_use = $rooms[0]['room_id'];
+                $room_name_to_use = $rooms[0]['room_name'];
+                error_log("WARNING: No unique room available, using: $room_name_to_use");
             }
         }
         
-        if(!$room_id) {
-            setMessage($message, $message_type, "No room available for scheduling.", "error");
-            return;
+        if(!$room_to_use) {
+            // Store error in session and redirect
+            $_SESSION['schedule_message'] = "No room available for scheduling. All rooms are already assigned to other years.";
+            $_SESSION['schedule_message_type'] = "error";
+            header("Location: " . $_SERVER['PHP_SELF']);
+            exit;
         }
+        
+        error_log("Assigned room for Year $auto_year: $room_name_to_use (ID: $room_to_use)");
 
         $pdo->beginTransaction();
         $scheduled_count = 0;
@@ -389,31 +494,35 @@ function processAutoGeneration($is_extension = false, $selected_room_id = null) 
         }
         
         error_log("Total slots to fill: $total_slots, Courses prepared: " . count($courses_to_schedule));
-        error_log("Using room: $room_name (ID: $room_id) for all classes");
+        error_log("Room assigned: $room_name_to_use (ID: $room_to_use)");
         
-        // SYSTEMATICALLY FILL ALL SLOTS WITH SAME ROOM
-        $instructor_index = 0;
+        // Keep track of scheduled slots to avoid conflicts within same room
+        $scheduled_slots = [];
         $course_index = 0;
         
         // Loop through each day
         foreach($days as $day) {
             // Loop through each time slot
             foreach($time_slots as $time_slot) {
+                $start_time = $time_slot[0];
+                $end_time = $time_slot[1];
+                
+                // Check if this slot is already booked in this room (shouldn't happen with our logic)
+                $slot_key = "$day-$start_time-$end_time";
+                if(in_array($slot_key, $scheduled_slots)) {
+                    error_log("Slot conflict: $slot_key already scheduled in $room_name_to_use");
+                    continue; // Skip this slot
+                }
+                
                 // Get the next course
                 $course_id = $courses_to_schedule[$course_index % count($courses_to_schedule)];
                 $course = $course_details[$course_id];
                 $course_name = $course['course_name'];
                 $course_code = $course['course_code'];
+                $instructor_id = $course['instructor_id'];
+                $instructor_name = $course['instructor_name'];
                 
-                $start_time = $time_slot[0];
-                $end_time = $time_slot[1];
-                
-                // Get instructor (round robin)
-                $instructor = $instructors[$instructor_index % count($instructors)];
-                $instructor_id = $instructor['user_id'];
-                $instructor_name = !empty($instructor['full_name']) ? $instructor['full_name'] : $instructor['username'];
-                
-                // Insert schedule - SAME ROOM FOR ALL
+                // Schedule this class
                 try {
                     $stmt = $pdo->prepare("
                         INSERT INTO schedule 
@@ -424,8 +533,8 @@ function processAutoGeneration($is_extension = false, $selected_room_id = null) 
                     
                     $result = $stmt->execute([
                         $course_id, 
-                        $instructor_id, 
-                        $room_id, // SAME ROOM FOR ALL
+                        $instructor_id, // ← PRE-ASSIGNED instructor from course_assignments
+                        $room_to_use, // SAME ROOM FOR ALL CLASSES IN THIS YEAR
                         $day, 
                         $start_time, 
                         $end_time, 
@@ -437,32 +546,32 @@ function processAutoGeneration($is_extension = false, $selected_room_id = null) 
                     
                     if($result) {
                         $scheduled_count++;
+                        $scheduled_slots[] = $slot_key;
                         $schedule_plan[] = [
                             'course_id' => $course_id,
                             'course_name' => $course_name,
                             'course_code' => $course_code,
                             'day' => $day,
                             'time' => substr($start_time, 0, 5) . ' - ' . substr($end_time, 0, 5),
-                            'room' => $room_name, // SAME ROOM
+                            'room' => $room_name_to_use,
                             'instructor' => $instructor_name
                         ];
                         
-                        error_log("Scheduled: $course_code on $day at $start_time in $room_name");
-                        
-                        // Move to next course and instructor
-                        $course_index++;
-                        $instructor_index++;
+                        error_log("Scheduled: $course_code on $day at $start_time in $room_name_to_use with $instructor_name");
                     } else {
                         error_log("Failed to insert schedule for $course_code");
                     }
                 } catch(PDOException $e) {
                     error_log("Database error scheduling $course_code: " . $e->getMessage());
                 }
+                
+                // Move to next course
+                $course_index++;
             }
         }
 
         $pdo->commit();
-        error_log("Successfully scheduled $scheduled_count out of $total_slots slots");
+        error_log("Successfully scheduled $scheduled_count out of $total_slots slots for Year $auto_year in room $room_name_to_use");
 
         // Prepare success message
         if($scheduled_count > 0) {
@@ -472,11 +581,10 @@ function processAutoGeneration($is_extension = false, $selected_room_id = null) 
             
             $slot_usage = round(($scheduled_count / $total_slots) * 100, 1);
             
-            $schedule_info = "✅ SUCCESS! Filled $scheduled_count out of $total_slots available slots!\n\n";
-            $schedule_info .= "📅 For: $year_text\n";
-            $schedule_info .= "📍 All Classes in: $room_name\n";
-            $schedule_info .= "📊 Slot Utilization: $slot_usage% ($scheduled_count/$total_slots slots filled)\n";
-            $schedule_info .= "📚 Semester: $auto_semester $auto_academic_year\n\n";
+            $schedule_info = "✅ SUCCESS! Scheduled $scheduled_count classes for $year_text!\n\n";
+            $schedule_info .= "📍 Assigned Room: $room_name_to_use\n";
+            $schedule_info .= "📅 Academic Period: $auto_semester $auto_academic_year\n";
+            $schedule_info .= "📊 Slot Utilization: $slot_usage% ($scheduled_count/$total_slots slots filled)\n\n";
             
             // Organize schedule by day for better display
             $schedule_by_day = [];
@@ -491,7 +599,7 @@ function processAutoGeneration($is_extension = false, $selected_room_id = null) 
                     foreach($schedule_by_day[$day] as $session) {
                         $time_display = substr($session['time'], 0, 5) . '-' . substr($session['time'], 8, 5);
                         $schedule_info .= "  ⏰ $time_display: {$session['course_code']}\n";
-                        $schedule_info .= "     👨‍🏫 {$session['instructor']}\n";
+                        $schedule_info .= "     👨‍🏫 {$session['instructor']} | 📍 {$session['room']}\n";
                     }
                 } else {
                     $schedule_info .= "\n$day: No classes scheduled\n";
@@ -500,22 +608,30 @@ function processAutoGeneration($is_extension = false, $selected_room_id = null) 
             
             if($scheduled_count < $total_slots) {
                 $empty_slots = $total_slots - $scheduled_count;
-                $schedule_info .= "\n⚠️ Note: $empty_slots slot(s) could not be filled.\n";
+                $schedule_info .= "\n⚠️ Note: $empty_slots slot(s) could not be scheduled.\n";
                 $final_message_type = "warning";
             } else {
-                $schedule_info .= "\n🎉 ALL $total_slots slots successfully filled!\n";
-                $schedule_info .= "🏫 All classes are in: $room_name";
+                $schedule_info .= "\n🎉 ALL $total_slots slots successfully scheduled!\n";
+                $schedule_info .= "✅ All classes for $year_text are in: $room_name_to_use\n";
                 $final_message_type = "success";
+            }
+            
+            // Add note about room assignment if rooms were reused
+            if(in_array($room_to_use, $used_rooms_ids)) {
+                $schedule_info .= "\n💡 Note: This room is also used by other years. Consider adding more rooms.\n";
             }
             
             $final_message = $schedule_info;
         } else {
-            $final_message = "❌ ERROR: Could not schedule any courses.\n\n";
-            $final_message .= "🔍 Check if:\n";
-            $final_message .= "1. You have rooms in the system\n";
-            $final_message .= "2. You have instructors in your department\n";
-            $final_message .= "3. The selected courses exist\n\n";
-            $final_message .= "💡 Try adding rooms/instructors first, then try again.";
+            $final_message = "❌ ERROR: Could not schedule any courses for Year $auto_year.\n\n";
+            $final_message .= "🔍 Possible reasons:\n";
+            $final_message .= "1. All rooms are already assigned to other years\n";
+            $final_message .= "2. Time slot conflicts in available rooms\n";
+            $final_message .= "3. Some courses don't have instructors assigned\n\n";
+            $final_message .= "💡 Try:\n";
+            $final_message .= "- Adding more rooms to the system\n";
+            $final_message .= "- Using the room selection dropdown to force a specific room\n";
+            $final_message .= "- Clearing all schedules first and starting fresh\n";
             $final_message_type = "error";
         }
 
@@ -537,7 +653,6 @@ function processAutoGeneration($is_extension = false, $selected_room_id = null) 
         exit;
     }
 }
-
 // ---------------- FETCH DATA ----------------
 // Fetch courses for the department
 $courses_stmt = $pdo->prepare("SELECT * FROM courses WHERE department_id = ? ORDER BY course_name");
@@ -2241,7 +2356,7 @@ foreach($recent_schedules as $schedule){
                 <div><strong>Extension Students (Extension Year 1-5):</strong> Saturday & Sunday only | Time Slots: 2:30-4:00, 4:30-6:00, 8:00-11:00</div>
                 <div><strong>Total Weekday Slots:</strong> 15 (5 days × 3 time slots)</div>
                 <div><strong>Total Weekend Slots:</strong> 6 (2 days × 3 time slots)</div>
-                <div><strong>Important:</strong> All classes will be scheduled in the SAME room</div>
+                <div><strong>Room Assignment:</strong> Each year gets a unique room when possible</div>
             </div>
 
             <!-- Course Information -->
@@ -2317,11 +2432,11 @@ foreach($recent_schedules as $schedule){
                         
                         <!-- Room Selection Section -->
                         <div class="room-selection">
-                            <h6><i class="fas fa-door-open"></i> Room Selection (All classes will use the same room)</h6>
+                            <h6><i class="fas fa-door-open"></i> Room Selection (All classes for this year will use the same room)</h6>
                             <div class="room-options">
                                 <div class="room-option">
                                     <select name="room_id" id="room_id" class="form-control">
-                                        <option value="">Auto-select first available classroom</option>
+                                        <option value="">Auto-select available room</option>
                                         <?php foreach($all_rooms as $room): 
                                             $room_type = $room['room_type'];
                                             $type_display = ucfirst($room_type);
@@ -2335,8 +2450,8 @@ foreach($recent_schedules as $schedule){
                                 </div>
                             </div>
                             <div class="room-details">
-                                <span><i class="fas fa-info-circle"></i> Leave empty to auto-select first classroom</span>
-                                <span><i class="fas fa-check-circle"></i> All classes will be in the same room</span>
+                                <span><i class="fas fa-info-circle"></i> System will avoid rooms used by other years</span>
+                                <span><i class="fas fa-check-circle"></i> All classes for this year will be in the same room</span>
                             </div>
                         </div>
                         
@@ -2352,7 +2467,7 @@ foreach($recent_schedules as $schedule){
                         </div>
                         
                         <div class="tip-box">
-                            <small><i class="fas fa-lightbulb"></i> <strong>Tip:</strong> All selected courses will be scheduled in the SAME room across all time slots. This ensures consistency and avoids room conflicts.</small>
+                            <small><i class="fas fa-lightbulb"></i> <strong>Tip:</strong> Each year will be assigned a different room when possible. If you schedule Year 1 in Room 101, Year 2 will automatically use a different room.</small>
                         </div>
                     </form>
                 </div>
