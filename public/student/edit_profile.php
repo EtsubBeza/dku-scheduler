@@ -12,6 +12,45 @@ include __DIR__ . '/../includes/darkmode.php';
 
 $student_id = $_SESSION['user_id'];
 
+// Function to validate username
+function validateUsername($username) {
+    // Trim whitespace
+    $username = trim($username);
+    
+    // Check if empty
+    if (empty($username)) {
+        return "Username is required!";
+    }
+    
+    // Check if it contains only numbers
+    if (preg_match('/^[0-9\s]+$/', $username)) {
+        return "Username cannot contain only numbers! Please use letters or a combination of letters and numbers.";
+    }
+    
+    // Check if it's too short (minimum 3 characters after removing spaces)
+    if (strlen(str_replace(' ', '', $username)) < 3) {
+        return "Username is too short! Minimum 3 characters required.";
+    }
+    
+    // Check if it's too long
+    if (strlen($username) > 50) {
+        return "Username is too long! Maximum 50 characters allowed.";
+    }
+    
+    // Check for invalid characters (allow letters, numbers, underscore, and hyphen)
+    if (!preg_match('/^[A-Za-z0-9_\-]+$/', $username)) {
+        return "Username contains invalid characters! Only letters, numbers, underscore (_) and hyphen (-) are allowed. No spaces.";
+    }
+    
+    // Check if it starts with a letter
+    if (!preg_match('/^[A-Za-z]/', $username)) {
+        return "Username must start with a letter!";
+    }
+    
+    // Valid username
+    return true;
+}
+
 // Fetch current user info - INCLUDING EMAIL
 $user_stmt = $pdo->prepare("SELECT username, email, profile_picture FROM users WHERE user_id = ?");
 $user_stmt->execute([$_SESSION['user_id']]);
@@ -66,76 +105,98 @@ if($_SERVER['REQUEST_METHOD'] == 'POST'){
         $email = trim($_POST['email']);
         $fileName = $user['profile_picture'] ?? ''; // Keep existing by default
         
+        // Validate username first
+        $username_validation = validateUsername($username);
+        if ($username_validation !== true) {
+            $message = $username_validation;
+            $message_type = 'error';
+        }
         // Email validation
-        if(!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        elseif(!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $message = "Please enter a valid email address!";
             $message_type = 'error';
         } else {
-            // Profile picture upload
-            if(isset($_FILES['profile_picture']) && $_FILES['profile_picture']['error'] == UPLOAD_ERR_OK) {
-                $upload_dir = __DIR__ . '/../uploads/';
-                
-                // Create uploads directory if it doesn't exist
-                if(!is_dir($upload_dir)) {
-                    mkdir($upload_dir, 0755, true);
-                }
-                
-                // Get file info
-                $file_name = $_FILES['profile_picture']['name'];
-                $file_tmp = $_FILES['profile_picture']['tmp_name'];
-                $file_size = $_FILES['profile_picture']['size'];
-                
-                // Validate file size (2MB = 2097152 bytes)
-                if ($file_size > 2097152) {
-                    $message = "File is too large. Maximum size is 2MB.";
-                    $message_type = 'error';
-                } else {
-                    // Validate file type
-                    $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-                    $file_type = mime_content_type($file_tmp);
+            // Check if username already exists (excluding current student)
+            $username_check = $pdo->prepare("SELECT user_id FROM users WHERE username = ? AND user_id != ?");
+            $username_check->execute([$username, $student_id]);
+            if($username_check->fetch()){
+                $message = "Username is already taken. Please choose a different username.";
+                $message_type = 'error';
+            }
+            // Check if email already exists (excluding current student)
+            elseif($pdo->prepare("SELECT user_id FROM users WHERE email = ? AND user_id != ?")->execute([$email, $student_id]) && 
+                  $pdo->prepare("SELECT user_id FROM users WHERE email = ? AND user_id != ?")->fetch()){
+                $message = "Email address is already in use. Please use a different email.";
+                $message_type = 'error';
+            } else {
+                // Profile picture upload
+                if(isset($_FILES['profile_picture']) && $_FILES['profile_picture']['error'] == UPLOAD_ERR_OK) {
+                    $upload_dir = __DIR__ . '/../uploads/';
                     
-                    if(in_array($file_type, $allowed_types)) {
-                        // Generate unique filename
-                        $file_extension = pathinfo($file_name, PATHINFO_EXTENSION);
-                        $fileName = time() . '_' . uniqid() . '.' . $file_extension;
+                    // Create uploads directory if it doesn't exist
+                    if(!is_dir($upload_dir)) {
+                        mkdir($upload_dir, 0755, true);
+                    }
+                    
+                    // Get file info
+                    $file_name = $_FILES['profile_picture']['name'];
+                    $file_tmp = $_FILES['profile_picture']['tmp_name'];
+                    $file_size = $_FILES['profile_picture']['size'];
+                    
+                    // Validate file size (2MB = 2097152 bytes)
+                    if ($file_size > 2097152) {
+                        $message = "File is too large. Maximum size is 2MB.";
+                        $message_type = 'error';
+                    } else {
+                        // Validate file type
+                        $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+                        $file_type = mime_content_type($file_tmp);
                         
-                        // Move uploaded file
-                        if(move_uploaded_file($file_tmp, $upload_dir . $fileName)) {
-                            // Delete old profile picture if it exists and is not default
-                            if(!empty($user['profile_picture']) && 
-                               $user['profile_picture'] != 'default_profile.png' && 
-                               file_exists($upload_dir . $user['profile_picture'])) {
-                                unlink($upload_dir . $user['profile_picture']);
+                        if(in_array($file_type, $allowed_types)) {
+                            // Generate unique filename
+                            $file_extension = pathinfo($file_name, PATHINFO_EXTENSION);
+                            $fileName = time() . '_' . uniqid() . '.' . $file_extension;
+                            
+                            // Move uploaded file
+                            if(move_uploaded_file($file_tmp, $upload_dir . $fileName)) {
+                                // Delete old profile picture if it exists and is not default
+                                if(!empty($user['profile_picture']) && 
+                                   $user['profile_picture'] != 'default_profile.png' && 
+                                   file_exists($upload_dir . $user['profile_picture'])) {
+                                    unlink($upload_dir . $user['profile_picture']);
+                                }
+                            } else {
+                                $fileName = $user['profile_picture'] ?? '';
+                                $message = "Error uploading profile picture. Please try again.";
+                                $message_type = 'error';
                             }
                         } else {
                             $fileName = $user['profile_picture'] ?? '';
-                            $message = "Error uploading profile picture. Please try again.";
+                            $message = "Invalid file type. Please upload JPEG, PNG, GIF, or WebP images only.";
                             $message_type = 'error';
                         }
+                    }
+                }
+                
+                // Update user in database if no errors
+                if($message_type !== 'error') {
+                    $update = $pdo->prepare("UPDATE users SET username = ?, email = ?, profile_picture = ? WHERE user_id = ?");
+                    if($update->execute([$username, $email, $fileName, $student_id])) {
+                        $message = "Profile updated successfully!";
+                        $message_type = 'success';
+                        
+                        // Update user array with new data
+                        $user['username'] = $username;
+                        $user['email'] = $email;
+                        $user['profile_picture'] = $fileName;
+                        
+                        // Update profile image path
+                        $profile_img_path = getProfilePicturePath($fileName);
                     } else {
-                        $fileName = $user['profile_picture'] ?? '';
-                        $message = "Invalid file type. Please upload JPEG, PNG, GIF, or WebP images only.";
+                        $message = "Error updating profile. Please try again.";
                         $message_type = 'error';
                     }
                 }
-            }
-            
-            // Update user in database
-            $update = $pdo->prepare("UPDATE users SET username = ?, email = ?, profile_picture = ? WHERE user_id = ?");
-            if($update->execute([$username, $email, $fileName, $student_id])) {
-                $message = "Profile updated successfully!";
-                $message_type = 'success';
-                
-                // Update user array with new data
-                $user['username'] = $username;
-                $user['email'] = $email;
-                $user['profile_picture'] = $fileName;
-                
-                // Update profile image path
-                $profile_img_path = getProfilePicturePath($fileName);
-            } else {
-                $message = "Error updating profile. Please try again.";
-                $message_type = 'error';
             }
         }
         
@@ -710,6 +771,13 @@ $current_page = basename($_SERVER['PHP_SELF']);
     box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
 }
 
+.btn-submit:disabled {
+    background: #6b7280 !important;
+    cursor: not-allowed;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
 /* Password Requirements */
 .password-requirements {
     background: var(--bg-secondary);
@@ -739,6 +807,24 @@ $current_page = basename($_SERVER['PHP_SELF']);
 }
 
 /* ================= Validation Styles ================= */
+/* Username validation */
+.username-feedback {
+    font-size: 0.875rem;
+    margin-top: 5px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: 500;
+}
+
+.username-success {
+    color: #10b981;
+}
+
+.username-error {
+    color: #dc2626;
+}
+
 /* Password strength meter */
 .password-strength-container {
     margin-top: 5px;
@@ -1172,7 +1258,13 @@ input.invalid {
                         <div class="form-group">
                             <label for="username">Username</label>
                             <input type="text" id="username" name="username" class="form-control" 
-                                   value="<?= htmlspecialchars($user['username'] ?? '') ?>" required>
+                                   value="<?= htmlspecialchars($user['username'] ?? '') ?>" 
+                                   required 
+                                   pattern="[A-Za-z][A-Za-z0-9_-]{2,49}"
+                                   title="Username must start with a letter, be 3-50 characters long, and can only contain letters, numbers, underscore (_) and hyphen (-)."
+                                   oninput="validateUsername()">
+                            <div class="username-feedback" id="username-feedback"></div>
+                            <div class="form-tip">Start with a letter • 3-50 characters • Letters, numbers, _, - only</div>
                         </div>
                         
                         <div class="form-group">
@@ -1307,6 +1399,7 @@ input.invalid {
         console.log('Profile preview src:', document.getElementById('profilePreview').src);
         
         // Initialize validation
+        validateUsername();
         validateEmail();
         validatePassword();
     });
@@ -1362,6 +1455,66 @@ input.invalid {
         }
     }
 
+    // Username validation
+    function validateUsername() {
+        const usernameInput = document.getElementById('username');
+        const username = usernameInput.value.trim();
+        const feedback = document.getElementById('username-feedback');
+        
+        usernameInput.classList.remove('valid', 'invalid');
+        feedback.innerHTML = '';
+        
+        if (!username) {
+            updateProfileSubmitButton();
+            return;
+        }
+        
+        // Check if it contains only numbers
+        if (/^[0-9\s]+$/.test(username)) {
+            usernameInput.classList.add('invalid');
+            feedback.innerHTML = '<span class="username-error"><i class="fas fa-exclamation-circle"></i> Username cannot contain only numbers!</span>';
+            updateProfileSubmitButton();
+            return;
+        }
+        
+        // Check length (minimum 3 characters after removing spaces)
+        if (username.replace(/\s+/g, '').length < 3) {
+            usernameInput.classList.add('invalid');
+            feedback.innerHTML = '<span class="username-error"><i class="fas fa-exclamation-circle"></i> Username is too short! Minimum 3 characters required.</span>';
+            updateProfileSubmitButton();
+            return;
+        }
+        
+        // Check maximum length
+        if (username.length > 50) {
+            usernameInput.classList.add('invalid');
+            feedback.innerHTML = '<span class="username-error"><i class="fas fa-exclamation-circle"></i> Username is too long! Maximum 50 characters allowed.</span>';
+            updateProfileSubmitButton();
+            return;
+        }
+        
+        // Check for invalid characters
+        if (!/^[A-Za-z0-9_\-]+$/.test(username)) {
+            usernameInput.classList.add('invalid');
+            feedback.innerHTML = '<span class="username-error"><i class="fas fa-exclamation-circle"></i> Invalid characters! Only letters, numbers, underscore (_) and hyphen (-) are allowed.</span>';
+            updateProfileSubmitButton();
+            return;
+        }
+        
+        // Check if it starts with a letter
+        if (!/^[A-Za-z]/.test(username)) {
+            usernameInput.classList.add('invalid');
+            feedback.innerHTML = '<span class="username-error"><i class="fas fa-exclamation-circle"></i> Username must start with a letter!</span>';
+            updateProfileSubmitButton();
+            return;
+        }
+        
+        // Valid username
+        usernameInput.classList.add('valid');
+        feedback.innerHTML = '<span class="username-success"><i class="fas fa-check-circle"></i> Valid username</span>';
+        updateProfileSubmitButton();
+    }
+
     // Email validation
     function validateEmail() {
         const emailInput = document.getElementById('email');
@@ -1373,6 +1526,7 @@ input.invalid {
         
         if (!email) {
             emailValidation.innerHTML = '';
+            updateProfileSubmitButton();
             return;
         }
         
@@ -1463,6 +1617,7 @@ input.invalid {
         if (newPassword.value === '' || confirmPassword.value === '') {
             passwordMatch.textContent = '';
             passwordMatch.className = 'password-match';
+            updatePasswordSubmitButton();
             return;
         }
         
@@ -1483,20 +1638,50 @@ input.invalid {
 
     // Update profile submit button state
     function updateProfileSubmitButton() {
-        const emailInput = document.getElementById('email');
         const usernameInput = document.getElementById('username');
+        const emailInput = document.getElementById('email');
         const submitBtn = document.getElementById('profileSubmitBtn');
         
-        // Check if email is valid
+        const username = usernameInput.value.trim();
         const email = emailInput.value.trim();
+        
+        // Validate username
+        if (!username) {
+            submitBtn.disabled = true;
+            return;
+        }
+        
+        if (/^[0-9\s]+$/.test(username)) {
+            submitBtn.disabled = true;
+            return;
+        }
+        
+        if (username.replace(/\s+/g, '').length < 3) {
+            submitBtn.disabled = true;
+            return;
+        }
+        
+        if (username.length > 50) {
+            submitBtn.disabled = true;
+            return;
+        }
+        
+        if (!/^[A-Za-z0-9_\-]+$/.test(username)) {
+            submitBtn.disabled = true;
+            return;
+        }
+        
+        if (!/^[A-Za-z]/.test(username)) {
+            submitBtn.disabled = true;
+            return;
+        }
+        
+        // Validate email
         const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
         const emailValid = emailRegex.test(email);
         
-        // Check if username is filled
-        const usernameValid = usernameInput.value.trim() !== '';
-        
         // Enable button only if both are valid
-        submitBtn.disabled = !(emailValid && usernameValid);
+        submitBtn.disabled = !(username && emailValid);
     }
 
     // Update password submit button state
@@ -1551,6 +1736,37 @@ input.invalid {
         if (!username || !email) {
             e.preventDefault();
             alert('Please fill in all required fields');
+            return false;
+        }
+        
+        // Username validation
+        if (/^[0-9\s]+$/.test(username)) {
+            e.preventDefault();
+            alert('Username cannot contain only numbers! Please use letters or a combination of letters and numbers.');
+            return false;
+        }
+        
+        if (username.replace(/\s+/g, '').length < 3) {
+            e.preventDefault();
+            alert('Username is too short! Minimum 3 characters required.');
+            return false;
+        }
+        
+        if (username.length > 50) {
+            e.preventDefault();
+            alert('Username is too long! Maximum 50 characters allowed.');
+            return false;
+        }
+        
+        if (!/^[A-Za-z0-9_\-]+$/.test(username)) {
+            e.preventDefault();
+            alert('Username contains invalid characters! Only letters, numbers, underscore (_) and hyphen (-) are allowed.');
+            return false;
+        }
+        
+        if (!/^[A-Za-z]/.test(username)) {
+            e.preventDefault();
+            alert('Username must start with a letter!');
             return false;
         }
         
@@ -1635,7 +1851,7 @@ input.invalid {
     
     // Add event listeners for real-time validation
     document.getElementById('email').addEventListener('input', validateEmail);
-    document.getElementById('username').addEventListener('input', updateProfileSubmitButton);
+    document.getElementById('username').addEventListener('input', validateUsername);
     document.getElementById('current_password').addEventListener('input', updatePasswordSubmitButton);
     document.getElementById('new_password').addEventListener('input', function() {
         validatePassword();

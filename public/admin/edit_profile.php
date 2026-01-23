@@ -25,6 +25,45 @@ if(!$current_user){
     exit;
 }
 
+// Function to validate username
+function validateUsername($username) {
+    // Trim whitespace
+    $username = trim($username);
+    
+    // Check if empty
+    if (empty($username)) {
+        return "Username is required!";
+    }
+    
+    // Check if it contains only numbers
+    if (preg_match('/^[0-9\s]+$/', $username)) {
+        return "Username cannot contain only numbers! Please use letters or a combination of letters and numbers.";
+    }
+    
+    // Check if it's too short (minimum 3 characters after removing spaces)
+    if (strlen(str_replace(' ', '', $username)) < 3) {
+        return "Username is too short! Minimum 3 characters required.";
+    }
+    
+    // Check if it's too long
+    if (strlen($username) > 50) {
+        return "Username is too long! Maximum 50 characters allowed.";
+    }
+    
+    // Check for invalid characters (allow letters, numbers, underscore, and hyphen)
+    if (!preg_match('/^[A-Za-z0-9_\-]+$/', $username)) {
+        return "Username contains invalid characters! Only letters, numbers, underscore (_) and hyphen (-) are allowed. No spaces.";
+    }
+    
+    // Check if it starts with a letter
+    if (!preg_match('/^[A-Za-z]/', $username)) {
+        return "Username must start with a letter!";
+    }
+    
+    // Valid username
+    return true;
+}
+
 // Get pending approvals count
 try {
     // Check if is_approved column exists
@@ -103,8 +142,14 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
     // Validation
     $errors = [];
     
-    if(empty($username) || empty($email)) {
-        $errors[] = "Please fill in all required fields.";
+    // Validate username
+    $username_validation = validateUsername($username);
+    if ($username_validation !== true) {
+        $errors[] = $username_validation;
+    }
+    
+    if(empty($email)) {
+        $errors[] = "Email is required.";
     }
     
     if(!filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -773,6 +818,44 @@ try {
     color: var(--text-secondary);
 }
 
+/* Username Validation Feedback */
+.username-feedback {
+    font-size: 0.875rem;
+    margin-top: 5px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: 500;
+}
+
+.username-success {
+    color: #10b981;
+}
+
+.username-error {
+    color: #dc2626;
+}
+
+.username-checking {
+    color: #f59e0b;
+}
+
+/* Input Validation States */
+input.valid {
+    border-color: #10b981 !important;
+    background: linear-gradient(90deg, var(--bg-input), #d1fae5) !important;
+}
+
+input.invalid {
+    border-color: #dc2626 !important;
+    background: linear-gradient(90deg, var(--bg-input), #fee2e2) !important;
+}
+
+input.checking {
+    border-color: #f59e0b !important;
+    background: linear-gradient(90deg, var(--bg-input), #fef3c7) !important;
+}
+
 /* Password Fields */
 .password-field {
     position: relative;
@@ -1218,7 +1301,13 @@ try {
                             <div class="form-group">
                                 <label for="username">Username <span class="required">*</span></label>
                                 <input type="text" id="username" name="username" class="form-control" 
-                                       value="<?= htmlspecialchars($current_user['username'] ?? '') ?>" required>
+                                       value="<?= htmlspecialchars($current_user['username'] ?? '') ?>" 
+                                       required
+                                       oninput="validateUsernameInput()"
+                                       pattern="[A-Za-z][A-Za-z0-9_-]{2,49}"
+                                       title="Username must start with a letter, be 3-50 characters long, and can only contain letters, numbers, underscore (_) and hyphen (-).">
+                                <div id="username-feedback" class="username-feedback"></div>
+                                <div class="form-tip">Start with a letter • 3-50 characters • Letters, numbers, _, - only</div>
                             </div>
                             
                             <div class="form-group">
@@ -1319,6 +1408,11 @@ try {
                 card.style.transform = 'translateY(0)';
             }, 300);
         });
+        
+        // Validate username on page load if there's an existing value
+        setTimeout(() => {
+            validateUsernameInput();
+        }, 100);
     });
 
     // Confirm logout
@@ -1383,6 +1477,59 @@ try {
         }
     }, 5000);
 
+    // Username validation
+    function validateUsernameInput() {
+        const usernameInput = document.getElementById('username');
+        const username = usernameInput.value.trim();
+        const feedback = document.getElementById('username-feedback');
+        
+        usernameInput.classList.remove('valid', 'invalid');
+        feedback.innerHTML = '';
+        
+        if (!username) {
+            return;
+        }
+        
+        // Check if it contains only numbers
+        if (/^[0-9\s]+$/.test(username)) {
+            usernameInput.classList.add('invalid');
+            feedback.innerHTML = '<span class="username-error"><i class="fas fa-exclamation-circle"></i> Username cannot contain only numbers!</span>';
+            return;
+        }
+        
+        // Check length (minimum 3 characters after removing spaces)
+        if (username.replace(/\s+/g, '').length < 3) {
+            usernameInput.classList.add('invalid');
+            feedback.innerHTML = '<span class="username-error"><i class="fas fa-exclamation-circle"></i> Username is too short! Minimum 3 characters required.</span>';
+            return;
+        }
+        
+        // Check maximum length
+        if (username.length > 50) {
+            usernameInput.classList.add('invalid');
+            feedback.innerHTML = '<span class="username-error"><i class="fas fa-exclamation-circle"></i> Username is too long! Maximum 50 characters allowed.</span>';
+            return;
+        }
+        
+        // Check for invalid characters
+        if (!/^[A-Za-z0-9_\-]+$/.test(username)) {
+            usernameInput.classList.add('invalid');
+            feedback.innerHTML = '<span class="username-error"><i class="fas fa-exclamation-circle"></i> Invalid characters! Only letters, numbers, underscore (_) and hyphen (-) are allowed.</span>';
+            return;
+        }
+        
+        // Check if it starts with a letter
+        if (!/^[A-Za-z]/.test(username)) {
+            usernameInput.classList.add('invalid');
+            feedback.innerHTML = '<span class="username-error"><i class="fas fa-exclamation-circle"></i> Username must start with a letter!</span>';
+            return;
+        }
+        
+        // Valid username
+        usernameInput.classList.add('valid');
+        feedback.innerHTML = '<span class="username-success"><i class="fas fa-check-circle"></i> Valid username</span>';
+    }
+
     // Form validation
     document.getElementById('profileForm').addEventListener('submit', function(e) {
         const username = document.getElementById('username').value.trim();
@@ -1395,6 +1542,37 @@ try {
         if (!username || !email) {
             e.preventDefault();
             showAlert('Please fill in all required fields', 'error');
+            return false;
+        }
+        
+        // Username validation
+        if (/^[0-9\s]+$/.test(username)) {
+            e.preventDefault();
+            showAlert('Username cannot contain only numbers! Please use letters or a combination of letters and numbers.', 'error');
+            return false;
+        }
+        
+        if (username.replace(/\s+/g, '').length < 3) {
+            e.preventDefault();
+            showAlert('Username is too short! Minimum 3 characters required.', 'error');
+            return false;
+        }
+        
+        if (username.length > 50) {
+            e.preventDefault();
+            showAlert('Username is too long! Maximum 50 characters allowed.', 'error');
+            return false;
+        }
+        
+        if (!/^[A-Za-z0-9_\-]+$/.test(username)) {
+            e.preventDefault();
+            showAlert('Username contains invalid characters! Only letters, numbers, underscore (_) and hyphen (-) are allowed.', 'error');
+            return false;
+        }
+        
+        if (!/^[A-Za-z]/.test(username)) {
+            e.preventDefault();
+            showAlert('Username must start with a letter!', 'error');
             return false;
         }
         

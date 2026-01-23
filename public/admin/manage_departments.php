@@ -62,6 +62,54 @@ $profile_img_path = getAdminProfilePicturePath($current_user['profile_picture'] 
 $message = "";
 $message_type = "success";
 
+// Fetch all colleges
+$colleges_stmt = $pdo->query("SELECT * FROM colleges ORDER BY category, college_name");
+$colleges = $colleges_stmt->fetchAll();
+
+// Organize colleges by category
+$colleges_by_category = [
+    'Natural' => [],
+    'Social' => []
+];
+
+foreach($colleges as $college){
+    $colleges_by_category[$college['category']][] = $college;
+}
+
+// Function to validate department name (no numbers allowed)
+function validateDepartmentName($name) {
+    // Remove any extra whitespace
+    $name = trim($name);
+    
+    // Check if name is empty
+    if (empty($name)) {
+        return "Department name cannot be empty";
+    }
+    
+    // Check if name contains any numbers
+    if (preg_match('/[0-9]/', $name)) {
+        return "Department name cannot contain numbers";
+    }
+    
+    // Check if name contains only letters, spaces, hyphens, apostrophes, and periods
+    if (!preg_match('/^[A-Za-z\s\-\'\.]+$/u', $name)) {
+        return "Department name can only contain letters, spaces, hyphens (-), apostrophes ('), and periods (.)";
+    }
+    
+    // Check minimum length
+    if (strlen($name) < 2) {
+        return "Department name must be at least 2 characters long";
+    }
+    
+    // Check maximum length
+    if (strlen($name) > 100) {
+        return "Department name cannot exceed 100 characters";
+    }
+    
+    // All validations passed
+    return true;
+}
+
 // Add Department
 if(isset($_POST['add_department'])){
     // CSRF validation
@@ -70,33 +118,39 @@ if(isset($_POST['add_department'])){
         $message_type = "error";
     } else {
         $department_name = trim($_POST['department_name']);
-        $department_code = trim($_POST['department_code']);
         $category = trim($_POST['category']);
         $description = trim($_POST['description'] ?? '');
+        $college_id = !empty($_POST['college_id']) ? (int)$_POST['college_id'] : null;
         
-        // Validate inputs
-        if(empty($department_name) || empty($department_code) || empty($category)){
+        // Validate department name
+        $nameValidation = validateDepartmentName($department_name);
+        if ($nameValidation !== true) {
+            $message = "Error: " . $nameValidation;
+            $message_type = "error";
+        }
+        // Validate other inputs
+        elseif(empty($category)){
             $message = "All required fields must be filled!";
             $message_type = "error";
         } else {
             try {
-                // Check if department code already exists
-                $check_stmt = $pdo->prepare("SELECT department_id FROM departments WHERE department_code = ?");
-                $check_stmt->execute([strtoupper($department_code)]);
+                // Check if department name already exists
+                $check_stmt = $pdo->prepare("SELECT department_id FROM departments WHERE department_name = ?");
+                $check_stmt->execute([$department_name]);
                 $exists = $check_stmt->fetch();
                 
                 if($exists){
-                    $message = "Error: Department code '$department_code' already exists!";
+                    $message = "Error: Department '$department_name' already exists!";
                     $message_type = "error";
                 } else {
                     $stmt = $pdo->prepare("INSERT INTO departments 
-                        (department_name, department_code, category, description) 
+                        (department_name, category, description, college_id) 
                         VALUES (?, ?, ?, ?)");
                     $stmt->execute([
                         $department_name, 
-                        strtoupper($department_code), 
                         $category, 
-                        $description
+                        $description,
+                        $college_id
                     ]);
                     $message = "Department added successfully!";
                     $message_type = "success";
@@ -118,33 +172,39 @@ if(isset($_POST['edit_department'])){
     } else {
         $department_id = (int)$_POST['department_id'];
         $department_name = trim($_POST['department_name']);
-        $department_code = trim($_POST['department_code']);
         $category = trim($_POST['category']);
         $description = trim($_POST['description'] ?? '');
+        $college_id = !empty($_POST['college_id']) ? (int)$_POST['college_id'] : null;
         
-        // Validate inputs
-        if(empty($department_name) || empty($department_code) || empty($category)){
+        // Validate department name
+        $nameValidation = validateDepartmentName($department_name);
+        if ($nameValidation !== true) {
+            $message = "Error: " . $nameValidation;
+            $message_type = "error";
+        }
+        // Validate other inputs
+        elseif(empty($category)){
             $message = "All required fields must be filled!";
             $message_type = "error";
         } else {
             try {
-                // Check if department code already exists (excluding current department)
-                $check_stmt = $pdo->prepare("SELECT department_id FROM departments WHERE department_code = ? AND department_id != ?");
-                $check_stmt->execute([strtoupper($department_code), $department_id]);
+                // Check if department name already exists (excluding current department)
+                $check_stmt = $pdo->prepare("SELECT department_id FROM departments WHERE department_name = ? AND department_id != ?");
+                $check_stmt->execute([$department_name, $department_id]);
                 $exists = $check_stmt->fetch();
                 
                 if($exists){
-                    $message = "Error: Department code '$department_code' already exists!";
+                    $message = "Error: Department '$department_name' already exists!";
                     $message_type = "error";
                 } else {
                     $stmt = $pdo->prepare("UPDATE departments SET 
-                        department_name=?, department_code=?, category=?, description=?
+                        department_name=?, category=?, description=?, college_id=?
                         WHERE department_id=?");
                     $stmt->execute([
                         $department_name, 
-                        strtoupper($department_code), 
                         $category, 
                         $description,
+                        $college_id,
                         $department_id
                     ]);
                     $message = "Department updated successfully!";
@@ -303,13 +363,21 @@ if(isset($_GET['edit'])){
     $edit_department = $stmt->fetch();
 }
 
+// Get selected college for edit mode
+$selected_college_id = null;
+if(isset($edit_department) && isset($edit_department['college_id'])) {
+    $selected_college_id = $edit_department['college_id'];
+}
+
 // Fetch all departments with head information
 $departments = $pdo->query("
     SELECT d.*, 
+           c.college_name,
            u.user_id as head_id, 
            u.username as head_name,
            u.email as head_email
     FROM departments d
+    LEFT JOIN colleges c ON d.college_id = c.college_id
     LEFT JOIN users u ON d.department_id = u.department_id AND u.role = 'department_head'
     ORDER BY d.category, d.department_name
 ")->fetchAll();
@@ -866,6 +934,16 @@ $current_page = basename($_SERVER['PHP_SELF']);
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
+/* Validation error message */
+.validation-error {
+    color: #ef4444;
+    font-size: 0.85rem;
+    margin-top: 5px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
 /* Button Styles */
 .btn {
     padding: 14px 24px;
@@ -1032,6 +1110,22 @@ $current_page = basename($_SERVER['PHP_SELF']);
     color: var(--text-secondary);
     font-style: italic;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* College Badge */
+.college-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    background: #6366f1;
+    color: white;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    margin-top: 5px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* Action Buttons */
@@ -1442,30 +1536,39 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
                         <input type="hidden" name="department_id" value="<?= $edit_department['department_id'] ?? '' ?>">
                         
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="department_name" class="required">Department Name</label>
-                                <input type="text" name="department_name" id="department_name" class="form-control" 
-                                       placeholder="e.g., Computer Science" required
-                                       value="<?= htmlspecialchars($edit_department['department_name'] ?? '') ?>">
-                            </div>
-                            <div class="form-group">
-                                <label for="department_code" class="required">Department Code</label>
-                                <input type="text" name="department_code" id="department_code" class="form-control" 
-                                       placeholder="e.g., CS" required
-                                       value="<?= htmlspecialchars($edit_department['department_code'] ?? '') ?>">
-                                <small class="form-info">Unique code for the department (2-6 characters)</small>
-                            </div>
+                        <div class="form-group">
+                            <label for="department_name" class="required">Department Name</label>
+                            <input type="text" name="department_name" id="department_name" class="form-control" 
+                                   placeholder="e.g., Computer Science" required
+                                   value="<?= htmlspecialchars($edit_department['department_name'] ?? '') ?>">
+                            <div class="form-info">Only letters, spaces, hyphens (-), apostrophes ('), and periods (.) allowed. No numbers.</div>
+                            <?php if(isset($_POST['add_department']) || isset($_POST['edit_department'])): ?>
+                                <?php if(isset($message) && $message_type === 'error'): ?>
+                                    <div class="validation-error">
+                                        <i class="fas fa-exclamation-circle"></i>
+                                        <?= htmlspecialchars($message) ?>
+                                    </div>
+                                <?php endif; ?>
+                            <?php endif; ?>
                         </div>
 
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="category" class="required">Category</label>
-                                <select name="category" id="category" class="form-control" required>
+                                <select name="category" id="category" class="form-control" required onchange="updateCollegeOptions()">
                                     <option value="">Select Category</option>
                                     <option value="Natural" <?= (isset($edit_department) && $edit_department['category']=='Natural')?'selected':'' ?>>Natural Sciences</option>
                                     <option value="Social" <?= (isset($edit_department) && $edit_department['category']=='Social')?'selected':'' ?>>Social Sciences</option>
                                 </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="college_id">College</label>
+                                <select name="college_id" id="college_id" class="form-control">
+                                    <option value="">Select College</option>
+                                    <!-- Colleges will be loaded dynamically based on category -->
+                                </select>
+                                <div class="form-info">Select the college this department belongs to</div>
                             </div>
                         </div>
 
@@ -1502,9 +1605,10 @@ $current_page = basename($_SERVER['PHP_SELF']);
                             <table class="departments-table">
                                 <thead>
                                     <tr>
-                                        <th>Code</th>
+                                        <th>ID</th>
                                         <th>Department Name</th>
                                         <th>Category</th>
+                                        <th>College</th>
                                         <th>Department Head</th>
                                         <th>Actions</th>
                                     </tr>
@@ -1512,7 +1616,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                                 <tbody>
                                     <?php foreach($departments as $dept): ?>
                                     <tr>
-                                        <td data-label="Code"><strong><?= htmlspecialchars($dept['department_code']) ?></strong></td>
+                                        <td data-label="ID"><strong>#<?= $dept['department_id'] ?></strong></td>
                                         <td data-label="Department Name">
                                             <?= htmlspecialchars($dept['department_name']) ?>
                                             <?php if(!empty($dept['description'])): ?>
@@ -1523,6 +1627,15 @@ $current_page = basename($_SERVER['PHP_SELF']);
                                             <span class="department-badge badge-<?= strtolower($dept['category']) ?>">
                                                 <?= $dept['category'] ?>
                                             </span>
+                                        </td>
+                                        <td data-label="College">
+                                            <?php if($dept['college_name']): ?>
+                                                <span class="college-badge" title="<?= htmlspecialchars($dept['college_name']) ?>">
+                                                    <?= htmlspecialchars($dept['college_name']) ?>
+                                                </span>
+                                            <?php else: ?>
+                                                <small class="form-info">Not assigned</small>
+                                            <?php endif; ?>
                                         </td>
                                         <td data-label="Department Head">
                                             <?php if($dept['head_id']): ?>
@@ -1630,6 +1743,15 @@ $current_page = basename($_SERVER['PHP_SELF']);
     </div>
 
     <script>
+    // College data from PHP (converted to JSON)
+    const collegesByCategory = {
+        'Natural': <?= json_encode($colleges_by_category['Natural'] ?? []) ?>,
+        'Social': <?= json_encode($colleges_by_category['Social'] ?? []) ?>
+    };
+
+    // Selected college for edit mode
+    const selectedCollegeId = <?= $selected_college_id ? json_encode($selected_college_id) : 'null' ?>;
+
     // Toggle sidebar
     function toggleSidebar() {
         const sidebar = document.getElementById('sidebar');
@@ -1668,28 +1790,67 @@ $current_page = basename($_SERVER['PHP_SELF']);
         }
     }
 
+    // Update college options based on selected category
+    function updateCollegeOptions() {
+        const category = document.getElementById('category').value;
+        const collegeSelect = document.getElementById('college_id');
+        
+        // Clear existing options except the first one
+        while(collegeSelect.options.length > 1) {
+            collegeSelect.remove(1);
+        }
+        
+        // If category is selected, add appropriate colleges
+        if(category && collegesByCategory[category]) {
+            collegesByCategory[category].forEach(college => {
+                const option = document.createElement('option');
+                option.value = college.college_id;
+                option.textContent = college.college_name;
+                collegeSelect.appendChild(option);
+            });
+            
+            // If editing, select the previously selected college
+            if(selectedCollegeId) {
+                collegeSelect.value = selectedCollegeId;
+            }
+        } else {
+            // If no category selected, show all colleges
+            Object.values(collegesByCategory).forEach(categoryColleges => {
+                categoryColleges.forEach(college => {
+                    const option = document.createElement('option');
+                    option.value = college.college_id;
+                    option.textContent = college.college_name;
+                    collegeSelect.appendChild(option);
+                });
+            });
+            
+            // If editing, select the previously selected college
+            if(selectedCollegeId) {
+                collegeSelect.value = selectedCollegeId;
+            }
+        }
+    }
+
     // Confirm delete with department name
     function confirmDelete(form, departmentName) {
         return confirm(`Are you sure you want to delete the department "${departmentName}"? This action cannot be undone.`);
     }
 
-    // Form validation
-    document.getElementById('departmentForm').addEventListener('submit', function(e) {
-        const departmentCode = document.getElementById('department_code').value.trim();
-        const departmentCodeRegex = /^[A-Za-z]{2,6}$/;
-        
-        if (!departmentCodeRegex.test(departmentCode)) {
-            e.preventDefault();
-            alert('Department code must be 2-6 letters only (e.g., CS, MATH)');
-            document.getElementById('department_code').focus();
-            return false;
-        }
-        
-        return true;
-    });
-
     // Initialize
     document.addEventListener('DOMContentLoaded', function() {
+        // Initialize college dropdown if category is already selected (edit mode)
+        const currentCategory = document.getElementById('category').value;
+        if(currentCategory) {
+            updateCollegeOptions();
+        }
+        
+        // Also update when form loads if we're in edit mode with a selected category
+        if(selectedCollegeId && currentCategory) {
+            setTimeout(() => {
+                updateCollegeOptions();
+            }, 100);
+        }
+        
         // Set active nav
         const currentPage = window.location.pathname.split('/').pop();
         document.querySelectorAll('.sidebar a').forEach(link => {
@@ -1727,14 +1888,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 e.preventDefault();
             }
         });
-        
-        // Auto-capitalize department code
-        const deptCodeInput = document.getElementById('department_code');
-        if(deptCodeInput) {
-            deptCodeInput.addEventListener('input', function() {
-                this.value = this.value.toUpperCase();
-            });
-        }
         
         // Initialize overlay and sidebar for mobile
         if (window.innerWidth <= 768) {

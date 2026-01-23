@@ -46,6 +46,33 @@ function getProfilePicturePath($profile_picture) {
     return '../assets/default_profile.png';
 }
 
+// Function to validate username - ONLY check it's not all numbers
+function validateUsername($username) {
+    $username = trim($username);
+    
+    // Check if empty
+    if (empty($username)) {
+        return ["isValid" => false, "message" => "Username cannot be empty."];
+    }
+    
+    // Check length
+    if (strlen($username) < 3) {
+        return ["isValid" => false, "message" => "Username must be at least 3 characters long."];
+    }
+    
+    if (strlen($username) > 50) {
+        return ["isValid" => false, "message" => "Username cannot exceed 50 characters."];
+    }
+    
+    // ONLY RESTRICTION: Check if it's only numbers
+    if (preg_match('/^\d+$/', $username)) {
+        return ["isValid" => false, "message" => "Username cannot consist only of numbers."];
+    }
+    
+    // That's it! Any other combination is allowed
+    return ["isValid" => true, "message" => "Valid username."];
+}
+
 // Get profile image path
 $profile_img_path = getProfilePicturePath($user['profile_picture'] ?? '');
 
@@ -59,11 +86,14 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
         $username = trim($_POST['username']);
         $email = trim($_POST['email']);
         
-        // Validation
-        if(empty($username) || empty($email)) {
-            $message = "Please fill in all required fields.";
+        // Validate username
+        $usernameValidation = validateUsername($username);
+        if (!$usernameValidation['isValid']) {
+            $message = "Error: " . $usernameValidation['message'];
             $message_type = "error";
-        } elseif(!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        }
+        // Email validation
+        elseif(!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $message = "Please enter a valid email address.";
             $message_type = "error";
         } else {
@@ -575,6 +605,58 @@ $current_page = basename($_SERVER['PHP_SELF']);
     background: var(--bg-card);
 }
 
+/* ================= Validation Styles ================= */
+/* Username validation */
+.username-validation {
+    font-size: 0.85rem;
+    margin-top: 5px;
+    font-weight: 500;
+    padding: 5px;
+    border-radius: 4px;
+}
+
+.username-valid {
+    background: var(--success-bg);
+    color: var(--success-text);
+    border: 1px solid var(--success-border);
+}
+
+.username-invalid {
+    background: var(--error-bg);
+    color: var(--error-text);
+    border: 1px solid var(--error-border);
+}
+
+/* Username requirements list */
+.username-requirements-list {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-top: 5px;
+    line-height: 1.4;
+}
+
+.username-requirements-list ul {
+    padding-left: 20px;
+    margin: 5px 0;
+}
+
+.username-requirements-list li {
+    margin-bottom: 3px;
+}
+
+.username-requirements-list li.valid {
+    color: #10b981;
+}
+
+.username-requirements-list li.invalid {
+    color: #dc2626;
+}
+
+.username-requirements-list li i {
+    margin-right: 5px;
+    font-size: 0.75rem;
+}
+
 /* Profile Picture Section */
 .profile-picture-section {
     text-align: center;
@@ -658,11 +740,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
 }
 
 .btn-submit:disabled {
-    opacity: 0.6;
+    background: #6b7280;
     cursor: not-allowed;
-}
-
-.btn-submit:disabled:hover {
     transform: none;
     box-shadow: none;
 }
@@ -695,7 +774,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
     line-height: 1.4;
 }
 
-/* ================= Validation Styles ================= */
 /* Password strength meter */
 .password-strength-container {
     margin-top: 5px;
@@ -764,14 +842,20 @@ $current_page = basename($_SERVER['PHP_SELF']);
     font-size: 0.85rem;
     margin-top: 5px;
     font-weight: 500;
+    padding: 5px;
+    border-radius: 4px;
 }
 
 .email-valid {
-    color: #10b981;
+    background: var(--success-bg);
+    color: var(--success-text);
+    border: 1px solid var(--success-border);
 }
 
 .email-invalid {
-    color: #dc2626;
+    background: var(--error-bg);
+    color: var(--error-text);
+    border: 1px solid var(--error-border);
 }
 
 /* Input Validation States */
@@ -797,11 +881,13 @@ input.invalid {
 .password-match.valid {
     background: var(--success-bg);
     color: var(--success-text);
+    border: 1px solid var(--success-border);
 }
 
 .password-match.invalid {
     background: var(--error-bg);
     color: var(--error-text);
+    border: 1px solid var(--error-border);
 }
 
 /* Password container with toggle */
@@ -1057,7 +1143,23 @@ input.invalid {
                         <div class="form-group">
                             <label for="username">Username</label>
                             <input type="text" id="username" name="username" class="form-control" 
-                                   value="<?= htmlspecialchars($user['username'] ?? '') ?>" required>
+                                   value="<?= htmlspecialchars($user['username'] ?? '') ?>" required oninput="validateUsername()">
+                            <div class="username-validation" id="username-validation"></div>
+                            
+                            <!-- Username requirements list -->
+                            <div class="username-requirements-list" id="username-requirements">
+                                <p>Username requirements:</p>
+                                <ul>
+                                    <li id="username-req-length" class="<?= (!empty($user['username']) && strlen($user['username']) >= 3) ? 'valid' : 'invalid'; ?>">
+                                        <i class="fas fa-<?= (!empty($user['username']) && strlen($user['username']) >= 3) ? 'check' : 'times'; ?>"></i> 
+                                        3-50 characters
+                                    </li>
+                                    <li id="username-req-not-only-numbers" class="<?= (!empty($user['username']) && !preg_match('/^\d+$/', $user['username'])) ? 'valid' : 'invalid'; ?>">
+                                        <i class="fas fa-<?= (!empty($user['username']) && !preg_match('/^\d+$/', $user['username'])) ? 'check' : 'times'; ?>"></i> 
+                                        Cannot be only numbers
+                                    </li>
+                                </ul>
+                            </div>
                         </div>
                         
                         <div class="form-group">
@@ -1188,6 +1290,7 @@ input.invalid {
         });
         
         // Initialize validation
+        validateUsername();
         validateEmail();
         validatePassword();
     });
@@ -1198,6 +1301,61 @@ input.invalid {
             e.preventDefault();
         }
     });
+
+    // Username validation - ONLY checks it's not all numbers
+    function validateUsername() {
+        const usernameInput = document.getElementById('username');
+        const usernameValidation = document.getElementById('username-validation');
+        const username = usernameInput.value.trim();
+        
+        // Update requirement indicators
+        updateUsernameRequirements(username);
+        
+        usernameInput.classList.remove('valid', 'invalid');
+        usernameValidation.innerHTML = '';
+        
+        if (!username) {
+            usernameValidation.innerHTML = '';
+            usernameInput.classList.remove('valid', 'invalid');
+            updateProfileSubmitButton();
+            return false;
+        }
+        
+        // Check length
+        if (username.length < 3 || username.length > 50) {
+            usernameInput.classList.add('invalid');
+            usernameValidation.innerHTML = '<span class="username-invalid"><i class="fas fa-exclamation-circle"></i> Username must be 3-50 characters long</span>';
+            updateProfileSubmitButton();
+            return false;
+        }
+        
+        // ONLY RESTRICTION: Check if it's only numbers
+        if (/^\d+$/.test(username)) {
+            usernameInput.classList.add('invalid');
+            usernameValidation.innerHTML = '<span class="username-invalid"><i class="fas fa-exclamation-circle"></i> Username cannot consist only of numbers</span>';
+            updateProfileSubmitButton();
+            return false;
+        }
+        
+        // That's it! Any other combination is valid
+        usernameInput.classList.add('valid');
+        usernameValidation.innerHTML = '<span class="username-valid"><i class="fas fa-check-circle"></i> Valid username</span>';
+        updateProfileSubmitButton();
+        return true;
+    }
+    
+    // Update username requirement indicators
+    function updateUsernameRequirements(username) {
+        // Length requirement
+        const lengthValid = username.length >= 3 && username.length <= 50;
+        document.getElementById('username-req-length').className = lengthValid ? 'valid' : 'invalid';
+        document.getElementById('username-req-length').innerHTML = (lengthValid ? '<i class="fas fa-check"></i>' : '<i class="fas fa-times"></i>') + ' 3-50 characters';
+        
+        // Not only numbers requirement
+        const notOnlyNumbersValid = !/^\d+$/.test(username);
+        document.getElementById('username-req-not-only-numbers').className = notOnlyNumbersValid ? 'valid' : 'invalid';
+        document.getElementById('username-req-not-only-numbers').innerHTML = (notOnlyNumbersValid ? '<i class="fas fa-check"></i>' : '<i class="fas fa-times"></i>') + ' Cannot be only numbers';
+    }
 
     // Profile picture preview
     function previewProfilePicture(input) {
@@ -1374,8 +1532,8 @@ input.invalid {
         const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
         const emailValid = emailRegex.test(email);
         
-        // Check if username is filled
-        const usernameValid = usernameInput.value.trim() !== '';
+        // Check if username is valid
+        const usernameValid = validateUsername();
         
         // Enable button only if both are valid
         submitBtn.disabled = !(emailValid && usernameValid);
@@ -1433,6 +1591,13 @@ input.invalid {
         if (!username || !email) {
             e.preventDefault();
             alert('Please fill in all required fields');
+            return false;
+        }
+        
+        // Username validation
+        if (!validateUsername()) {
+            e.preventDefault();
+            alert('Please fix the username errors before submitting.');
             return false;
         }
         
@@ -1510,7 +1675,7 @@ input.invalid {
     
     // Add event listeners for real-time validation
     document.getElementById('email').addEventListener('input', validateEmail);
-    document.getElementById('username').addEventListener('input', updateProfileSubmitButton);
+    document.getElementById('username').addEventListener('input', validateUsername);
     document.getElementById('current_password').addEventListener('input', updatePasswordSubmitButton);
     document.getElementById('new_password').addEventListener('input', function() {
         validatePassword();

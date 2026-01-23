@@ -1000,6 +1000,13 @@
             opacity: 0.9;
         }
 
+        .cta-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
         .cta-btn {
             padding: 1rem 2.5rem;
             border-radius: 50px;
@@ -1011,11 +1018,23 @@
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
+            border: none;
+            cursor: pointer;
         }
 
         .cta-btn:hover {
             transform: translateY(-2px);
             box-shadow: var(--shadow);
+        }
+
+        .cta-btn.secondary {
+            background: transparent;
+            color: white;
+            border: 2px solid white;
+        }
+
+        .cta-btn.secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
         }
 
         /* Footer */
@@ -1361,6 +1380,12 @@
                 padding: 0 1rem;
             }
             
+            .cta-buttons {
+                flex-direction: column;
+                align-items: center;
+                gap: 1rem;
+            }
+            
             .cta-btn {
                 width: 100%;
                 max-width: 300px;
@@ -1627,15 +1652,15 @@
         <div class="hero-container">
             <div class="hero-content">
                 <h1>Academic Scheduling Platform</h1>
-                <p>Access your personalized academic schedule through DKU's secure platform. Accounts are managed by administrators for enhanced security and control.</p>
+                <p>Access your personalized academic schedule through DKU's secure platform. Students and instructors can now register for access to the system.</p>
                 <div class="hero-buttons">
                     <a href="login.php" class="primary-btn">
                         <i class="fas fa-sign-in-alt"></i>
                         Access Your Account
                     </a>
-                    <a href="#security" class="secondary-btn">
-                        <i class="fas fa-shield-alt"></i>
-                        Learn About Security
+                    <a href="register.php" class="secondary-btn">
+                        <i class="fas fa-user-plus"></i>
+                        Register Now
                     </a>
                 </div>
             </div>
@@ -1804,8 +1829,8 @@
             <div class="security-icon">
                 <i class="fas fa-shield-alt"></i>
             </div>
-            <h2>Secure Account Management</h2>
-            <p>For enhanced security and institutional control, all user accounts are created and managed by authorized administrators. This ensures proper verification and maintains the integrity of our academic scheduling system.</p>
+            <h2>Secure Platform Access</h2>
+            <p>Students and instructors can now register directly through our secure platform. Once registered, accounts require administrative approval before full access is granted.</p>
             
             <div class="security-features">
                 <div class="security-feature fade-in">
@@ -1883,12 +1908,18 @@
     <!-- CTA Section -->
     <section class="cta">
         <div class="cta-content">
-            <h2>Ready to Access Your Schedule?</h2>
-            <p>Use your administrator-provided credentials to sign in and access your personalized academic schedule.</p>
-            <a href="login.php" class="cta-btn">
-                <i class="fas fa-sign-in-alt"></i>
-                Sign In to Your Account
-            </a>
+            <h2>Start Your Academic Journey</h2>
+            <p>Register as a student or instructor, or sign in with your existing credentials.</p>
+            <div class="cta-buttons">
+                <a href="login.php" class="cta-btn">
+                    <i class="fas fa-sign-in-alt"></i>
+                    Sign In
+                </a>
+                <a href="register.php" class="cta-btn secondary">
+                    <i class="fas fa-user-plus"></i>
+                    Register Now
+                </a>
+            </div>
         </div>
     </section>
 
@@ -1935,7 +1966,7 @@
             </div>
         </div>
         <div class="footer-bottom">
-            <p>&copy; 2024 DKU Scheduler. All rights reserved. | Account access by administrator invitation only.</p>
+            <p>&copy; 2024 DKU Scheduler. All rights reserved. | Account access requires administrative approval.</p>
         </div>
     </footer>
 

@@ -65,6 +65,40 @@ $departments = $pdo->query("SELECT * FROM departments")->fetchAll();
 $message = "";
 $message_type = "success";
 
+// Function to validate course name
+function validateCourseName($course_name) {
+    // Trim whitespace
+    $course_name = trim($course_name);
+    
+    // Check if empty
+    if (empty($course_name)) {
+        return "Course name is required!";
+    }
+    
+    // Check if it contains only numbers
+    if (preg_match('/^[0-9\s]+$/', $course_name)) {
+        return "Course name cannot contain only numbers! Please provide a descriptive name.";
+    }
+    
+    // Check if it's too short (minimum 3 characters after removing spaces)
+    if (strlen(str_replace(' ', '', $course_name)) < 3) {
+        return "Course name is too short! Minimum 3 characters required.";
+    }
+    
+    // Check if it's too long
+    if (strlen($course_name) > 200) {
+        return "Course name is too long! Maximum 200 characters allowed.";
+    }
+    
+    // Check for invalid characters (allow letters, numbers, spaces, and common punctuation)
+    if (!preg_match('/^[A-Za-z0-9\s\-_,.:()&\'"\/]+$/i', $course_name)) {
+        return "Course name contains invalid characters! Only letters, numbers, spaces, and basic punctuation are allowed.";
+    }
+    
+    // Valid course name
+    return true;
+}
+
 // Add/Edit/Delete Course logic with enhanced validation
 if(isset($_POST['add_course'])){
     // CSRF validation
@@ -87,9 +121,15 @@ if(isset($_POST['add_course'])){
         $prerequisite = trim($_POST['prerequisite'] ?? '');
         $description = trim($_POST['description'] ?? '');
         
-        // Validate inputs
-        if(empty($course_name) || empty($course_code)){
-            $message = "Course name and code are required!";
+        // Validate course name
+        $course_name_validation = validateCourseName($course_name);
+        if ($course_name_validation !== true) {
+            $message = $course_name_validation;
+            $message_type = "error";
+        }
+        // Validate other inputs
+        elseif(empty($course_code)){
+            $message = "Course code is required!";
             $message_type = "error";
         } elseif(!$is_freshman && empty($department_id)) {
             $message = "Department is required for non-freshman courses!";
@@ -160,9 +200,15 @@ if(isset($_POST['edit_course'])){
         $prerequisite = trim($_POST['prerequisite'] ?? '');
         $description = trim($_POST['description'] ?? '');
         
-        // Validate inputs
-        if(empty($course_name) || empty($course_code)){
-            $message = "Course name and code are required!";
+        // Validate course name
+        $course_name_validation = validateCourseName($course_name);
+        if ($course_name_validation !== true) {
+            $message = $course_name_validation;
+            $message_type = "error";
+        }
+        // Validate other inputs
+        elseif(empty($course_code)){
+            $message = "Course code is required!";
             $message_type = "error";
         } elseif(!$is_freshman && empty($department_id)) {
             $message = "Department is required for non-freshman courses!";
@@ -1001,6 +1047,28 @@ body { display:flex; min-height:100vh; background: var(--bg-primary); position:r
     color: var(--text-primary);
 }
 
+/* Course Name Validation */
+.course-name-feedback {
+    font-size: 0.875rem;
+    margin-top: 5px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: 500;
+}
+
+.course-name-success {
+    color: #10b981;
+}
+
+.course-name-error {
+    color: #dc2626;
+}
+
+.course-name-checking {
+    color: #f59e0b;
+}
+
 /* Course Code Validation */
 .course-code-checking {
     color: #f59e0b;
@@ -1312,7 +1380,9 @@ input.checking {
                             <label for="course_name" class="required">Course Name</label>
                             <input type="text" name="course_name" id="course_name" class="form-control" 
                                    placeholder="e.g., Introduction to Programming" required
-                                   value="<?= htmlspecialchars($edit_course['course_name'] ?? '') ?>">
+                                   value="<?= htmlspecialchars($edit_course['course_name'] ?? '') ?>"
+                                   oninput="checkCourseName()">
+                            <div id="course-name-feedback"></div>
                         </div>
                     </div>
 
@@ -1514,6 +1584,8 @@ function toggleMenu() {
 // DOM elements
 const courseCodeInput = document.getElementById('course_code');
 const courseCodeFeedback = document.getElementById('course-code-feedback');
+const courseNameInput = document.getElementById('course_name');
+const courseNameFeedback = document.getElementById('course-name-feedback');
 const creditHoursSelect = document.getElementById('credit_hours');
 const contactHoursInput = document.getElementById('contact_hours');
 const labHoursInput = document.getElementById('lab_hours');
@@ -1559,6 +1631,43 @@ function checkCourseCode() {
     }
 }
 
+// Course Name validation
+function checkCourseName() {
+    const courseName = courseNameInput.value.trim();
+    
+    courseNameInput.classList.remove('valid', 'invalid');
+    
+    if (!courseName) {
+        courseNameFeedback.innerHTML = '';
+    } else {
+        // Check if it contains only numbers or spaces
+        if (/^[0-9\s]+$/.test(courseName)) {
+            courseNameInput.classList.add('invalid');
+            courseNameFeedback.innerHTML = '<span class="course-name-error"><i class="fas fa-exclamation-circle"></i> Course name cannot contain only numbers!</span>';
+        } 
+        // Check if it's too short (minimum 3 characters after removing spaces)
+        else if (courseName.replace(/\s+/g, '').length < 3) {
+            courseNameInput.classList.add('invalid');
+            courseNameFeedback.innerHTML = '<span class="course-name-error"><i class="fas fa-exclamation-circle"></i> Course name is too short! Minimum 3 characters required.</span>';
+        }
+        // Check if it's too long
+        else if (courseName.length > 200) {
+            courseNameInput.classList.add('invalid');
+            courseNameFeedback.innerHTML = '<span class="course-name-error"><i class="fas fa-exclamation-circle"></i> Course name is too long! Maximum 200 characters allowed.</span>';
+        }
+        // Check for invalid characters
+        else if (!/^[A-Za-z0-9\s\-_,.:()&\'"\/]+$/i.test(courseName)) {
+            courseNameInput.classList.add('invalid');
+            courseNameFeedback.innerHTML = '<span class="course-name-error"><i class="fas fa-exclamation-circle"></i> Invalid characters detected!</span>';
+        }
+        // Valid course name
+        else {
+            courseNameInput.classList.add('valid');
+            courseNameFeedback.innerHTML = '<span class="course-name-success"><i class="fas fa-check-circle"></i> Valid course name</span>';
+        }
+    }
+}
+
 // Auto-calculate hours based on credit hours
 creditHoursSelect.addEventListener('change', function() {
     const creditHours = parseInt(this.value);
@@ -1590,6 +1699,7 @@ creditHoursSelect.addEventListener('change', function() {
 // Form validation
 function validateForm() {
     const courseCode = courseCodeInput.value.trim();
+    const courseName = courseNameInput.value.trim();
     const creditHours = parseInt(creditHoursSelect.value);
     const contactHours = parseInt(contactHoursInput.value);
     const labHours = parseInt(labHoursInput.value);
@@ -1602,6 +1712,34 @@ function validateForm() {
     if (!courseCodeRegex.test(courseCode)) {
         alert('Please enter a valid course code format: Letters (2-6) + Numbers (3-4), e.g., CS101');
         courseCodeInput.focus();
+        return false;
+    }
+    
+    // Validate course name
+    if (!courseName) {
+        alert('Course name is required!');
+        courseNameInput.focus();
+        return false;
+    }
+    
+    // Check if course name contains only numbers
+    if (/^[0-9\s]+$/.test(courseName)) {
+        alert('Course name cannot contain only numbers! Please provide a descriptive name.');
+        courseNameInput.focus();
+        return false;
+    }
+    
+    // Check if course name is too short
+    if (courseName.replace(/\s+/g, '').length < 3) {
+        alert('Course name is too short! Minimum 3 characters required.');
+        courseNameInput.focus();
+        return false;
+    }
+    
+    // Check if course name is too long
+    if (courseName.length > 200) {
+        alert('Course name is too long! Maximum 200 characters allowed.');
+        courseNameInput.focus();
         return false;
     }
     
@@ -1639,10 +1777,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Event listeners
-    document.getElementById('course_name').addEventListener('input', function() {
-        // Enable real-time validation if needed
-    });
-    
+    courseNameInput.addEventListener('input', checkCourseName);
     courseCodeInput.addEventListener('input', checkCourseCode);
     
     // Hours input validation
@@ -1703,10 +1838,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // If editing, validate existing course code
+    // If editing, validate existing course code and name
     <?php if(isset($edit_course)): ?>
         setTimeout(() => {
             checkCourseCode();
+            checkCourseName();
         }, 100);
     <?php endif; ?>
 });

@@ -114,7 +114,28 @@ if(isset($_POST['save_user'])){
         if(empty($username) || empty($email) || empty($role)) {
             $message = "Please fill in all required fields!";
             $message_type = "error";
-        } elseif(!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        } 
+        // Validate username - cannot be only numbers
+        elseif(preg_match('/^[0-9]+$/', $username)) {
+            $message = "Username cannot be only numbers! Please include letters or other characters.";
+            $message_type = "error";
+        }
+        // Validate full name - cannot be only numbers
+        elseif(preg_match('/^[0-9]+$/', $full_name)) {
+            $message = "Full name cannot be only numbers! Please enter a valid name.";
+            $message_type = "error";
+        }
+        // Validate username - must contain at least one non-numeric character
+        elseif(!preg_match('/[a-zA-Z]/', $username)) {
+            $message = "Username must contain at least one letter!";
+            $message_type = "error";
+        }
+        // Validate full name - must contain at least one non-numeric character
+        elseif(!empty($full_name) && !preg_match('/[a-zA-Z]/', $full_name)) {
+            $message = "Full name must contain at least one letter!";
+            $message_type = "error";
+        }
+        elseif(!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $message = "Please enter a valid email address!";
             $message_type = "error";
         } elseif(!$editing && empty($password)) {
@@ -727,6 +748,28 @@ body { display:flex; min-height:100vh; background: var(--bg-primary, #f8f9fa); o
     outline: none; 
     border-color: #2563eb; 
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2); 
+}
+
+/* ================= Name Validation ================= */
+.name-validation {
+    font-size: 0.85rem;
+    margin-top: 5px;
+    font-weight: 500;
+}
+
+.name-valid {
+    color: #10b981;
+}
+
+.name-invalid {
+    color: #dc2626;
+}
+
+.name-hint {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    margin-top: 3px;
+    font-style: italic;
 }
 
 /* ================= Password Field with Toggle ================= */
@@ -1353,12 +1396,20 @@ input.checking {
                     
                     <div class="form-group">
                         <label class="required">Username:</label>
-                        <input type="text" name="username" value="<?= isset($edit_data['username']) ? htmlspecialchars($edit_data['username']) : '' ?>" required>
+                        <input type="text" name="username" id="username-input" 
+                               value="<?= isset($edit_data['username']) ? htmlspecialchars($edit_data['username']) : '' ?>" 
+                               required oninput="validateUsername()">
+                        <div id="username-validation"></div>
+                        <div class="name-hint">Cannot be only numbers. Must contain at least one letter.</div>
                     </div>
                     
                     <div class="form-group">
                         <label class="required">Full Name:</label>
-                        <input type="text" name="full_name" value="<?= isset($edit_data['full_name']) ? htmlspecialchars($edit_data['full_name']) : '' ?>" required>
+                        <input type="text" name="full_name" id="full-name-input" 
+                               value="<?= isset($edit_data['full_name']) ? htmlspecialchars($edit_data['full_name']) : '' ?>" 
+                               required oninput="validateFullName()">
+                        <div id="fullname-validation"></div>
+                        <div class="name-hint">Cannot be only numbers. Must contain at least one letter.</div>
                     </div>
                     
                     <div class="form-group" id="student-id-group" style="display:none;">
@@ -1608,10 +1659,16 @@ input.checking {
     const passwordRequirements = document.getElementById('password-requirements');
     const togglePasswordBtn = document.getElementById('toggle-password-btn');
     const togglePasswordIcon = togglePasswordBtn.querySelector('i');
+    const usernameInput = document.getElementById('username-input');
+    const usernameValidation = document.getElementById('username-validation');
+    const fullNameInput = document.getElementById('full-name-input');
+    const fullNameValidation = document.getElementById('fullname-validation');
 
     let studentIdValid = true;
     let emailValid = false;
     let passwordValid = false;
+    let usernameValid = false;
+    let fullNameValid = false;
     let passwordVisible = false;
 
     // Toggle password visibility
@@ -1631,6 +1688,76 @@ input.checking {
             togglePasswordBtn.setAttribute('aria-label', 'Show password');
             togglePasswordBtn.title = 'Show password';
         }
+    }
+
+    // Validate username - cannot be only numbers
+    function validateUsername() {
+        const username = usernameInput.value.trim();
+        
+        usernameInput.classList.remove('valid', 'invalid');
+        
+        if (!username) {
+            usernameValidation.innerHTML = '';
+            usernameValid = false;
+            updateSubmitButton();
+            return;
+        }
+        
+        // Check if username is only numbers
+        if (/^[0-9]+$/.test(username)) {
+            usernameInput.classList.add('invalid');
+            usernameValidation.innerHTML = '<span class="name-invalid"><i class="fas fa-exclamation-circle"></i> Username cannot be only numbers! Must contain at least one letter.</span>';
+            usernameValid = false;
+        }
+        // Check if username contains at least one letter
+        else if (!/[a-zA-Z]/.test(username)) {
+            usernameInput.classList.add('invalid');
+            usernameValidation.innerHTML = '<span class="name-invalid"><i class="fas fa-exclamation-circle"></i> Username must contain at least one letter!</span>';
+            usernameValid = false;
+        }
+        // Username is valid
+        else {
+            usernameInput.classList.add('valid');
+            usernameValidation.innerHTML = '<span class="name-valid"><i class="fas fa-check-circle"></i> Username is valid!</span>';
+            usernameValid = true;
+        }
+        
+        updateSubmitButton();
+    }
+
+    // Validate full name - cannot be only numbers
+    function validateFullName() {
+        const fullName = fullNameInput.value.trim();
+        
+        fullNameInput.classList.remove('valid', 'invalid');
+        
+        if (!fullName) {
+            fullNameValidation.innerHTML = '';
+            fullNameValid = false;
+            updateSubmitButton();
+            return;
+        }
+        
+        // Check if full name is only numbers
+        if (/^[0-9]+$/.test(fullName)) {
+            fullNameInput.classList.add('invalid');
+            fullNameValidation.innerHTML = '<span class="name-invalid"><i class="fas fa-exclamation-circle"></i> Full name cannot be only numbers! Must contain at least one letter.</span>';
+            fullNameValid = false;
+        }
+        // Check if full name contains at least one letter
+        else if (!/[a-zA-Z]/.test(fullName)) {
+            fullNameInput.classList.add('invalid');
+            fullNameValidation.innerHTML = '<span class="name-invalid"><i class="fas fa-exclamation-circle"></i> Full name must contain at least one letter!</span>';
+            fullNameValid = false;
+        }
+        // Full name is valid
+        else {
+            fullNameInput.classList.add('valid');
+            fullNameValidation.innerHTML = '<span class="name-valid"><i class="fas fa-check-circle"></i> Full name is valid!</span>';
+            fullNameValid = true;
+        }
+        
+        updateSubmitButton();
     }
 
     // Show/hide fields based on role
@@ -1957,6 +2084,8 @@ input.checking {
         // Basic validation
         if (!role) enabled = false;
         if (!emailValid) enabled = false;
+        if (!usernameValid) enabled = false;
+        if (!fullNameValid) enabled = false;
         if (isStudent && !studentIdValid) enabled = false;
         if (isStudent && !yearType) enabled = false;
         if (isStudent && !yearHiddenValue) enabled = false;
@@ -1986,6 +2115,20 @@ input.checking {
         const yearType = yearTypeSelect.value;
         const yearHiddenValue = yearHidden.value;
         const departmentValue = departmentSelect.value;
+        
+        // Username validation
+        if (!usernameValid) {
+            alert('Please fix the username errors before submitting');
+            usernameInput.focus();
+            return false;
+        }
+        
+        // Full name validation
+        if (!fullNameValid) {
+            alert('Please fix the full name errors before submitting');
+            fullNameInput.focus();
+            return false;
+        }
         
         // Email validation
         if (!emailValid) {
@@ -2071,25 +2214,26 @@ input.checking {
         extensionYearSelect.addEventListener('change', updateYearHiddenField);
         departmentSelect.addEventListener('change', updateSubmitButton);
         emailInput.addEventListener('input', validateEmail);
+        usernameInput.addEventListener('input', validateUsername);
+        fullNameInput.addEventListener('input', validateFullName);
         
         // Initial field setup
         toggleRoleFields();
         initializeYearSelection();
         
-        // Validate email if editing
-        <?php if($editing && isset($edit_data['email'])): ?>
+        // Validate fields if editing
+        <?php if($editing): ?>
             setTimeout(() => {
+                validateUsername();
+                validateFullName();
                 validateEmail();
+                
+                <?php if(isset($edit_data['role']) && $edit_data['role'] === 'student'): ?>
+                    if (studentIdInput.value.trim()) {
+                        checkStudentID();
+                    }
+                <?php endif; ?>
             }, 100);
-        <?php endif; ?>
-        
-        // If editing a student, check student ID
-        <?php if($editing && isset($edit_data['role']) && $edit_data['role'] === 'student'): ?>
-            setTimeout(() => {
-                if (studentIdInput.value.trim()) {
-                    checkStudentID();
-                }
-            }, 500);
         <?php endif; ?>
         
         // Profile picture fallback

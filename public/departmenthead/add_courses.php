@@ -29,6 +29,39 @@ if (!empty($user['profile_picture']) && file_exists($profile_path)) {
 
 $current_page = basename($_SERVER['PHP_SELF']);
 
+// Function to validate course name
+function validateCourseName($course_name) {
+    $course_name = trim($course_name);
+    
+    // Check if empty
+    if (empty($course_name)) {
+        return ["isValid" => false, "message" => "Course name cannot be empty."];
+    }
+    
+    // Check if it's only numbers
+    if (preg_match('/^\d+$/', $course_name)) {
+        return ["isValid" => false, "message" => "Course name cannot consist only of numbers."];
+    }
+    
+    // Check if it starts or ends with a number
+    if (preg_match('/^\d/', $course_name) || preg_match('/\d$/', $course_name)) {
+        return ["isValid" => false, "message" => "Course name cannot start or end with a number."];
+    }
+    
+    // Check if it contains at least some letters (allows letters, spaces, hyphens, parentheses, apostrophes, commas)
+    if (!preg_match('/[a-zA-Z]/', $course_name)) {
+        return ["isValid" => false, "message" => "Course name must contain at least some letters."];
+    }
+    
+    // Check for invalid patterns (numbers in the middle without context are allowed, but not recommended)
+    if (preg_match('/\b\d+\b/', $course_name)) {
+        // This warns but doesn't fail for numbers in the middle
+        return ["isValid" => true, "message" => "warning", "warning" => "Consider using words instead of numbers in course names."];
+    }
+    
+    return ["isValid" => true, "message" => "Valid course name."];
+}
+
 // Handle Add Course
 if(isset($_POST['add_course'])){
     // Initialize all variables with default values
@@ -42,8 +75,13 @@ if(isset($_POST['add_course'])){
     $tutorial_hours = isset($_POST['tutorial_hours']) ? (int)$_POST['tutorial_hours'] : 0;
     $description = isset($_POST['description']) ? trim($_POST['description']) : '';
 
+    // Validate course name
+    $nameValidation = validateCourseName($course_name);
+    if (!$nameValidation['isValid']) {
+        $message = "Error: " . $nameValidation['message'];
+    }
     // Validate required fields
-    if(empty($course_name) || empty($course_code) || $credit_hours <= 0) {
+    else if(empty($course_name) || empty($course_code) || $credit_hours <= 0) {
         $message = "Please fill all required fields (Course Name, Course Code, and Credit Hours).";
     } else {
         // Validate total hours match credit hours
@@ -61,6 +99,9 @@ if(isset($_POST['add_course'])){
                     $contact_hours, $lab_hours, $tutorial_hours, $description, $dept_id
                 ]);
                 $message = "Course '$course_name' added successfully!";
+                if (isset($nameValidation['warning'])) {
+                    $message .= " Note: " . $nameValidation['warning'];
+                }
             } catch(PDOException $e) {
                 $message = "Error adding course: " . $e->getMessage();
             }
@@ -70,9 +111,9 @@ if(isset($_POST['add_course'])){
     }
 }
 
-// Handle Edit Course
-if(isset($_POST['edit_course'])){
-    $course_id = isset($_POST['course_id']) ? $_POST['course_id'] : 0;
+// Handle Edit/Update Course
+if(isset($_POST['update_course'])){
+    $course_id = isset($_POST['course_id']) ? (int)$_POST['course_id'] : 0;
     $course_name = isset($_POST['course_name']) ? trim($_POST['course_name']) : '';
     $course_code = isset($_POST['course_code']) ? trim($_POST['course_code']) : '';
     $credit_hours = isset($_POST['credit_hours']) ? (int)$_POST['credit_hours'] : 0;
@@ -83,7 +124,12 @@ if(isset($_POST['edit_course'])){
     $tutorial_hours = isset($_POST['tutorial_hours']) ? (int)$_POST['tutorial_hours'] : 0;
     $description = isset($_POST['description']) ? trim($_POST['description']) : '';
 
-    if($course_id > 0 && !empty($course_name) && !empty($course_code) && $credit_hours > 0) {
+    // Validate course name
+    $nameValidation = validateCourseName($course_name);
+    if (!$nameValidation['isValid']) {
+        $message = "Error: " . $nameValidation['message'];
+    }
+    else if($course_id > 0 && !empty($course_name) && !empty($course_code) && $credit_hours > 0) {
         $total_contact_hours = $contact_hours + $lab_hours + $tutorial_hours;
         
         if($total_contact_hours == $credit_hours){
@@ -98,6 +144,9 @@ if(isset($_POST['edit_course'])){
                     $contact_hours, $lab_hours, $tutorial_hours, $description, $course_id, $dept_id
                 ]);
                 $message = "Course updated successfully!";
+                if (isset($nameValidation['warning'])) {
+                    $message .= " Note: " . $nameValidation['warning'];
+                }
             } catch(PDOException $e) {
                 $message = "Error updating course: " . $e->getMessage();
             }
@@ -111,7 +160,7 @@ if(isset($_POST['edit_course'])){
 
 // Handle Delete Course
 if(isset($_POST['delete_course'])){
-    $course_id = isset($_POST['course_id']) ? $_POST['course_id'] : 0;
+    $course_id = isset($_POST['course_id']) ? (int)$_POST['course_id'] : 0;
     if($course_id > 0) {
         try {
             $stmt = $pdo->prepare("DELETE FROM courses WHERE course_id=? AND department_id=?");
@@ -129,6 +178,15 @@ if(isset($_POST['delete_course'])){
 $courses_stmt = $pdo->prepare("SELECT * FROM courses WHERE department_id = ? ORDER BY category, course_name");
 $courses_stmt->execute([$dept_id]);
 $courses = $courses_stmt->fetchAll();
+
+// Check if we're editing a course
+$edit_course = null;
+if(isset($_GET['edit_id'])) {
+    $edit_id = (int)$_GET['edit_id'];
+    $edit_stmt = $pdo->prepare("SELECT * FROM courses WHERE course_id = ? AND department_id = ?");
+    $edit_stmt->execute([$edit_id, $dept_id]);
+    $edit_course = $edit_stmt->fetch(PDO::FETCH_ASSOC);
+}
 ?>
 
 <!DOCTYPE html>
@@ -462,6 +520,33 @@ $courses = $courses_stmt->fetchAll();
     min-width: 250px;
 }
 
+/* Validation Styles */
+.validation-feedback {
+    display: block;
+    margin-top: 5px;
+    font-size: 0.85rem;
+    padding: 5px 10px;
+    border-radius: 5px;
+}
+
+.validation-feedback.valid {
+    color: var(--success-text);
+    background: var(--success-bg);
+    border: 1px solid var(--success-border);
+}
+
+.validation-feedback.invalid {
+    color: var(--error-text);
+    background: var(--error-bg);
+    border: 1px solid var(--error-border);
+}
+
+.validation-feedback.warning {
+    color: var(--warning-text);
+    background: var(--warning-bg);
+    border: 1px solid var(--warning-border);
+}
+
 /* Button Styles */
 .btn {
     padding: 14px 24px;
@@ -632,6 +717,77 @@ $courses = $courses_stmt->fetchAll();
     flex-wrap: wrap;
 }
 
+/* Edit Modal */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1300;
+    padding: 20px;
+    overflow-y: auto;
+}
+
+.modal-content {
+    background: var(--bg-card);
+    margin: 50px auto;
+    max-width: 800px;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    animation: modalFadeIn 0.3s ease;
+}
+
+@keyframes modalFadeIn {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.modal-header {
+    padding: 20px 25px;
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: white;
+    border-radius: 15px 15px 0 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h3 {
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 5px 10px;
+    border-radius: 5px;
+    transition: background 0.3s;
+}
+
+.close-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.modal-body {
+    padding: 25px;
+}
+
+/* Form Actions */
+.form-actions {
+    display: flex;
+    gap: 15px;
+    margin-top: 20px;
+    justify-content: flex-end;
+}
+
 /* ================= Responsive ================= */
 @media(max-width: 768px){
     .university-header {
@@ -677,6 +833,7 @@ $courses = $courses_stmt->fetchAll();
     .form-row { flex-direction: column; }
     .form-row .form-group { min-width: auto; }
     .action-buttons { flex-direction: column; }
+    .modal-content { margin: 20px; }
 }
 </style>
 </head>
@@ -760,21 +917,33 @@ $courses = $courses_stmt->fetchAll();
             </div>
         <?php endif; ?>
 
-        <!-- Add Course Form Card -->
+        <!-- Add/Edit Course Form Card -->
         <div class="card">
             <div class="card-header">
-                <h3><i class="fas fa-plus-circle"></i> Add New Course</h3>
+                <h3><i class="fas fa-plus-circle"></i> <?= $edit_course ? 'Edit Course' : 'Add New Course' ?></h3>
             </div>
             <div class="card-body">
-                <form method="POST">
+                <form method="POST" id="courseForm">
+                    <?php if($edit_course): ?>
+                        <input type="hidden" name="course_id" value="<?= $edit_course['course_id'] ?>">
+                    <?php endif; ?>
+                    
                     <div class="form-row">
                         <div class="form-group">
                             <label for="course_code">Course Code *</label>
-                            <input type="text" name="course_code" id="course_code" class="form-control" placeholder="e.g., CS101" required>
+                            <input type="text" name="course_code" id="course_code" class="form-control" 
+                                   placeholder="e.g., CS101" 
+                                   value="<?= $edit_course ? htmlspecialchars($edit_course['course_code']) : '' ?>" 
+                                   required>
                         </div>
                         <div class="form-group">
                             <label for="course_name">Course Name *</label>
-                            <input type="text" name="course_name" id="course_name" class="form-control" placeholder="e.g., Introduction to Programming" required>
+                            <input type="text" name="course_name" id="course_name" class="form-control" 
+                                   placeholder="e.g., Introduction to Programming" 
+                                   value="<?= $edit_course ? htmlspecialchars($edit_course['course_name']) : '' ?>" 
+                                   required>
+                            <div id="courseNameFeedback" class="validation-feedback"></div>
+                            <small class="hours-info">Course name should contain letters and not start/end with numbers</small>
                         </div>
                     </div>
 
@@ -783,19 +952,19 @@ $courses = $courses_stmt->fetchAll();
                             <label for="credit_hours">Credit Hours *</label>
                             <select name="credit_hours" id="credit_hours" class="form-control" required>
                                 <option value="">Select Credit Hours</option>
-                                <option value="1">1 Credit Hour</option>
-                                <option value="2">2 Credit Hours</option>
-                                <option value="3" selected>3 Credit Hours</option>
-                                <option value="4">4 Credit Hours</option>
-                                <option value="5">5 Credit Hours</option>
+                                <option value="1" <?= ($edit_course && $edit_course['credit_hours'] == 1) ? 'selected' : '' ?>>1 Credit Hour</option>
+                                <option value="2" <?= ($edit_course && $edit_course['credit_hours'] == 2) ? 'selected' : '' ?>>2 Credit Hours</option>
+                                <option value="3" <?= (!$edit_course || ($edit_course && $edit_course['credit_hours'] == 3)) ? 'selected' : '' ?>>3 Credit Hours</option>
+                                <option value="4" <?= ($edit_course && $edit_course['credit_hours'] == 4) ? 'selected' : '' ?>>4 Credit Hours</option>
+                                <option value="5" <?= ($edit_course && $edit_course['credit_hours'] == 5) ? 'selected' : '' ?>>5 Credit Hours</option>
                             </select>
                         </div>
                         <div class="form-group">
                             <label for="category">Course Category *</label>
                             <select name="category" id="category" class="form-control" required>
-                                <option value="Compulsory">Compulsory</option>
-                                <option value="Elective">Elective</option>
-                                <option value="Optional">Optional</option>
+                                <option value="Compulsory" <?= (!$edit_course || ($edit_course && $edit_course['category'] == 'Compulsory')) ? 'selected' : '' ?>>Compulsory</option>
+                                <option value="Elective" <?= ($edit_course && $edit_course['category'] == 'Elective') ? 'selected' : '' ?>>Elective</option>
+                                <option value="Optional" <?= ($edit_course && $edit_course['category'] == 'Optional') ? 'selected' : '' ?>>Optional</option>
                             </select>
                         </div>
                     </div>
@@ -803,17 +972,26 @@ $courses = $courses_stmt->fetchAll();
                     <div class="form-row">
                         <div class="form-group">
                             <label for="contact_hours">Contact Hours (Theory) *</label>
-                            <input type="number" name="contact_hours" id="contact_hours" class="form-control" min="0" max="5" value="3" required>
+                            <input type="number" name="contact_hours" id="contact_hours" class="form-control" 
+                                   min="0" max="5" 
+                                   value="<?= $edit_course ? $edit_course['contact_hours'] : '3' ?>" 
+                                   required>
                             <small class="hours-info">Classroom teaching hours</small>
                         </div>
                         <div class="form-group">
                             <label for="lab_hours">Lab Hours *</label>
-                            <input type="number" name="lab_hours" id="lab_hours" class="form-control" min="0" max="5" value="0" required>
+                            <input type="number" name="lab_hours" id="lab_hours" class="form-control" 
+                                   min="0" max="5" 
+                                   value="<?= $edit_course ? $edit_course['lab_hours'] : '0' ?>" 
+                                   required>
                             <small class="hours-info">Laboratory/practical hours</small>
                         </div>
                         <div class="form-group">
                             <label for="tutorial_hours">Tutorial Hours *</label>
-                            <input type="number" name="tutorial_hours" id="tutorial_hours" class="form-control" min="0" max="5" value="0" required>
+                            <input type="number" name="tutorial_hours" id="tutorial_hours" class="form-control" 
+                                   min="0" max="5" 
+                                   value="<?= $edit_course ? $edit_course['tutorial_hours'] : '0' ?>" 
+                                   required>
                             <small class="hours-info">Tutorial/discussion hours</small>
                         </div>
                     </div>
@@ -821,19 +999,33 @@ $courses = $courses_stmt->fetchAll();
                     <div class="form-row">
                         <div class="form-group">
                             <label for="prerequisite">Prerequisite Course</label>
-                            <input type="text" name="prerequisite" id="prerequisite" class="form-control" placeholder="e.g., CS101, MATH102 or None">
+                            <input type="text" name="prerequisite" id="prerequisite" class="form-control" 
+                                   placeholder="e.g., CS101, MATH102 or None"
+                                   value="<?= $edit_course ? htmlspecialchars($edit_course['prerequisite']) : '' ?>">
                             <small class="hours-info">Enter course codes separated by commas</small>
                         </div>
                     </div>
 
                     <div class="form-group">
                         <label for="description">Course Description</label>
-                        <textarea name="description" id="description" class="form-control" rows="3" placeholder="Brief course description..."></textarea>
+                        <textarea name="description" id="description" class="form-control" rows="3" 
+                                  placeholder="Brief course description..."><?= $edit_course ? htmlspecialchars($edit_course['description']) : '' ?></textarea>
                     </div>
 
-                    <button type="submit" name="add_course" class="btn btn-primary">
-                        <i class="fas fa-plus-circle"></i> Add Course
-                    </button>
+                    <div class="form-actions">
+                        <?php if($edit_course): ?>
+                            <button type="submit" name="update_course" class="btn btn-warning">
+                                <i class="fas fa-save"></i> Update Course
+                            </button>
+                            <a href="add_courses.php" class="btn btn-danger">
+                                <i class="fas fa-times"></i> Cancel
+                            </a>
+                        <?php else: ?>
+                            <button type="submit" name="add_course" class="btn btn-primary" id="submitBtn">
+                                <i class="fas fa-plus-circle"></i> Add Course
+                            </button>
+                        <?php endif; ?>
+                    </div>
                 </form>
             </div>
         </div>
@@ -878,13 +1070,10 @@ $courses = $courses_stmt->fetchAll();
                                     <td><?= $c['prerequisite'] ? htmlspecialchars($c['prerequisite']) : 'None' ?></td>
                                     <td>
                                         <div class="action-buttons">
-                                            <!-- Edit Form -->
-                                            <form method="POST" style="display:inline;">
-                                                <input type="hidden" name="course_id" value="<?= $c['course_id'] ?>">
-                                                <button type="submit" name="edit_course" class="btn btn-warning btn-sm">
-                                                    <i class="fas fa-edit"></i> Edit
-                                                </button>
-                                            </form>
+                                            <!-- Edit Button -->
+                                            <a href="?edit_id=<?= $c['course_id'] ?>" class="btn btn-warning btn-sm">
+                                                <i class="fas fa-edit"></i> Edit
+                                            </a>
                                             <!-- Delete Form -->
                                             <form method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this course?');">
                                                 <input type="hidden" name="course_id" value="<?= $c['course_id'] ?>">
@@ -918,12 +1107,100 @@ $courses = $courses_stmt->fetchAll();
             overlay.classList.toggle('active');
         }
 
+        // Function to validate course name
+        function validateCourseName(courseName) {
+            const feedback = document.getElementById('courseNameFeedback');
+            
+            // Trim whitespace
+            courseName = courseName.trim();
+            
+            // Check if empty
+            if (!courseName) {
+                feedback.textContent = "Course name cannot be empty.";
+                feedback.className = "validation-feedback invalid";
+                return false;
+            }
+            
+            // Check if it's only numbers
+            if (/^\d+$/.test(courseName)) {
+                feedback.textContent = "Course name cannot consist only of numbers.";
+                feedback.className = "validation-feedback invalid";
+                return false;
+            }
+            
+            // Check if it starts or ends with a number
+            if (/^\d/.test(courseName) || /\d$/.test(courseName)) {
+                feedback.textContent = "Course name cannot start or end with a number.";
+                feedback.className = "validation-feedback invalid";
+                return false;
+            }
+            
+            // Check if it contains at least some letters
+            if (!/[a-zA-Z]/.test(courseName)) {
+                feedback.textContent = "Course name must contain at least some letters.";
+                feedback.className = "validation-feedback invalid";
+                return false;
+            }
+            
+            // Check for standalone numbers (warn but don't fail)
+            if (/\b\d+\b/.test(courseName)) {
+                feedback.textContent = "Consider using words instead of numbers (e.g., 'One' instead of '1').";
+                feedback.className = "validation-feedback warning";
+                return true;
+            }
+            
+            // Valid course name
+            feedback.textContent = "✓ Valid course name.";
+            feedback.className = "validation-feedback valid";
+            return true;
+        }
+
+        // Real-time course name validation
+        document.getElementById('course_name').addEventListener('input', function() {
+            validateCourseName(this.value);
+        });
+
+        // Form validation on submit
+        document.getElementById('courseForm').addEventListener('submit', function(e) {
+            const courseName = document.getElementById('course_name').value;
+            const creditHours = parseInt(document.getElementById('credit_hours').value);
+            const contactHours = parseInt(document.getElementById('contact_hours').value);
+            const labHours = parseInt(document.getElementById('lab_hours').value);
+            const tutorialHours = parseInt(document.getElementById('tutorial_hours').value);
+            
+            // Validate course name
+            if (!validateCourseName(courseName)) {
+                e.preventDefault();
+                alert("Please fix the course name error before submitting.");
+                return false;
+            }
+            
+            // Validate hours total equals credit hours
+            const totalHours = contactHours + labHours + tutorialHours;
+            
+            if (totalHours !== creditHours) {
+                e.preventDefault();
+                alert(`Error: Total hours (${totalHours}) must equal credit hours (${creditHours}). Please adjust the hours.`);
+                return false;
+            }
+            
+            // Additional validation for course code (must not be empty)
+            const courseCode = document.getElementById('course_code').value.trim();
+            if (!courseCode) {
+                e.preventDefault();
+                alert("Course code cannot be empty.");
+                return false;
+            }
+            
+            return true;
+        });
+
         // Auto-calculate hours based on credit hours
-        document.querySelector('select[name="credit_hours"]').addEventListener('change', function() {
+        document.getElementById('credit_hours').addEventListener('change', function() {
             const creditHours = parseInt(this.value);
-            const contactInput = document.querySelector('input[name="contact_hours"]');
-            const labInput = document.querySelector('input[name="lab_hours"]');
-            const tutorialInput = document.querySelector('input[name="tutorial_hours"]');
+            const contactInput = document.getElementById('contact_hours');
+            const labInput = document.getElementById('lab_hours');
+            const tutorialInput = document.getElementById('tutorial_hours');
             
             // Set default distribution based on credit hours
             if (creditHours === 1) {
@@ -949,19 +1226,21 @@ $courses = $courses_stmt->fetchAll();
             }
         });
 
-        // Validate hours total equals credit hours
-        document.querySelector('form').addEventListener('submit', function(e) {
-            const creditHours = parseInt(document.querySelector('select[name="credit_hours"]').value);
-            const contactHours = parseInt(document.querySelector('input[name="contact_hours"]').value);
-            const labHours = parseInt(document.querySelector('input[name="lab_hours"]').value);
-            const tutorialHours = parseInt(document.querySelector('input[name="tutorial_hours"]').value);
-            
-            const totalHours = contactHours + labHours + tutorialHours;
-            
-            if (totalHours !== creditHours) {
-                e.preventDefault();
-                alert(`Error: Total hours (${totalHours}) must equal credit hours (${creditHours}). Please adjust the hours.`);
-            }
+        // Validate hours on input change
+        ['contact_hours', 'lab_hours', 'tutorial_hours'].forEach(id => {
+            document.getElementById(id).addEventListener('input', function() {
+                const creditHours = parseInt(document.getElementById('credit_hours').value);
+                const contactHours = parseInt(document.getElementById('contact_hours').value);
+                const labHours = parseInt(document.getElementById('lab_hours').value);
+                const tutorialHours = parseInt(document.getElementById('tutorial_hours').value);
+                
+                const totalHours = contactHours + labHours + tutorialHours;
+                
+                if (creditHours && totalHours !== creditHours) {
+                    // Show warning but don't prevent input
+                    console.log(`Warning: Total hours (${totalHours}) should equal credit hours (${creditHours})`);
+                }
+            });
         });
 
         // Set active state for current page
@@ -975,7 +1254,22 @@ $courses = $courses_stmt->fetchAll();
                     link.classList.add('active');
                 }
             });
+            
+            // Validate course name on page load if editing
+            <?php if($edit_course): ?>
+            validateCourseName(document.getElementById('course_name').value);
+            <?php endif; ?>
         });
+
+        // Scroll to edit form when editing
+        <?php if($edit_course): ?>
+        document.addEventListener('DOMContentLoaded', function() {
+            const editForm = document.querySelector('.card-header h3');
+            if(editForm) {
+                editForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
+        <?php endif; ?>
     </script>
     
     <!-- Include darkmode.js -->

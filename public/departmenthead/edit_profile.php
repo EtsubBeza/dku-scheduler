@@ -51,6 +51,33 @@ function getProfilePicturePath($profile_picture) {
     return '../assets/default_profile.png';
 }
 
+// Function to validate username - ONLY check it's not all numbers
+function validateUsername($username) {
+    $username = trim($username);
+    
+    // Check if empty
+    if (empty($username)) {
+        return ["isValid" => false, "message" => "Username cannot be empty."];
+    }
+    
+    // Check length
+    if (strlen($username) < 3) {
+        return ["isValid" => false, "message" => "Username must be at least 3 characters long."];
+    }
+    
+    if (strlen($username) > 50) {
+        return ["isValid" => false, "message" => "Username cannot exceed 50 characters."];
+    }
+    
+    // ONLY RESTRICTION: Check if it's only numbers
+    if (preg_match('/^\d+$/', $username)) {
+        return ["isValid" => false, "message" => "Username cannot consist only of numbers."];
+    }
+    
+    // That's it! Any other combination is allowed
+    return ["isValid" => true, "message" => "Valid username."];
+}
+
 // Handle form submission
 if($_SERVER['REQUEST_METHOD'] == 'POST'){
     // Check which form was submitted
@@ -60,8 +87,14 @@ if($_SERVER['REQUEST_METHOD'] == 'POST'){
         $email = trim($_POST['email']);
         $fileName = $user['profile_picture'] ?? ''; // Keep existing by default
         
+        // Validate username
+        $usernameValidation = validateUsername($username);
+        if (!$usernameValidation['isValid']) {
+            $message = "Error: " . $usernameValidation['message'];
+            $message_type = 'error';
+        }
         // Email validation
-        if(!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        else if(!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $message = "Please enter a valid email address!";
             $message_type = 'error';
         } else {
@@ -704,6 +737,57 @@ $current_page = basename($_SERVER['PHP_SELF']);
 }
 
 /* ================= Validation Styles ================= */
+/* Username validation */
+.username-validation {
+    font-size: 0.85rem;
+    margin-top: 5px;
+    font-weight: 500;
+    padding: 5px;
+    border-radius: 4px;
+}
+
+.username-valid {
+    background: var(--success-bg);
+    color: var(--success-text);
+    border: 1px solid var(--success-border);
+}
+
+.username-invalid {
+    background: var(--error-bg);
+    color: var(--error-text);
+    border: 1px solid var(--error-border);
+}
+
+/* Username requirements list */
+.username-requirements-list {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-top: 5px;
+    line-height: 1.4;
+}
+
+.username-requirements-list ul {
+    padding-left: 20px;
+    margin: 5px 0;
+}
+
+.username-requirements-list li {
+    margin-bottom: 3px;
+}
+
+.username-requirements-list li.valid {
+    color: #10b981;
+}
+
+.username-requirements-list li.invalid {
+    color: #dc2626;
+}
+
+.username-requirements-list li i {
+    margin-right: 5px;
+    font-size: 0.75rem;
+}
+
 /* Password strength meter */
 .password-strength-container {
     margin-top: 5px;
@@ -772,14 +856,20 @@ $current_page = basename($_SERVER['PHP_SELF']);
     font-size: 0.85rem;
     margin-top: 5px;
     font-weight: 500;
+    padding: 5px;
+    border-radius: 4px;
 }
 
 .email-valid {
-    color: #10b981;
+    background: var(--success-bg);
+    color: var(--success-text);
+    border: 1px solid var(--success-border);
 }
 
 .email-invalid {
-    color: #dc2626;
+    background: var(--error-bg);
+    color: var(--error-text);
+    border: 1px solid var(--error-border);
 }
 
 /* Input Validation States */
@@ -805,11 +895,13 @@ input.invalid {
 .password-match.valid {
     background: var(--success-bg);
     color: var(--success-text);
+    border: 1px solid var(--success-border);
 }
 
 .password-match.invalid {
     background: var(--error-bg);
     color: var(--error-text);
+    border: 1px solid var(--error-border);
 }
 
 /* ================= End Validation Styles ================= */
@@ -1055,22 +1147,22 @@ input.invalid {
                 <a href="manage_enrollments.php" class="<?php echo $current_page=='manage_enrollments.php'?'active':''; ?>">
                     <i class="fas fa-users"></i> Manage Enrollments
                 </a>
-                <a href="manage_schedules.php" class="<?php echo $current_page=='manage_schedules.php'?'active':''; ?>">
+                <a href="manage_schedules.php" class="<?php echo $current_page=='manage_schedules.php'?'active':'' ?>">
                     <i class="fas fa-calendar-alt"></i> Manage Schedules
                 </a>
-                <a href="assign_courses.php" class="<?php echo $current_page=='assign_courses.php'?'active':''; ?>">
+                <a href="assign_courses.php" class="<?php echo $current_page=='assign_courses.php'?'active':'' ?>">
                     <i class="fas fa-chalkboard-teacher"></i> Assign Courses
                 </a>
-                <a href="add_courses.php" class="<?php echo $current_page=='add_courses.php'?'active':''; ?>">
+                <a href="add_courses.php" class="<?php echo $current_page=='add_courses.php'?'active':'' ?>">
                     <i class="fas fa-book"></i> Add Courses
                 </a>
-                <a href="exam_schedules.php" class="<?php echo $current_page=='exam_schedules.php'?'active':''; ?>">
+                <a href="exam_schedules.php" class="<?php echo $current_page=='exam_schedules.php'?'active':'' ?>">
                     <i class="fas fa-clipboard-list"></i> Exam Schedules
                 </a>
-                <a href="edit_profile.php" class="<?php echo $current_page=='edit_profile.php'?'active':''; ?>">
+                <a href="edit_profile.php" class="<?php echo $current_page=='edit_profile.php'?'active':'' ?>">
                     <i class="fas fa-user-edit"></i> Edit Profile
                 </a>
-                <a href="manage_announcements.php" class="<?php echo $current_page=='manage_announcements.php'?'active':''; ?>">
+                <a href="manage_announcements.php" class="<?php echo $current_page=='manage_announcements.php'?'active':'' ?>">
                     <i class="fas fa-bullhorn"></i> Announcements
                 </a>
                 <a href="../logout.php">
@@ -1133,7 +1225,23 @@ input.invalid {
                     <div class="form-group">
                         <label for="username">Username</label>
                         <input type="text" id="username" name="username" class="form-control" 
-                               value="<?php echo htmlspecialchars($user['username'] ?? ''); ?>" required>
+                               value="<?php echo htmlspecialchars($user['username'] ?? ''); ?>" required oninput="validateUsername()">
+                        <div class="username-validation" id="username-validation"></div>
+                        
+                        <!-- Username requirements list -->
+                        <div class="username-requirements-list" id="username-requirements">
+                            <p>Username requirements:</p>
+                            <ul>
+                                <li id="username-req-length" class="<?php echo (!empty($user['username']) && strlen($user['username']) >= 3) ? 'valid' : 'invalid'; ?>">
+                                    <i class="fas fa-<?php echo (!empty($user['username']) && strlen($user['username']) >= 3) ? 'check' : 'times'; ?>"></i> 
+                                    3-50 characters
+                                </li>
+                                <li id="username-req-not-only-numbers" class="<?php echo (!empty($user['username']) && !preg_match('/^\d+$/', $user['username'])) ? 'valid' : 'invalid'; ?>">
+                                    <i class="fas fa-<?php echo (!empty($user['username']) && !preg_match('/^\d+$/', $user['username'])) ? 'check' : 'times'; ?>"></i> 
+                                    Cannot be only numbers
+                                </li>
+                            </ul>
+                        </div>
                     </div>
                     
                     <div class="form-group">
@@ -1262,9 +1370,65 @@ input.invalid {
         });
         
         // Initialize validation
+        validateUsername();
         validateEmail();
         validatePassword();
     });
+
+    // Username validation - ONLY checks it's not all numbers
+    function validateUsername() {
+        const usernameInput = document.getElementById('username');
+        const usernameValidation = document.getElementById('username-validation');
+        const username = usernameInput.value.trim();
+        
+        // Update requirement indicators
+        updateUsernameRequirements(username);
+        
+        usernameInput.classList.remove('valid', 'invalid');
+        usernameValidation.innerHTML = '';
+        
+        if (!username) {
+            usernameValidation.innerHTML = '';
+            usernameInput.classList.remove('valid', 'invalid');
+            updateProfileSubmitButton();
+            return false;
+        }
+        
+        // Check length
+        if (username.length < 3 || username.length > 50) {
+            usernameInput.classList.add('invalid');
+            usernameValidation.innerHTML = '<span class="username-invalid"><i class="fas fa-exclamation-circle"></i> Username must be 3-50 characters long</span>';
+            updateProfileSubmitButton();
+            return false;
+        }
+        
+        // ONLY RESTRICTION: Check if it's only numbers
+        if (/^\d+$/.test(username)) {
+            usernameInput.classList.add('invalid');
+            usernameValidation.innerHTML = '<span class="username-invalid"><i class="fas fa-exclamation-circle"></i> Username cannot consist only of numbers</span>';
+            updateProfileSubmitButton();
+            return false;
+        }
+        
+        // That's it! Any other combination is valid
+        usernameInput.classList.add('valid');
+        usernameValidation.innerHTML = '<span class="username-valid"><i class="fas fa-check-circle"></i> Valid username</span>';
+        updateProfileSubmitButton();
+        return true;
+    }
+    
+    // Update username requirement indicators
+    function updateUsernameRequirements(username) {
+        // Length requirement
+        const lengthValid = username.length >= 3 && username.length <= 50;
+        document.getElementById('username-req-length').className = lengthValid ? 'valid' : 'invalid';
+        document.getElementById('username-req-length').innerHTML = (lengthValid ? '<i class="fas fa-check"></i>' : '<i class="fas fa-times"></i>') + ' 3-50 characters';
+        
+        // Not only numbers requirement
+        const notOnlyNumbersValid = !/^\d+$/.test(username);
+        document.getElementById('username-req-not-only-numbers').className = notOnlyNumbersValid ? 'valid' : 'invalid';
+        document.getElementById('username-req-not-only-numbers').innerHTML = (notOnlyNumbersValid ? '<i class="fas fa-check"></i>' : '<i class="fas fa-times"></i>') + ' Cannot be only numbers';
+    }
 
     // Profile picture preview
     function previewProfilePicture(input) {
@@ -1440,8 +1604,8 @@ input.invalid {
         const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
         const emailValid = emailRegex.test(email);
         
-        // Check if username is filled
-        const usernameValid = usernameInput.value.trim() !== '';
+        // Check if username is valid
+        const usernameValid = validateUsername();
         
         // Enable button only if both are valid
         submitBtn.disabled = !(emailValid && usernameValid);
@@ -1499,6 +1663,13 @@ input.invalid {
         if (!username || !email) {
             e.preventDefault();
             alert('Please fill in all required fields');
+            return false;
+        }
+        
+        // Username validation
+        if (!validateUsername()) {
+            e.preventDefault();
+            alert('Please fix the username errors before submitting.');
             return false;
         }
         
@@ -1583,7 +1754,7 @@ input.invalid {
     
     // Add event listeners for real-time validation
     document.getElementById('email').addEventListener('input', validateEmail);
-    document.getElementById('username').addEventListener('input', updateProfileSubmitButton);
+    document.getElementById('username').addEventListener('input', validateUsername);
     document.getElementById('current_password').addEventListener('input', updatePasswordSubmitButton);
     document.getElementById('new_password').addEventListener('input', function() {
         validatePassword();
